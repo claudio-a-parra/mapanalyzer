@@ -7,6 +7,7 @@ import matplotlib.patches as mpatches # to manually edit the legend
 from matplotlib import colors # to create the colormap
 
 in_csv=None
+plot_title = None
 out_pdf=None
 
 class MemAccess:
@@ -60,11 +61,13 @@ def help():
 def parse_args():
     # get input file name
     global in_csv
-    if len(sys.argv) < 2:
-        print(f"ERROR: {sys.argv[0]} expects the csv input file as argument\n")
+    global plot_title
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
+        print(f"ERROR: Usage: {sys.argv[0]} <csv input> [plot title]\n")
         help()
         exit(1)
     in_csv = sys.argv[1];
+    plot_title = sys.argv[2] if len(sys.argv) == 3 else None
     return
 
 def draw_trace_old(mem_trace, fig_width=80, marker_size=6, marker_ratio=1):
@@ -151,12 +154,14 @@ def draw_trace(mem_trace, fig_height=20):
               color='#ddd', linewidth=0.3, zorder=-1)
     axe1.set_axisbelow(True)
 
-    # add legend
+    # add legend and title
     legend_cols = {0: 'green', 1: 'red'}
     legend_labels = {0: 'read', 1: 'write'}
     legend_patches =[mpatches.Patch(color=legend_cols[i],label=legend_labels[i])
                      for i in legend_cols]
     axe1.legend(handles=legend_patches, loc='best', borderaxespad=0)
+    if plot_title != None:
+        axe1.set_title(plot_title, fontsize=20)
 
     # draw plot
     axe1.imshow(access_matrix,
@@ -172,8 +177,9 @@ def draw_trace(mem_trace, fig_height=20):
     fig.set_size_inches(fig_width, fig_height)
 
     # export image
-    print("traceplot: exporting pdf...")
-    fig.savefig('mem_trace_plot.pdf', bbox_inches='tight')
+    out_pdf = "mem_trace_plot.pdf"
+    print(f"traceplot: exporting {out_pdf}...")
+    fig.savefig(out_pdf, bbox_inches='tight')
     return
 
 def main():

@@ -1,134 +1,154 @@
 #!/usr/bin/env python3
-
 import sys # read command line arguments
+import os # to clean paths
 import csv # handle csv files
 import matplotlib.pyplot as plt # draw plots
 import matplotlib.patches as mpatches # to manually edit the legend
 from matplotlib import colors # to create the colormap
 
-in_csv=None
-plot_title = None
-out_pdf=None
+options = {"in":None, "out":None, "title":None}
 
-class MemAccess:
-    coreid = 0
-    time = 0
+class MemoryAccess:
     action = ''
     size = 0
     offset = 0
-    def __init__(self, raw_dict):
+    def __init__(self, act, siz, off):
         try:
-            self.coreid = int(raw_dict["core"])
-            self.time = raw_dict["time"]
-            self.action = raw_dict["action"]
-            self.size = int(raw_dict["size"])
-            self.offset = int(raw_dict["offset"])
+            self.action = act
+            self.size = int(siz)
+            self.offset = int(off)
         except ValueError:
-            print("Incorrect Value")
+            print("Incorrect Value given to MemoryAccess()")
         except Exception:
             print("Something went wrong parsing the input line")
         return
 
-    def __repr__(self):
-        return f"{self.coreid}, {self.action}, {self.size}, {self.offset}"
+    def __format__(self, format_spec):
+        return f"[{self.action},{self.size:2},{self.offset:4}]"
 
-class MemTrace:
-    block_size = 0
-    access_list = []
-    def __init__(self, blsize=0):
-        self.block_size = blsize
+class ThreadTrace:
+    clock = None
+    thread = None
+    times_list = None
+    access_list = None
+
+    def __init__(self, clk, thr):
+        self.clock = clk
+        self.thread = thr
+        self.times_list = []
+        self.access_list = []
         return
 
-    def append(self, new_access):
-        self.access_list.append(new_access)
+    def add(self, mem_access):
+        #if self.thread == 1:
+        #   print(f"thr: {self.thread}, clock: {self.clock}, times_list:{self.times_list}")
+        self.clock += 1
+        self.times_list.append(self.clock)
+        self.access_list.append(mem_access)
+        #if self.thread == 1:
+        #    print(f"thr: {self.thread}, clock: {self.clock}, times_list:{self.times_list}")
+        return self.clock
+
+    def __format__(self, format_spec):
+        rtn  = f"thread  : {self.thread}\n"
+        rtn += f"thr_clk : {self.clock}\n"
+        for t,ac in zip(self.times_list,self.access_list):
+            rtn += f"t:{t:4}, a:{ac}\n"
+        return rtn
+
+class SystemTrace:
+    block_size = None
+    system_clock = None
+    threads_trace = None
+
+    def __init__(self, blksize=0):
+        self.block_size = blksize
+        self.system_clock = -1
+        self.threads_trace = {}
         return
 
-    def len(self):
-        return len(self.access_list)
 
-    def __repr__(self):
-        rtn = f"Block size: {self.block_size}\n"
-        rtn += "coreID, W, Size, Offset\n"
-        for ac in self.access_list:
-            rtn += f"{ac[0]}: {ac[1]!r}\n"
+    def add(self, reg:dict):
+        thread = int(reg["thread"])
+        action = reg["action"]
+        size = int(reg["size"])
+        offset = int(reg["offset"])
+
+        # if it is thread destruction, don't do anything
+        if action == "Td":
+            return
+
+        # If there is no knowledge of this thread, then create a trace for it.
+        if thread not in self.threads_trace:
+            #print(f"{thread} is not in threads_trace")
+            self.threads_trace[thread] = ThreadTrace(self.system_clock, thread)
+
+        # if it is thread creation or destruction, there is nothing to add.
+        if action == "Tc":
+            return
+
+        # at this point, we have a trace for this thread, and we
+        # know the action is R or W, so we record it in the thread's trace.
+        acc0 = MemoryAccess(action, size, offset)
+        #print(f"thr: {thread}, act: {acc0}")
+        thread_clock = self.threads_trace[thread].add(acc0)
+
+        # if the thread is the one ahead, then update the system clock.
+        if thread_clock > self.system_clock:
+            self.system_clock = thread_clock
+
+        return
+
+    def __format__(self, format_spec):
+        rtn  = f"blk_size:{self.block_size}\n"
+        rtn += f"sys_clk :{self.system_clock}\n\n"
+        for tt in self.threads_trace:
+            rtn += f"{self.threads_trace[tt]}\n"
         return rtn
 
 def help():
-    print(f"USAGE: {sys.argv[0]} <input.csv>")
-    print("Plots the memory tracing obtained from the tracechunk tool.")
+    global options
+    opts = "in=input_csv_file [out=output_pdf_file] [title=plot_title]"
+    print(f"USAGE: {os.path.basename(sys.argv[0])} {opts}")
+    print("Plots the memory tracing obtained from the mem_trace pintool.")
     return
 
 def parse_args():
     # get input file name
-    global in_csv
-    global plot_title
-    if len(sys.argv) < 2 or len(sys.argv) > 3:
-        print(f"ERROR: Usage: {sys.argv[0]} <csv input> [plot title]\n")
+    global options
+    for arg in sys.argv[1:]:
+        eq_idx = arg.find("=")
+        arg_name = arg[:eq_idx]
+        arg_val = arg[(eq_idx+1):]
+
+        if arg_val == '':
+            print(f"ERROR: argument '{arg}' malformed. Expected 'name=value'")
+            help()
+            exit(1)
+        if arg_name in options:
+            options[arg_name] = arg_val
+        else:
+            print(f"ERROR: Unknown argument name '{arg_name}'.'")
+            help()
+            exit(1)
+
+    # error if no input file was given.
+    if options["in"] == None:
+        print(f"ERROR: Input file not given.")
         help()
         exit(1)
-    in_csv = sys.argv[1];
-    plot_title = sys.argv[2] if len(sys.argv) == 3 else None
-    return
 
-def draw_trace_old(mem_trace, fig_width=80, marker_size=6, marker_ratio=1):
-    fig, axe1 = plt.subplots()
-    axe1.set_ylabel("Offset within Memory Block [bytes]")
-    axe1.invert_yaxis()
-    axe1.set_xlabel("Time of Access")
-    # force x and y axis limits and to use integers
-    axe1.set_xlim([-2,mem_trace.len()])
-    axe1.xaxis.get_major_locator().set_params(integer=True)
-    axe1.yaxis.get_major_locator().set_params(integer=True)
-
-    # creates custom marker
-    marker_width = 5
-    marker_height = marker_width * marker_ratio
-    access_marker = mpath.Path(
-        [[-marker_width,marker_height],
-        [marker_width,marker_height],
-        [marker_width,-marker_height],
-        [-marker_width,-marker_height],
-        [-marker_width,marker_height]],
-        closed=True)
-
-
-    # create two pairs of arrays: each pair is the X,Y coordenates of all
-    # reads and writes to memory.
-    read_x,read_y = [],[]
-    write_x,write_y = [],[]
-    for ac in mem_trace.access_list:
-        if ac.action=='R':
-            for i in range(ac.size):
-                read_x.append(ac.time)
-                read_y.append(ac.offset+i)
-        else:
-            for i in range(ac.size):
-                write_x.append(ac.time)
-                write_y.append(ac.offset+i)
-    # plot all reads and all writes
-    axe1.scatter(read_x, read_y, marker=access_marker, label="Read", color='g', s=marker_size)
-    axe1.scatter(write_x, write_y, marker=access_marker, label="Write", color='r', s=marker_size)
-
-    # set the figure proportions to match the block_size/trace_length ratio
-    ratio = mem_trace.block_size / mem_trace.len()
-    fig_height = fig_width * ratio
-    fig.set_size_inches(fig_width,fig_height)
-    fig.set_dpi(300)
-
-    # legend_without_duplicate_labels(axe1)
-    axe1.legend(loc='best')
-    axe1.grid(visible=True, which='both', markevery=8)
-    fig.savefig('mem_trace_plot.pdf', dpi=300, bbox_inches='tight')
+    # default output filename
+    if options["out"] == None:
+        options["out"] = '.'.join(options["in"].split('.')[:-1]) + ".pdf"
     return
 
 def draw_trace(mem_trace, fig_height=20):
+    global options
 
-    # create a matrix that maps one operations to numbers:
-    #   10: no-operation
-    #   20: read access
-    #   30: write access
-
-    # extract data
+    # create a matrix that maps one operations to numbers: 10: no-operation,
+    # 20: read access, 30: write access.
+    # Extract data
     access_matrix = [
         [10 for x in range(mem_trace.len())]
         for y in range(mem_trace.block_size)]
@@ -160,15 +180,14 @@ def draw_trace(mem_trace, fig_height=20):
     legend_patches =[mpatches.Patch(color=legend_cols[i],label=legend_labels[i])
                      for i in legend_cols]
     axe1.legend(handles=legend_patches, loc='best', borderaxespad=0)
-    if plot_title != None:
-        axe1.set_title(plot_title, fontsize=20)
+    if options['title'] != None:
+        axe1.set_title(options['title'], fontsize=20)
 
     # draw plot
     axe1.imshow(access_matrix,
                 cmap=cmap,
                 norm=norm,
                 interpolation='none')
-
 
     # set the figure proportions to match the block_size/trace_length ratio
     fig_width = (fig_height*mem_trace.len())/mem_trace.block_size
@@ -177,39 +196,59 @@ def draw_trace(mem_trace, fig_height=20):
     fig.set_size_inches(fig_width, fig_height)
 
     # export image
-    out_pdf = "mem_trace_plot.pdf"
-    print(f"traceplot: exporting {out_pdf}...")
-    fig.savefig(out_pdf, bbox_inches='tight')
+    print(f"traceplot: exporting {options['out']}...")
+    fig.savefig(options["out"], bbox_inches='tight')
     return
 
+def read_trace_log(open_file):
+    print(f"traceplot: reading {options['in']}...")
+
+    # search for line with byte size of the block.
+    # once it is found, create the system trace with
+    # that basic info.
+    line_arr = ['']
+    while line_arr[0] != "SIZE_BYTES":
+        line_arr = [x.strip() for x in next(open_file).split(':')]
+    sys_trace = SystemTrace(int(line_arr[1]))
+
+    # search line after which the actual trace data starts in CSV format.
+    while line_arr[0] != "TRACE_DATA_START":
+        line_arr = [x.strip() for x in next(open_file).split(':')]
+
+
+    # Now read the actual Memory Trace data
+    # Open rest of the file in CSV format.
+    # the fields in each row are:
+    #    core
+    #    action
+    #    size
+    #    offset
+    # actions can be
+    #    Tc : thread creation
+    #    R : read
+    #    W  : write
+    #    Td : thread destruction
+    csv_reader = csv.DictReader(open_file, delimiter=',')
+
+    # pass one register at the time to the memory_trace object.
+    # inside, it will figure out what to do with it.
+    i = 0
+    for register in csv_reader:
+        sys_trace.add(register)
+    return sys_trace
+
+
 def main():
+    global options
     parse_args()
-    mem_trace = MemTrace()
-    with open(in_csv, 'r', newline='') as open_file:
 
-        # Drop 1st and 2nd lines with the start and end address.
-        # Capture the size of the block at the end of the 3rd line
-        # Drop the 4th line (empty)
-        next(open_file)
-        next(open_file)
-        mem_trace.block_size = int(next(open_file).split(' ')[-1])
-        next(open_file)
+    with open(options["in"], 'r', newline='') as open_file:
 
-        # Open rest of the file in CSV format.
-        csv_reader = csv.DictReader(open_file, delimiter=',')
-
-        # Each access is stored in a MemAccess object, which is
-        # appened to the whole trace
-        print(f"traceplot: reading {in_csv}...")
-        i = 0
-        for reg in csv_reader:
-            reg["time"]=i
-            mem_trace.append(MemAccess(reg))
-            i += 1
+        # read log file from mem_trace
+        trace = read_trace_log(open_file)
 
         # draw the memory trace as a mesh
-        print(f"traceplot: plotting...")
-        draw_trace(mem_trace, fig_height=20)
+        draw_trace(trace, fig_height=20)
 
     return
 

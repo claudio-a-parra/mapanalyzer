@@ -6,19 +6,22 @@ import matplotlib.pyplot as plt # draw plots
 import matplotlib.patches as mpatches # to manually edit the legend
 from matplotlib import colors # to create the colormap
 
-options = {"in":None, "out":None, "title":None}
+options = {"in":None, "out":None, "title":None, "access":"event"}
 ops_n2v = {'R':1, 'W':2, 'Tc':101, 'Td':102, '?':999}
 ops_v2n = {v: k for k, v in ops_n2v.items()}
 
 def help():
     global options
     opts = "in=input_csv_file [out=output_pdf_file] [title=plot_title]"
-    print(f"USAGE: {os.path.basename(sys.argv[0])} {opts}")
+    print(f"    USAGE: {os.path.basename(sys.argv[0])} {opts}")
     print("Plots the memory tracing obtained from the mem_trace pintool.")
+    # print("The 'access' parameter is to plot each byte accessed or just the access event. The\n"
+    #       +"former is useful when the instructions accessing the memory block read/write different\n"
+    #       + "ammounts of bytes in different operations. Generally (for example in a matrix of doubles)\n"
+    #       + "this is not the case. Default 'event'.")
     return
 
 def parse_args():
-    # get input file name
     global options
     for arg in sys.argv[1:]:
         eq_idx = arg.find("=")
@@ -29,13 +32,11 @@ def parse_args():
             print(f"ERROR: argument '{arg}' malformed. Expected 'name=value'")
             help()
             exit(1)
-        if arg_name in options:
-            options[arg_name] = arg_val
-        else:
+        if  arg_name not in options:
             print(f"ERROR: Unknown argument name '{arg_name}'.'")
             help()
             exit(1)
-
+        options[arg_name] = arg_val
     # error if no input file was given.
     if options["in"] == None:
         print(f"ERROR: Input file not given.")
@@ -109,14 +110,14 @@ class ThreadTrace:
         # thread clock should currently be None, otherwise the thread was not
         # previously destroyed, and is being created twice.
         if event.op_name() == 'Tc':
-            if self.thr_clock == None:
-                self.set_mark(event.op_name())
-                self.thr_clock = self.sys_clock_ref.val
-                return
-            else:
-                print("---------\n\n\n")
-                raise Exception(f"Thread {self.threadid} registered two 'Tc' "
-                                +"events not separated by a 'Td' event.")
+            return
+            # if self.thr_clock == None:
+            #     self.set_mark(event.op_name())
+            #     # self.thr_clock = self.sys_clock_ref.val
+            #     return
+            # else:
+            #     raise Exception(f"Thread {self.threadid} registered two 'Tc' "
+            #                     +"events not separated by a 'Td' event.")
 
         # if the action is to destroy the thread, then the thread should
         # reset its clock, so if it ever comes back alive, it shall take
@@ -290,19 +291,16 @@ def draw_trace(sys_trace, fig_height=20):
         thr_norm = colors.BoundaryNorm(color_bounds, thr_cmap.N)
 
         # draw plot
-        axe1.pcolormesh(x, y, thr_trace,
-                        cmap=thr_cmap,
-                        shading='flat',
-                        norm=thr_norm,
-                        edgecolors='none',#'#eee',
-                        #linewidth=0.01,
-                        snap=True,
-                        rasterized=False)
+        axe1.pcolor(x, y, thr_trace,
+                    cmap=thr_cmap, shading='flat', norm=thr_norm,
+                    # edgecolors='#eee', linewidth=0.01,
+                    snap=True,
+                    rasterized=True)
 
     # set the figure proportions to match the block_size/trace_length ratio
     fig_width = (fig_height*sys_trace.system_clock.val)/sys_trace.block_size
     fig.set_size_inches(fig_height,fig_width)
-    fig.set_dpi(600)
+    fig.set_dpi(800)
     fig.set_size_inches(fig_width, fig_height)
 
     # export image
@@ -358,7 +356,7 @@ def main():
 
         print(f"Num of Threads: {list(trace.threads_trace.keys())}")
         # draw the memory trace as a mesh
-        draw_trace(trace, fig_height=16)
+        draw_trace(trace, fig_height=20)
 
     return
 

@@ -1,3 +1,3 @@
-*.bin
 obj-intel64/
-tracechunk.out
+mem_trace_log*
+example

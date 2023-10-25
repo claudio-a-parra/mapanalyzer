@@ -15,9 +15,11 @@
  */
 
 #include "pin.H"
+#include <ctime> // C library 'time.h'
 #include <iostream>
 #include <fstream>
-
+#include <iomanip> // to set doubles precision
+                   //
 // data structure to keep the information of the memory block being tracked
 struct tracked_malloc_block {
     ADDRINT start;     // First address of the block
@@ -61,6 +63,30 @@ KNOB<std::string> trace_output_fname(
 
 
 
+/* get the current timestamp with epoch at the starting of the process. */
+// long nano_stopwatch(void){
+//     struct timespec ts;
+//     clock_gettime(CLOCK_MONOTONIC, &ts);
+//     return 1000000000 * ts.tv_sec + ts.tv_nsec;
+// }
+
+struct timespec ts;
+long timestamp;
+
+void log_event(const THREADID thrid, const char *event, const UINT32 size, const ADDRINT offset){
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    timestamp = 1000000000 * ts.tv_sec + ts.tv_nsec;
+    PIN_GetLock(&pin_lock, thrid + 1);
+    trace_file
+        << timestamp   << ","
+        << thrid  << ","
+        << event  << ","
+        << size   << ","
+        << offset << std::endl;
+    PIN_ReleaseLock(&pin_lock);
+}
+
+
 
 /* ==============================================================
  *   Analysis Routines
@@ -72,28 +98,14 @@ KNOB<std::string> trace_output_fname(
 VOID thread_start(THREADID threadid, CONTEXT* ctxt, INT32 flags, VOID* v){
     if(threadid == 0)
         return;
-
-    PIN_GetLock(&pin_lock, threadid + 1);
-    trace_file
-        << threadid << ","
-        << "Tc,"
-        << "0,"
-        << "0" << std::endl;
-    PIN_ReleaseLock(&pin_lock);
+    log_event(threadid, "Tc", 0, 0);
 }
 
 /* This routine is called every time a thread is destroyed. */
 VOID thread_end(THREADID threadid, const CONTEXT* ctxt, INT32 code, VOID* v){
     if(threadid == 0)
         return;
-
-    PIN_GetLock(&pin_lock, threadid + 1);
-    trace_file
-        << threadid << ","
-        << "Td,"
-        << "0,"
-        << "0" << std::endl;
-    PIN_ReleaseLock(&pin_lock);
+    log_event(threadid, "Td", 0, 0);
 }
 
 
@@ -142,14 +154,15 @@ VOID malloc_after(ADDRINT retval, THREADID threadid) {
 
     // log to file
     trace_file << std::hex << std::showbase
-               << "START_ADDR   : " << tracked_block.start << std::endl
-               << "END_ADDR     : " << tracked_block.end   << std::endl
+               << "START_ADDR      : " << tracked_block.start << std::endl
+               << "END_ADDR        : " << tracked_block.end   << std::endl
                << std::noshowbase << std::dec
-               << "SIZE_BYTES   : " << tracked_block.size  << std::endl
-               << "ALLOCATED_BY : thread " << threadid     << std::endl
+               << "SIZE_BYTES      : " << tracked_block.size  << std::endl
+               << "ALLOCATED_BY    : thread " << threadid     << std::endl
+               << "CONCUR_TIME_GAP : ##GAP_VALUE##" << std::endl
                << std::endl
                << "TRACE_DATA_START" << std::endl;
-    trace_file << "thread,action,size,offset" << std::endl;
+    trace_file << "time,thread,event,size,offset" << std::endl;
 
     // reset flag so following mallocs are not tracked.
     select_next_block = NO_SELECTION;
@@ -222,14 +235,7 @@ VOID trace_read_before(ADDRINT ip, ADDRINT addr, UINT32 size, THREADID threadid)
     if (!tracked_block.being_traced || !tracked_block.size || !size ||
         offset < 0 || offset >= tracked_block.size)
         return;
-
-    PIN_GetLock(&pin_lock, threadid + 1);
-    trace_file
-        << threadid << ","
-        << "R,"
-        << size << ","
-        << offset << std::endl;
-    PIN_ReleaseLock(&pin_lock);
+    log_event(threadid, "R", size, offset);
 }
 
 /* Executed *before* any write operation: registers address and write size */
@@ -241,14 +247,7 @@ VOID trace_write_before(ADDRINT ip, ADDRINT addr, UINT32 size, THREADID threadid
     if (!tracked_block.being_traced || !tracked_block.size || !size ||
         offset < 0 || offset >= tracked_block.size)
         return;
-
-    PIN_GetLock(&pin_lock, threadid + 1);
-    trace_file
-        << threadid << ","
-        << "W,"
-        << size << ","
-        << offset << std::endl;
-    PIN_ReleaseLock(&pin_lock);
+    log_event(threadid, "W", size, offset);
 }
 
 

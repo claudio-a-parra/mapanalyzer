@@ -101,21 +101,7 @@ void log_event2(const THREADID thrid,
     }
 }
 
-// void log_event(const THREADID thrid, const char *event, const UINT32 size,
-//                const ADDRINT offset){
-//     struct timespec ts;
-//     clock_gettime(CLOCK_MONOTONIC, &ts);
-//     long timestamp = 1000000000 * ts.tv_sec + ts.tv_nsec;
-//     PIN_GetLock(&pin_lock, thrid + 1);
-//     trace_file
-//         << timestamp   << ","
-//         << thrid  << ","
-//         << event  << ","
-//         << size   << ","
-//         << offset << std::endl;
-//     PIN_ReleaseLock(&pin_lock);
-// }
-
+VOID Fini(INT32 code, VOID* v);
 
 /* ======== Analysis Routines ======== */
  /* This routine is called every time a thread is created */
@@ -175,9 +161,8 @@ VOID malloc_after(ADDRINT retval, THREADID threadid) {
              << "END_ADDR        : " << tracked_block.end   << std::endl
              << std::noshowbase << std::dec
              << "SIZE_BYTES      : " << tracked_block.size  << std::endl
-             << "ALLOCATED_BY    : thread " << threadid     << std::endl
-             << "CONCUR_TIME_GAP : ##GAP_VALUE##" << std::endl
-             << std::endl;
+             << "ALLOCATED_BY    : thread " << threadid     << std::endl;
+
     data << "# DATA" << std::endl
          << "time,thread,event,size,offset" << std::endl;
 
@@ -392,14 +377,18 @@ VOID Fini(INT32 code, VOID* v) {
     std::ofstream out_file;
     out_file.open(trace_output_fname.Value().c_str());
 
-    // write errors
+
+
+    // write errors section
     if(code != 0){
         out_file << "# ERROR" << std::endl
                  << error.rdbuf() << std::endl
                  << std::endl;
     }
 
-    // write warnings
+
+
+    // write warnings section
     bool warn = false;
     for(UINT32 i=0; i<MAX_THREADS; i++){
         if(thrlogs[i].size > 0){
@@ -415,30 +404,84 @@ VOID Fini(INT32 code, VOID* v) {
     if(warn)
         out_file << warning.rdbuf() << std::endl;
 
-    // write metadata
+
+
+    // Sort logs in cronological order AND obtain the minimal time gap between two
+    // consecutive events in the same thread.
+
+    // Allocate memory for the final sorted list.
+    UINT32 tot_events = 0;
+    for(UINT32 i=0; i<MAX_THREADS; i++){
+        if(thrlogs[i].size == 0){
+            free(thrlogs[i].list);
+            thrlogs[i].overflow=0;
+        }
+        tot_events += thrlogs[i].size;
+    }
+    Event *full_log = (Event*)malloc(tot_events * sizeof(Event));
+    UINT64 fl_idx = 0;
+
+    // Move all events from their corresponding thread logs to the full log.
+    // Also, as we move stuff to that log, check which is the smallest time gap
+    // between two consecutive reads performed by the same thread.
+    Event_log *earliest_thread;
+    UINT64 earliest_timestamp, gap, smallest_gap = UINT64_MAX;
+    while(true){
+        earliest_thread = NULL;
+        earliest_timestamp = UINT64_MAX;
+        // pick the thread log that who's first event has the earliest timestamp.
+        for(UINT32 i=0; i<MAX_THREADS; i++){
+
+            // if the list of events of this thread has at least one event,
+            if(thrlogs[i].size>0){
+                // check if it is the earliest among all threads
+                if(thrlogs[i].list[0].time <= earliest_timestamp){
+                    earliest_thread = &thrlogs[i];
+                    earliest_timestamp = thrlogs[i].list[0].time;
+                }
+                // if it has two events, then check their gap
+                if(thrlogs[i].size>1){
+                    // get the current gap between the consecutive events
+                    // (it is always positive because they are in order)
+                    gap = thrlogs[i].list[1].time - thrlogs[i].list[0].time;
+                    if(gap < smallest_gap)
+                        smallest_gap = gap;
+                }
+
+            }
+        }
+        // if no event was found, break
+        if(earliest_thread == NULL) break;
+
+        // add the event to the full list
+        full_log[fl_idx] = earliest_thread->list[0];
+        fl_idx += 1;
+
+        // and consume the element from the thread log.
+        earliest_thread->list = earliest_thread->list+1;
+        earliest_thread->size -= 1;
+    }
+
+
+
+    // complete and write metadata section
+    metadata << "TIME_SLICE_SIZE : " << smallest_gap << std::endl << std::endl;
     out_file << metadata.rdbuf();
 
 
-
-    // sort logs in cronological order
-    //   - each list is sorted. Do a merge-sort.
+    // quantize time
 
 
-    // write data
+    // write data section
     out_file << data.rdbuf();
-    Event e;
-    for(UINT32 i=0; i<MAX_THREADS; i++){
-        if(thrlogs[i].size > 0){
-            for(UINT32 j=0; j<thrlogs[i].size; j++){
-                e = thrlogs[i].list[j];
-                out_file << e.time << ","
-                         << e.thrid << ","
-                         << events_n[e.event] << ","
-                         << e.size << ","
-                         << e.offset << std::endl;
-            }
-        }
+    for(UINT64 i=0; i<fl_idx; i++){
+        out_file << full_log[i].time << ","
+                 << full_log[i].thrid << ","
+                 << events_n[full_log[i].event] << ","
+                 << full_log[i].size << ","
+                 << full_log[i].offset << std::endl;
     }
+
     out_file.close();
 }
 
@@ -491,6 +534,7 @@ int main(int argc, char **argv) {
         thrlogs[i].overflow = 0;
     }
 
+
     // Register routines to instrument:
     // every malloc
     IMG_AddInstrumentFunction(image_load, 0);
@@ -501,7 +545,6 @@ int main(int argc, char **argv) {
     PIN_AddThreadFiniFunction(thread_end, 0);
     // application termination (when the patient program ends)
     PIN_AddFiniFunction(Fini, 0);
-
     // Starts the patient program. It should never return.
     PIN_StartProgram();
 

@@ -87,7 +87,7 @@ find_gap(){
     # difference.
     local min_seq_gap=$(awk -f \
                         <(embedded_file AWK_GET_MIN) \
-                        <(tail -n+8 "$tmp_log_file"))
+                        <(sed -e '/# DATA/,//!d' mem.out | tail -n+3 "$tmp_log_file"))
 
     # Ok, this is the part I pull out of my ass: let's just take 0.66 of that
     # value, just to be sure that those "concurrent events" were really
@@ -123,9 +123,9 @@ convert_log(){
     # save header and data in two different files
     local tmp_header=$(mktemp /tmp/mem_trace_header-XXXXX.log)
     local tmp_data=$(mktemp /tmp/mem_trace_data-XXXXX.log)
-    local -i header_end=$(awk '{if($0 == "TRACE_DATA_START")print NR}' "$log")
+    local -i header_end=$(awk '{if($0 == "# DATA")print NR}' "$log")
     head -n$((header_end+1)) "$log" > "$tmp_header"
-    tail -n+$((header_end+2)) "$log" | sort -n > "$tmp_data"
+    tail -n+$((header_end+2)) "$log" | > "$tmp_data"
 
     # re-compose the log file by concatenating the header file with the new
     # data file that has had replaced the timestamps.

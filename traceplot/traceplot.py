@@ -68,12 +68,13 @@ class Clock:
         return
 
 class ThreadEvent:
-    def __init__(self, op_name, siz, off):
+    def __init__(self, time, ev_name, siz, off):
         try:
-            if op_name not in ops_n2v:
-                op_name = '?'
+            if ev_name not in ops_n2v:
+                ev_name = '?'
 
-            self.operation = ops_n2v[op_name]
+            self.time = time
+            self.eve_name = ops_n2v[ev_name]
             self.size = int(siz)
             self.offset = int(off)
         except ValueError:
@@ -83,11 +84,11 @@ class ThreadEvent:
         return
 
     def op_name(self):
-        return ops_v2n[self.operation]
+        return ops_v2n[self.eve_name]
 
     def __format__(self, format_spec):
-        op_name = ops_v2n[self.operation]
-        return f"[{op_name:2}({self.operation:2}),{self.size:2},{self.offset:4}]"
+        eve_name = ops_v2n[self.eve_name]
+        return f"[{self.time},{eve_name:2}({self.eve_name:2}),{self.size:2},{self.offset:4}]"
 
 class ThreadTrace:
     def __init__(self, clk:Clock, thrid):
@@ -159,9 +160,10 @@ class SystemTrace:
         return
 
     def add_event(self, reg:dict):
-        """Adds a new access to its corresponding thread trace."""
+        """Adds a new event to its corresponding thread trace."""
+        qtime = int(reg["time"])
         threadid = int(reg["thread"])
-        op_name = reg["action"]
+        event = reg["event"]
         size = int(reg["size"])
         offset = int(reg["offset"])
 
@@ -170,7 +172,7 @@ class SystemTrace:
             self.threads_trace[threadid] = ThreadTrace(self.system_clock, threadid)
 
         # add the thread event to that thread's trace.
-        eve0 = ThreadEvent(op_name, size, offset)
+        eve0 = ThreadEvent(qtime, event, size, offset)
         self.threads_trace[threadid].add_event(eve0)
 
         return
@@ -320,22 +322,24 @@ def read_trace_log(open_file):
     sys_trace = SystemTrace(int(line_arr[1]))
 
     # search line after which the actual trace data starts in CSV format.
-    while line_arr[0] != "TRACE_DATA_START":
+    while line_arr[0] != "# DATA":
         line_arr = [x.strip() for x in next(open_file).split(':')]
 
 
     # Now read the actual Memory Trace data
     # Open rest of the file in CSV format.
     # the fields in each row are:
-    #    core
-    #    action
-    #    size
-    #    offset
+    #    time   : the time at which the event happened
+    #    thread : the thread performing the event
+    #    event  : which event (defined below)
+    #    size   : the size of the memory operation (if the event reads/write memory)
+    #    offset : the read/write offset from the beginning of the monitored memory block.
     # actions can be
     #    Tc : thread creation
-    #    R : read
-    #    W  : write
     #    Td : thread destruction
+    #    R  : read
+    #    W  : write
+    #    ?  : unknown event
     csv_reader = csv.DictReader(open_file, delimiter=',')
 
     # pass one register at the time to the memory_trace object.

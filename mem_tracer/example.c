@@ -1,37 +1,51 @@
 // example.c
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include "instr.h"
 
-unsigned int N=256;
+int N=512;
+int shared=0;
+pthread_mutex_t m;
+volatile double *chunk;
+void *thread_work(void* tid){
+    int id = *((int*) tid);
+    for(int i=0; i<N; i++){
+        while(1){
+            pthread_mutex_lock(&m);
+            if(shared%2==id){
+                chunk[i] = i;
+                shared += 1;
+                pthread_mutex_unlock(&m);
+                break;
+            }
+            pthread_mutex_unlock(&m);
+        }
+    }
+    return NULL;
+}
 
 int main(void){
-    volatile double *chunk;
+    pthread_mutex_init(&m,NULL);
 
     instr_select_next_block();
     chunk = malloc(N * sizeof(double));
-
     if(!chunk){
         printf("allocation failed\n");
         return 1;
     }
 
-    double x;
-    unsigned int i;
     instr_start_tracing();
 
-    for(i=0; i<N; i++)
-        x = chunk[i];
-    for(i=0; i<N; i++)
-        x = chunk[i];
-    for(i=0; i<N; i++)
-        x = chunk[i];
-    for(i=0; i<N; i++)
-        x = chunk[i];
+    int id0=0, id1=1;
+    pthread_t t0, t1;
+    pthread_create(&t0, NULL, &thread_work, (void*)&id0);
+    pthread_create(&t1, NULL, &thread_work, (void*)&id1);
+
+    pthread_join(t0,NULL);
+    pthread_join(t1,NULL);
 
     instr_stop_tracing();
-
-    x = x+1;
 
     free((double *)chunk);
 

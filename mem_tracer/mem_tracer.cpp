@@ -60,7 +60,7 @@ KNOB<std::string> trace_output_fname(KNOB_MODE_WRITEONCE, "pintool", "o",
  This is done in this manner to avoid dynamic allocation. Why? because we are
  measuring real time events and if we go down to the OS to request memory
  at runtime, well... we fuck up all the measurments. */
-const UINT32 MAX_THREADS = 32;
+const UINT16 MAX_THREADS = 32;
 const UINT32 MAX_THR_EVENTS = 64000;
 std::stringstream metadata;
 std::stringstream data;
@@ -69,48 +69,183 @@ std::stringstream warning;
 enum event_t{OTHER, Tc, Td, R, W};
 const char* events_n[] = {"?","Tc","Td","R","W"};
 typedef struct {
-    UINT64 time;
-    UINT32 thrid;
-    UINT8 event;
+    UINT32 time;
+    UINT32 qtime;
+    UINT16 thrid;
+    UINT16 event;
     UINT32 size;
     UINT64 offset;
 } Event;
 typedef struct {
     Event *list;
-    UINT64 size;
+    UINT32 size;
+    INT32 min_time_gap;
     UINT64 overflow;
     UINT64 pad[5]; // to avoid false sharing among cores
-} Event_log;
-Event_log thrlogs[MAX_THREADS];
+} ThreadTrace;
+typedef struct {
+    Event **list;
+    UINT64 list_len;
+    UINT32 slice_size;
+} MergedTrace;
 
+UINT64 basetime; // to subtract from every timestamp;
+ThreadTrace thr_traces[MAX_THREADS];
+MergedTrace merged_trace={.list=NULL,
+                          .list_len=0,
+                          .slice_size=INT32_MAX};
 /* ======== Utilitarian functions ======== */
 /* log a thread event in its own queue */
-void log_event2(const THREADID thrid,
-                const event_t event,
-                const UINT32 size,
-                const ADDRINT offset){
+void log_event(const THREADID thrid, const event_t event,
+                const UINT32 size, const ADDRINT offset){
+    if(thrid > MAX_THREADS){
+        warning << "WARNING: Application tried to create more than "
+                << MAX_THREADS
+                << " threads. To do that, please change the MAX_THREADS"
+                << " constant in the mem_trace pintool.";
+        return;
+    }
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    UINT64 timestamp = 1000000000 * ts.tv_sec + ts.tv_nsec;
-    UINT32 idx = thrlogs[thrid].size;
+    UINT32 timestamp = (UINT32)((1000000000 * ts.tv_sec + ts.tv_nsec) - basetime);
+    UINT32 idx = thr_traces[thrid].size;
     if(idx < MAX_THR_EVENTS){
-        thrlogs[thrid].list[idx] = (Event){timestamp,thrid,event,size,offset};
-        thrlogs[thrid].size += 1;
-    }else{
-        thrlogs[thrid].overflow +=1;
+        thr_traces[thrid].list[idx] =
+            (Event){timestamp,0,(UINT16)thrid,event,size,offset};
+        thr_traces[thrid].size += 1;
+        return;
     }
+    thr_traces[thrid].overflow +=1;
 }
 
+
+
+
+VOID write_file(UINT32 exit_now);
 VOID Fini(INT32 code, VOID* v);
+
+
+VOID merge_traces(void){
+
+    // Two things are done here:
+    // 1. Get the minimum time-gap between two sequential accesses in any same
+    // thread.
+    // 2. Count the total number of events (to be used in the merged list).
+    merged_trace.slice_size = UINT32_MAX;
+    for(UINT32 t=0; t<MAX_THREADS; t++){
+        // std::cout << "t:" << t << std::endl;
+        if(thr_traces[t].size < 1)
+            continue;
+        //thr_traces[t].min_time_gap = INT32_MAX;
+        merged_trace.list_len += thr_traces[t].size;
+        if(thr_traces[t].size < 2){
+            warning << "WARNING: Thread " << t << " registers only "
+                    << "one event. Not useful to determine slice size."
+                    << std::endl;
+            continue;
+        }
+        for(UINT32 j=0; j<thr_traces[t].size-2; j++){
+            INT64 this_gap = thr_traces[t].list[j+1].time \
+                - thr_traces[t].list[j].time;
+            // std::cout << "t[" << j+1 << "] - t[" << j << "] "
+            //           << "gap:" << this_gap << std::endl;
+            if(this_gap < merged_trace.slice_size)
+                merged_trace.slice_size = this_gap;
+        }
+    }
+
+
+    // Allocate space for merged list. This list just points to the events
+    // in each thread's log.
+    if(! merged_trace.list_len){
+        error << "ERROR: No thread registered any event. "
+              << "merged_trace.list_len == 0." << std::endl;
+        write_file(1);
+        exit(1);
+    }
+    merged_trace.list = (Event**)malloc(merged_trace.list_len * sizeof(Event*));
+    if(! merged_trace.list){
+        error << "ERROR: Could not allocate memory for merged_trace.list[]"
+              << std::endl;
+        write_file(1);
+        exit(1);
+    }
+
+
+    // Now merge events such that they are globally sorted by their timestamp
+    UINT64 earliest_timestamp;
+    UINT32 front[MAX_THREADS] = {0};
+    INT64 t_star;
+    for(UINT64 e=0; e<merged_trace.list_len; e++){
+        // find the thread t_star such that its front event is the earliest.
+        t_star = -1;
+        earliest_timestamp = UINT64_MAX;
+        for(INT32 t=MAX_THREADS-1; t>=0; t--){
+            // if the index to the front event in this thread trace is out of
+            // boundaries, that means that this thread trace has no more events.
+            if(! (front[t] < thr_traces[t].size))
+                continue;
+
+            // if this thread's front event is the earliest among all threads
+            // checked so far, then remember this thread and the timestamp.
+            if(thr_traces[t].list[front[t]].time <= earliest_timestamp){
+                t_star = t;
+                earliest_timestamp = thr_traces[t].list[front[t]].time;
+            }
+        }
+
+        // Add the event found to be the earliest, to the merged_log list, and
+        // move the "front event" of that thread to the next position.
+        merged_trace.list[e] = &(thr_traces[t_star].list[front[t_star]]);
+        front[t_star] += 1;
+    }
+
+
+    // convert nanosecond (time) timestamps to timeslices (qtime)
+    basetime = merged_trace.list[0]->time;
+    for(UINT64 e=0; e<merged_trace.list_len; e++){
+        merged_trace.list[e]->qtime = (merged_trace.list[e]->time - basetime)
+            /(merged_trace.slice_size);
+    }
+
+
+    // Remove long qtime jumps.
+    // The idea of the trace is to show the "before-after" relationship,
+    // so if we have a long jump in qtimes where no thread does anything,
+    // elet's better cut it off to simulate a "contiguous" execution.
+    // For example:
+    //   Let's say the qtime of the last two events from thread
+    //   0 and thread 1 is qtime=43. And the next three events
+    //   from thread 1, 2, and 3; is 99.
+    //   There is no point to leave 99-43=56 qtimes empty, so we
+    //   shift all the subsequent events (starting from those
+    //   three with qtime=99) by -55, so they keep counting from
+    //   44 and ahead.
+    UINT32 shift = 0;
+    Event *ev;
+    UINT32 last_qtime=0;
+    for(UINT64 e=0; e<merged_trace.list_len; e++){
+        ev = merged_trace.list[e];
+        if(ev->qtime - shift > last_qtime + 1)
+            shift = ev->qtime - last_qtime -1;
+        ev->qtime = ev->qtime - shift;
+        last_qtime = ev->qtime;
+    }
+    return;
+}
+
+
+
+
 
 /* ======== Analysis Routines ======== */
  /* This routine is called every time a thread is created */
 VOID thread_start(THREADID threadid, CONTEXT* ctxt, INT32 flags, VOID* v){
-    log_event2(threadid, Tc, 0, 0);
+    log_event(threadid, Tc, 0, 0);
 }
 /* This routine is called every time a thread is destroyed. */
 VOID thread_end(THREADID threadid, const CONTEXT* ctxt, INT32 code, VOID* v){
-    log_event2(threadid, Td, 0, 0);
+    log_event(threadid, Td, 0, 0);
 }
 /* Sets flag such that the next time the pintool calls malloc_before(),
 the size given to malloc is recorded */
@@ -156,15 +291,13 @@ VOID malloc_after(ADDRINT retval, THREADID threadid) {
 
     // save metadata
     metadata << std::hex << std::showbase
-             << "# METADATA" << std::endl
              << "START_ADDR      : " << tracked_block.start << std::endl
              << "END_ADDR        : " << tracked_block.end   << std::endl
              << std::noshowbase << std::dec
              << "SIZE_BYTES      : " << tracked_block.size  << std::endl
              << "ALLOCATED_BY    : thread " << threadid     << std::endl;
 
-    data << "# DATA" << std::endl
-         << "time,thread,event,size,offset" << std::endl;
+    data << "time,thread,event,size,offset" << std::endl;
 
     // reset flag so following mallocs are not tracked.
     select_next_block = NO_SELECTION;
@@ -233,7 +366,7 @@ VOID trace_read_before(ADDRINT ip, ADDRINT addr, UINT32 size, THREADID threadid)
     if (!tracked_block.being_traced || !tracked_block.size || !size ||
         offset < 0 || offset >= tracked_block.size)
         return;
-    log_event2(threadid, R, size, offset);
+    log_event(threadid, R, size, offset);
 }
 /* Executed *before* any write operation: registers address and write size */
 VOID trace_write_before(ADDRINT ip, ADDRINT addr, UINT32 size, THREADID threadid) {
@@ -243,7 +376,7 @@ VOID trace_write_before(ADDRINT ip, ADDRINT addr, UINT32 size, THREADID threadid
     if (!tracked_block.being_traced || !tracked_block.size || !size ||
         offset < 0 || offset >= tracked_block.size)
         return;
-    log_event2(threadid, W, size, offset);
+    log_event(threadid, W, size, offset);
 }
 
 
@@ -373,116 +506,66 @@ VOID rw_instructions(INS ins, VOID* v) {
     }
 }
 /* What to do at the end of the execution. */
-VOID Fini(INT32 code, VOID* v) {
+
+VOID write_file(UINT32 exit_now){
     std::ofstream out_file;
     out_file.open(trace_output_fname.Value().c_str());
-
-
-
-    // write errors section
-    if(code != 0){
+    // write error section
+    if(error.tellp() != 0)
         out_file << "# ERROR" << std::endl
-                 << error.rdbuf() << std::endl
-                 << std::endl;
-    }
+                 << error.rdbuf() << std::endl;
+    if(exit_now)
+        return;
 
+    // write warning section
+    if(warning.tellp() != 0)
+        out_file << "# WARNING" << std::endl
+                 << warning.rdbuf() << std::endl;
 
-
-    // write warnings section
-    bool warn = false;
-    for(UINT32 i=0; i<MAX_THREADS; i++){
-        if(thrlogs[i].size > 0){
-            if(thrlogs[i].overflow > 0){
-                if(warn == false)
-                    warning << "# WARNING" << std::endl;
-                warn = true;
-                warning << "Thread " << i << " could not log "
-                        << thrlogs[i].overflow << " events!" << std::endl;
-            }
-        }
-    }
-    if(warn)
-        out_file << warning.rdbuf() << std::endl;
-
-
-
-    // Sort logs in cronological order AND obtain the minimal time gap between two
-    // consecutive events in the same thread.
-
-    // Allocate memory for the final sorted list.
-    UINT32 tot_events = 0;
-    for(UINT32 i=0; i<MAX_THREADS; i++){
-        if(thrlogs[i].size == 0){
-            free(thrlogs[i].list);
-            thrlogs[i].overflow=0;
-        }
-        tot_events += thrlogs[i].size;
-    }
-    Event *full_log = (Event*)malloc(tot_events * sizeof(Event));
-    UINT64 fl_idx = 0;
-
-    // Move all events from their corresponding thread logs to the full log.
-    // Also, as we move stuff to that log, check which is the smallest time gap
-    // between two consecutive reads performed by the same thread.
-    Event_log *earliest_thread;
-    UINT64 earliest_timestamp, gap, smallest_gap = UINT64_MAX;
-    while(true){
-        earliest_thread = NULL;
-        earliest_timestamp = UINT64_MAX;
-        // pick the thread log that who's first event has the earliest timestamp.
-        for(UINT32 i=0; i<MAX_THREADS; i++){
-
-            // if the list of events of this thread has at least one event,
-            if(thrlogs[i].size>0){
-                // check if it is the earliest among all threads
-                if(thrlogs[i].list[0].time <= earliest_timestamp){
-                    earliest_thread = &thrlogs[i];
-                    earliest_timestamp = thrlogs[i].list[0].time;
-                }
-                // if it has two events, then check their gap
-                if(thrlogs[i].size>1){
-                    // get the current gap between the consecutive events
-                    // (it is always positive because they are in order)
-                    gap = thrlogs[i].list[1].time - thrlogs[i].list[0].time;
-                    if(gap < smallest_gap)
-                        smallest_gap = gap;
-                }
-
-            }
-        }
-        // if no event was found, break
-        if(earliest_thread == NULL) break;
-
-        // add the event to the full list
-        full_log[fl_idx] = earliest_thread->list[0];
-        fl_idx += 1;
-
-        // and consume the element from the thread log.
-        earliest_thread->list = earliest_thread->list+1;
-        earliest_thread->size -= 1;
-    }
-
-
-
-    // complete and write metadata section
-    metadata << "TIME_SLICE_SIZE : " << smallest_gap << std::endl << std::endl;
-    out_file << metadata.rdbuf();
-
-
-    // quantize time
-
+    // write metadata section
+    if(metadata.tellp() != 0)
+        out_file << "# METADATA" << std::endl
+                 << metadata.rdbuf() << std::endl;
 
     // write data section
-    out_file << data.rdbuf();
-    for(UINT64 i=0; i<fl_idx; i++){
-        out_file << full_log[i].time << ","
-                 << full_log[i].thrid << ","
-                 << events_n[full_log[i].event] << ","
-                 << full_log[i].size << ","
-                 << full_log[i].offset << std::endl;
+    out_file << "# DATA" << std::endl
+             << data.rdbuf();
+    for(UINT64 i=0; i<merged_trace.list_len; i++){
+        out_file << merged_trace.list[i]->qtime << ","
+                 << merged_trace.list[i]->thrid << ","
+                 << events_n[merged_trace.list[i]->event] << ","
+                 << merged_trace.list[i]->size << ","
+                 << merged_trace.list[i]->offset << std::endl;
     }
 
     out_file.close();
+}
+
+VOID Fini(INT32 code, VOID* v) {
+    // if finishing application not nicely, then report error and exit.
+    if(code != 0){
+        error << "ERROR: Pintool terminated the application with code "
+              << code << "." << std::endl;
+        write_file(1);
+        return;
+    }
+
+    // detect events overflow in threads
+    for(UINT32 i=0; i<MAX_THREADS; i++){
+        if(thr_traces[i].size > 0 && thr_traces[i].overflow > 0){
+            warning << "Thread " << i << " could not log "
+                    << thr_traces[i].overflow << " events!" << std::endl;
+        }
+    }
+
+    // merge the thread traces
+    merge_traces();
+
+    // complete metadata info
+    metadata << "TIME_SLICE_SIZE : " << merged_trace.slice_size << std::endl;
+
+    // and now write the file
+    write_file(0);
 }
 
 
@@ -529,9 +612,9 @@ int main(int argc, char **argv) {
             Fini(1, NULL);
             exit(1);
         }
-        thrlogs[i].list = e_list;
-        thrlogs[i].size = 0;
-        thrlogs[i].overflow = 0;
+        thr_traces[i].list = e_list;
+        thr_traces[i].size = 0;
+        thr_traces[i].overflow = 0;
     }
 
 
@@ -545,6 +628,12 @@ int main(int argc, char **argv) {
     PIN_AddThreadFiniFunction(thread_end, 0);
     // application termination (when the patient program ends)
     PIN_AddFiniFunction(Fini, 0);
+
+    // get the basetime to subtract every to timestamp
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    basetime = 1000000000 * ts.tv_sec + ts.tv_nsec;
+
     // Starts the patient program. It should never return.
     PIN_StartProgram();
 

@@ -291,11 +291,11 @@ VOID malloc_after(ADDRINT retval, THREADID threadid) {
 
     // save metadata
     metadata << std::hex << std::showbase
-             << "START_ADDR      : " << tracked_block.start << std::endl
-             << "END_ADDR        : " << tracked_block.end   << std::endl
+             << "start-addr    : " << tracked_block.start << std::endl
+             << "end-addr      : " << tracked_block.end   << std::endl
              << std::noshowbase << std::dec
-             << "SIZE_BYTES      : " << tracked_block.size  << std::endl
-             << "ALLOCATED_BY    : thread " << threadid     << std::endl;
+             << "block-size    : " << tracked_block.size  << std::endl
+             << "owner-thread  : " << threadid     << std::endl;
 
     data << "time,thread,event,size,offset" << std::endl;
 
@@ -550,9 +550,13 @@ VOID Fini(INT32 code, VOID* v) {
         return;
     }
 
-    // detect events overflow in threads
+    // count total threads and detect events overflow in threads
+    UINT32 thread_count=0;
     for(UINT32 i=0; i<MAX_THREADS; i++){
-        if(thr_traces[i].size > 0 && thr_traces[i].overflow > 0){
+        if(thr_traces[i].size < 1)
+            continue;
+        thread_count += 1;
+        if(thr_traces[i].overflow > 0){
             warning << "Thread " << i << " could not log "
                     << thr_traces[i].overflow << " events!" << std::endl;
         }
@@ -562,7 +566,9 @@ VOID Fini(INT32 code, VOID* v) {
     merge_traces();
 
     // complete metadata info
-    metadata << "TIME_SLICE_SIZE : " << merged_trace.slice_size << std::endl;
+    metadata << "slice-size    : " << merged_trace.slice_size << std::endl;
+    metadata << "threads-count : " << thread_count << std::endl;
+    metadata << "events-count  : " << merged_trace.list_len << std::endl;
 
     // and now write the file
     write_file(0);

@@ -234,8 +234,9 @@ class SystemTrace:
 def draw_trace(sys_trace, fig_height=20):
 
     # obtain the matrix form of the trace.
+    print("Log to Matrix format...")
     access_matrices = sys_trace.to_matrix_form()
-
+    print("Log to Matrix format: OK")
 
     # create discrete colormap
     palette = {0 :('#1f77b4','#81beea'),
@@ -285,7 +286,7 @@ def draw_trace(sys_trace, fig_height=20):
     # quads edges
     x = [x-0.5 for x in range(sys_trace.max_qtime+2)]
     y = [y-0.5 for y in range(sys_trace.block_size+1)]
-    print("traceplot: drawing threads:", endl="")
+    print("traceplot: drawing threads:", end="")
     for color_idx,trace_dic in enumerate(access_matrices):
         color_idx = color_idx % len(palette)
         thr_id = trace_dic['id']
@@ -296,7 +297,7 @@ def draw_trace(sys_trace, fig_height=20):
         thr_norm = colors.BoundaryNorm(color_bounds, thr_cmap.N)
 
         # draw plot
-	print(f" t{thr_id}", endl="")
+        print(f" t{thr_id}", end="")
         axe1.pcolor(x, y, thr_trace,
                     cmap=thr_cmap, shading='flat', norm=thr_norm,
                     # edgecolors='#eee', linewidth=0.01,

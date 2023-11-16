@@ -3,3 +3,4 @@ mem_trace_log*
 example
 pin.log
 pintool.log
+*.pdf

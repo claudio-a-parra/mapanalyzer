@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt # draw plots
 import matplotlib.patches as mpatches # to manually edit the legend
 from matplotlib import colors # to create the colormap
 
-options = {"in":None, "out":None, "title":None, "access":"event"}
+options = {"in":None, "out":None, "title":None}
 ops_n2v = {'R':1, 'W':2, 'Tc':101, 'Td':102, '?':999}
 ops_v2n = {v: k for k, v in ops_n2v.items()}
 
@@ -49,32 +49,32 @@ def parse_args():
     return
 
 
-class Clock:
-    """Clock object that keeps track of the
-    thread or system time position"""
-    def __init__(self, clk):
-        self.val = clk
-        return
-    @property
-    def val(self):
-        return self._val
-    @val.setter
-    def val(self, v):
-        self._val = v
-        return
-    @val.deleter
-    def val(self):
-        self._val = None
-        return
+# class Clock:
+#     """Clock object that keeps track of the
+#     thread or system time position"""
+#     def __init__(self, clk):
+#         self.val = clk
+#         return
+#     @property
+#     def val(self):
+#         return self._val
+#     @val.setter
+#     def val(self, v):
+#         self._val = v
+#         return
+#     @val.deleter
+#     def val(self):
+#         self._val = None
+#         return
 
-class ThreadEvent:
+class Event:
     def __init__(self, time, ev_name, siz, off):
         try:
             if ev_name not in ops_n2v:
                 ev_name = '?'
 
             self.time = time
-            self.eve_name = ops_n2v[ev_name]
+            self.event = ops_n2v[ev_name]
             self.size = int(siz)
             self.offset = int(off)
         except ValueError:
@@ -83,79 +83,84 @@ class ThreadEvent:
             print("Something went wrong while calling ThreadEvent()")
         return
 
-    def op_name(self):
-        return ops_v2n[self.eve_name]
+    def event_name(self):
+        return ops_v2n[self.event]
 
     def __format__(self, format_spec):
-        eve_name = ops_v2n[self.eve_name]
-        return f"[{self.time},{eve_name:2}({self.eve_name:2}),{self.size:2},{self.offset:4}]"
+        eve_name = ops_v2n[self.event]
+        return f"[{self.time},{eve_name:2}({self.event:2}),{self.size:2},{self.offset:4}]"
 
-class ThreadTrace:
-    def __init__(self, clk:Clock, thrid):
-        self.sys_clock_ref = clk
-        self.threadid = thrid
-        self.thr_clock = None
-        self.times_list = []
-        self.event_list = []
-        return
 
-    def set_mark(self, marker):
-        # set a marker for later use in the graph.
-        # use system_clock + 0.5 here, to signify that this event happened
-        # after the last event, but before the next event.
-        return
+# class ThreadTrace:
+#     def __init__(self, clk:Clock, thrid):
+#         self.sys_clock_ref = clk
+#         self.threadid = thrid
+#         self.thr_clock = None
+#         self.times_list = []
+#         self.event_list = []
+#         return
 
-    def add_event(self, event):
+#     def set_mark(self, marker):
+#         # set a marker for later use in the graph.
+#         # use system_clock + 0.5 here, to signify that this event happened
+#         # after the last event, but before the next event.
+#         return
 
-        # If the thread was previously destroyed (by an event 'Td'), then the
-        # thread clock should currently be None, otherwise the thread was not
-        # previously destroyed, and is being created twice.
-        if event.op_name() == 'Tc':
-            return
-            # if self.thr_clock == None:
-            #     self.set_mark(event.op_name())
-            #     # self.thr_clock = self.sys_clock_ref.val
-            #     return
-            # else:
-            #     raise Exception(f"Thread {self.threadid} registered two 'Tc' "
-            #                     +"events not separated by a 'Td' event.")
+#     def add_event(self, event):
 
-        # if the action is to destroy the thread, then the thread should
-        # reset its clock, so if it ever comes back alive, it shall take
-        # the system's clock.
-        if event.op_name() == 'Td':
-            self.thr_clock = None
-            self.set_mark(event.op_name())
-            return
+#         # If the thread was previously destroyed (by an event 'Td'), then the
+#         # thread clock should currently be None, otherwise the thread was not
+#         # previously destroyed, and is being created twice.
+#         if event.op_name() == 'Tc':
+#             return
+#             # if self.thr_clock == None:
+#             #     self.set_mark(event.op_name())
+#             #     # self.thr_clock = self.sys_clock_ref.val
+#             #     return
+#             # else:
+#             #     raise Exception(f"Thread {self.threadid} registered two 'Tc' "
+#             #                     +"events not separated by a 'Td' event.")
 
-        # if the thread was supposedly destroyed, but we receive some event
-        # on it different from 'Tc' (catched above), then let's assume a
-        # 'Tc' and move on.
-        if self.thr_clock == None:
-            self.set_mark(event.op_name())
-            self.thr_clock = self.sys_clock_ref.val
+#         # if the action is to destroy the thread, then the thread should
+#         # reset its clock, so if it ever comes back alive, it shall take
+#         # the system's clock.
+#         if event.op_name() == 'Td':
+#             self.thr_clock = None
+#             self.set_mark(event.op_name())
+#             return
 
-        # now actually adding the event to the trace
-        self.thr_clock += 1
-        self.times_list.append(self.thr_clock)
-        self.event_list.append(event)
+#         # if the thread was supposedly destroyed, but we receive some event
+#         # on it different from 'Tc' (catched above), then let's assume a
+#         # 'Tc' and move on.
+#         if self.thr_clock == None:
+#             self.set_mark(event.op_name())
+#             self.thr_clock = self.sys_clock_ref.val
 
-        # if this thread's time is the leading one, then update the system's clock
-        if self.thr_clock > self.sys_clock_ref.val:
-            self.sys_clock_ref.val = self.thr_clock
-        return
+#         # now actually adding the event to the trace
+#         self.thr_clock += 1
+#         self.times_list.append(self.thr_clock)
+#         self.event_list.append(event)
 
-    def __format__(self, format_spec):
-        rtn  = f"thread  : {self.threadid}\n"
-        rtn += f"thr_clk : {self.thr_clock}\n"
-        for t,ac in zip(self.times_list,self.event_list):
-            rtn += f"t:{t:4}, a:{ac}\n"
-        return rtn
+#         # if this thread's time is the leading one, then update the system's clock
+#         if self.thr_clock > self.sys_clock_ref.val:
+#             self.sys_clock_ref.val = self.thr_clock
+#         return
+
+#     def __format__(self, format_spec):
+#         rtn  = f"thread  : {self.threadid}\n"
+#         rtn += f"thr_clk : {self.thr_clock}\n"
+#         for t,ac in zip(self.times_list,self.event_list):
+#             rtn += f"t:{t:4}, a:{ac}\n"
+#         return rtn
+
 
 class SystemTrace:
-    def __init__(self, blksize=0):
-        self.block_size = blksize
-        self.system_clock = Clock(-1)
+    def __init__(self, block_size, max_qtime, thread_count):
+        """The system trace is a dictionary with thread ids as keys,
+        and an array of 'Events' as values"""
+        self.block_size = block_size
+        self.max_qtime = max_qtime
+        self.thread_count = thread_count
         self.threads_trace = {}
         return
 
@@ -169,16 +174,16 @@ class SystemTrace:
 
         # If there is no knowledge of this thread, then create a trace for it.
         if threadid not in self.threads_trace:
-            self.threads_trace[threadid] = ThreadTrace(self.system_clock, threadid)
+            self.threads_trace[threadid] = []
 
         # add the thread event to that thread's trace.
-        eve0 = ThreadEvent(qtime, event, size, offset)
-        self.threads_trace[threadid].add_event(eve0)
+        eve0 = Event(qtime, event, size, offset)
+        self.threads_trace[threadid].append(eve0)
 
         return
 
-    def num_threads(self):
-        return len(self.threads_trace)
+    #def num_threads(self):
+    #    return len(self.threads_trace)
 
 
     def to_matrix_form(self):
@@ -195,7 +200,7 @@ class SystemTrace:
         block_size = self.block_size
         # +1 because sys_clock starts at 0 and by the end, it is equal to the last
         # valid index. So trace_length should be +1
-        trace_length = self.system_clock.val+1
+        trace_length = self.max_qtime+1
         rtn_list = []
 
         # for for each thread, create a 2-elements dictionary with the ID
@@ -208,14 +213,11 @@ class SystemTrace:
             thread_trace_matrix = {'id':thr_id, 'trace':trace}
 
             # fill that matrix with the thread's data
-            for eve,time in zip(
-                    self.threads_trace[thr_id].event_list,
-                    self.threads_trace[thr_id].times_list
-            ):
+            for eve in self.threads_trace[thr_id]:
                 # events cover a certain 'size' in the memory block,
                 # so repeat the event eve.size times.
                 for i in range(eve.size):
-                    trace[eve.offset+i][time] = eve.operation
+                    trace[eve.offset+i][eve.time] = eve.event
 
             # add this thread_matrix_trace to the list to be returned
             rtn_list.append(thread_trace_matrix)
@@ -223,7 +225,7 @@ class SystemTrace:
     
     def __format__(self, format_spec):
         rtn  = f"blk_size:{self.block_size}\n"
-        rtn += f"sys_clk :{self.system_clock.val}\n\n"
+        rtn += f"sys_clk :{self.max_qtime}\n\n"
         for tt in self.threads_trace:
             rtn += f"{self.threads_trace[tt]}\n"
         return rtn
@@ -281,7 +283,7 @@ def draw_trace(sys_trace, fig_height=20):
     color_bounds = [0.5, 1.5, 2.5]
 
     # quads edges
-    x = [x-0.5 for x in range(sys_trace.system_clock.val+2)]
+    x = [x-0.5 for x in range(sys_trace.max_qtime+2)]
     y = [y-0.5 for y in range(sys_trace.block_size+1)]
     for color_idx,trace_dic in enumerate(access_matrices):
         color_idx = color_idx % len(palette)
@@ -300,7 +302,7 @@ def draw_trace(sys_trace, fig_height=20):
                     rasterized=True)
 
     # set the figure proportions to match the block_size/trace_length ratio
-    fig_width = (fig_height*sys_trace.system_clock.val)/sys_trace.block_size
+    fig_width = (fig_height*sys_trace.max_qtime)/sys_trace.block_size
     fig.set_size_inches(fig_height,fig_width)
     fig.set_dpi(800)
     fig.set_size_inches(fig_width, fig_height)
@@ -313,17 +315,27 @@ def draw_trace(sys_trace, fig_height=20):
 def read_trace_log(open_file):
     print(f"traceplot: reading {options['in']}...")
 
-    # search for line with byte size of the block.
-    # once it is found, create the system trace with
-    # that basic info.
+    # search for block-size, thread-count, and max-qtime in the header of the trace file
     line_arr = ['']
-    while line_arr[0] != "SIZE_BYTES":
-        line_arr = [x.strip() for x in next(open_file).split(':')]
-    sys_trace = SystemTrace(int(line_arr[1]))
+    block_size = 0
+    thread_count = 0
+    max_qtime = 0
 
-    # search line after which the actual trace data starts in CSV format.
     while line_arr[0] != "# DATA":
         line_arr = [x.strip() for x in next(open_file).split(':')]
+        if line_arr[0] == "block-size":
+            block_size = int(line_arr[1])
+        elif line_arr[0] == "thread-count":
+            thread_count =  int(line_arr[1])
+        elif line_arr[0] == "max-qtime":
+            max_qtime =  int(line_arr[1])
+
+    if block_size == 0 or max_qtime == 0:
+        raise Exception(f"The trace file {options['in']} does not contain valid"
+                        " values for 'block-size', 'thread-count', or 'max-qtime' in its metadata.")
+
+    # create the system trace
+    sys_trace = SystemTrace(block_size, max_qtime, thread_count)
 
 
     # Now read the actual Memory Trace data
@@ -342,8 +354,7 @@ def read_trace_log(open_file):
     #    ?  : unknown event
     csv_reader = csv.DictReader(open_file, delimiter=',')
 
-    # pass one register at the time to the memory_trace object.
-    # inside, it will figure out what to do with it.
+    # shred merged list into one-list-per-thread.
     for eve in csv_reader:
         sys_trace.add_event(eve)
     return sys_trace
@@ -356,11 +367,13 @@ def main():
     with open(options["in"], 'r', newline='') as open_file:
 
         # read log file from mem_trace
-        trace = read_trace_log(open_file)
+        sys_trace = read_trace_log(open_file)
 
-        print(f"Num of Threads: {list(trace.threads_trace.keys())}")
+        # show number of threads
+        print(f"Num of Threads: {list(sys_trace.threads_trace.keys())}")
+
         # draw the memory trace as a mesh
-        draw_trace(trace, fig_height=20)
+        draw_trace(sys_trace, fig_height=20)
 
     return
 

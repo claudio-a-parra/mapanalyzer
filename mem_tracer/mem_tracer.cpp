@@ -212,7 +212,7 @@ VOID merge_traces(void){
     // Remove long qtime jumps.
     // The idea of the trace is to show the "before-after" relationship,
     // so if we have a long jump in qtimes where no thread does anything,
-    // elet's better cut it off to simulate a "contiguous" execution.
+    // let's better cut it off to simulate a "contiguous" execution.
     // For example:
     //   Let's say the qtime of the last two events from thread
     //   0 and thread 1 is qtime=43. And the next three events
@@ -291,11 +291,11 @@ VOID malloc_after(ADDRINT retval, THREADID threadid) {
 
     // save metadata
     metadata << std::hex << std::showbase
-             << "start-addr    : " << tracked_block.start << std::endl
-             << "end-addr      : " << tracked_block.end   << std::endl
+             << "start-addr   : " << tracked_block.start << std::endl
+             << "end-addr     : " << tracked_block.end   << std::endl
              << std::noshowbase << std::dec
-             << "block-size    : " << tracked_block.size  << std::endl
-             << "owner-thread  : " << threadid     << std::endl;
+             << "block-size   : " << tracked_block.size  << std::endl
+             << "owner-thread : " << threadid     << std::endl;
 
     data << "time,thread,event,size,offset" << std::endl;
 
@@ -566,9 +566,10 @@ VOID Fini(INT32 code, VOID* v) {
     merge_traces();
 
     // complete metadata info
-    metadata << "slice-size    : " << merged_trace.slice_size << std::endl;
-    metadata << "threads-count : " << thread_count << std::endl;
-    metadata << "events-count  : " << merged_trace.list_len << std::endl;
+    metadata << "slice-size   : " << merged_trace.slice_size << std::endl;
+    metadata << "thread-count : " << thread_count << std::endl;
+    metadata << "event-count  : " << merged_trace.list_len << std::endl;
+    metadata << "max-qtime    : " << merged_trace.list[merged_trace.list_len-1]->qtime << std::endl;
 
     // and now write the file
     write_file(0);

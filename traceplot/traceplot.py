@@ -285,6 +285,7 @@ def draw_trace(sys_trace, fig_height=20):
     # quads edges
     x = [x-0.5 for x in range(sys_trace.max_qtime+2)]
     y = [y-0.5 for y in range(sys_trace.block_size+1)]
+    print("traceplot: drawing threads:", endl="")
     for color_idx,trace_dic in enumerate(access_matrices):
         color_idx = color_idx % len(palette)
         thr_id = trace_dic['id']
@@ -295,6 +296,7 @@ def draw_trace(sys_trace, fig_height=20):
         thr_norm = colors.BoundaryNorm(color_bounds, thr_cmap.N)
 
         # draw plot
+	print(f" t{thr_id}", endl="")
         axe1.pcolor(x, y, thr_trace,
                     cmap=thr_cmap, shading='flat', norm=thr_norm,
                     # edgecolors='#eee', linewidth=0.01,
@@ -302,6 +304,7 @@ def draw_trace(sys_trace, fig_height=20):
                     rasterized=True)
 
     # set the figure proportions to match the block_size/trace_length ratio
+    print("")
     fig_width = (fig_height*sys_trace.max_qtime)/sys_trace.block_size
     fig.set_size_inches(fig_height,fig_width)
     fig.set_dpi(800)

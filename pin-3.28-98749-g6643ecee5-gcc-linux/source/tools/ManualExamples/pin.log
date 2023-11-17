@@ -1,0 +1,277 @@
+Pin: pin-3.28-98749-6643ecee5
+Copyright 2002-2023 Intel Corporation.
+ [tid:120130] image: ImgLoad(/usr/bin/ls, /usr/bin/ls, 0x55beba306000, RT,)
+ [tid:120130] image: ELF Header 
+ id        ELF,
+ type      0x3,
+ machine   0x3e,
+ version   0x1,
+ entry     0x000006bb0,
+ phoff     0x000000040,
+ shoff     0x000022238,
+ flags     0x0,
+ ehsize    0x40,
+ phentsize 0x38,
+ phnum     0xd,
+ shentsize 0x40,
+ shnum     0x20,
+ shstrndx 0x1f
+ [tid:120130] image: Program headers for image "/usr/bin/ls"
+ [tid:120130] image: Segment 0   ty 0x6 ; fl 0x4 R ; of 0x000000040 ; va 0x000000040 ; pa 0x000000040 ; fs 0x0000002d8 ; ms 0x0000002d8 ; al 0x000000008
+ [tid:120130] image: Segment 1   ty 0x3 ; fl 0x4 R ; of 0x000000318 ; va 0x000000318 ; pa 0x000000318 ; fs 0x00000001c ; ms 0x00000001c ; al 0x000000001
+ [tid:120130] image: Segment 2   ty 0x1 ; fl 0x4 R ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000003740 ; ms 0x000003740 ; al 0x000001000
+ [tid:120130] image: Segment 3   ty 0x1 ; fl 0x5 RX ; of 0x000004000 ; va 0x000004000 ; pa 0x000004000 ; fs 0x000013e81 ; ms 0x000013e81 ; al 0x000001000
+ [tid:120130] image: Segment 4   ty 0x1 ; fl 0x4 R ; of 0x000018000 ; va 0x000018000 ; pa 0x000018000 ; fs 0x000007548 ; ms 0x000007548 ; al 0x000001000
+ [tid:120130] image: Segment 5   ty 0x1 ; fl 0x6 RW ; of 0x00001fef0 ; va 0x000020ef0 ; pa 0x000020ef0 ; fs 0x000001368 ; ms 0x000002630 ; al 0x000001000
+ [tid:120130] image: Segment 6   ty 0x2 ; fl 0x6 RW ; of 0x0000209f8 ; va 0x0000219f8 ; pa 0x0000219f8 ; fs 0x000000210 ; ms 0x000000210 ; al 0x000000008
+ [tid:120130] image: Segment 7   ty 0x4 ; fl 0x4 R ; of 0x000000338 ; va 0x000000338 ; pa 0x000000338 ; fs 0x000000050 ; ms 0x000000050 ; al 0x000000008
+ [tid:120130] image: Segment 8   ty 0x4 ; fl 0x4 R ; of 0x000000388 ; va 0x000000388 ; pa 0x000000388 ; fs 0x0000000d0 ; ms 0x0000000d0 ; al 0x000000004
+ [tid:120130] image: Segment 9   ty 0x6474e553 ; fl 0x4 R ; of 0x000000338 ; va 0x000000338 ; pa 0x000000338 ; fs 0x000000050 ; ms 0x000000050 ; al 0x000000008
+ [tid:120130] image: Segment 10   ty 0x6474e550 ; fl 0x4 R ; of 0x00001cde8 ; va 0x00001cde8 ; pa 0x00001cde8 ; fs 0x0000005cc ; ms 0x0000005cc ; al 0x000000004
+ [tid:120130] image: Segment 11   ty 0x6474e551 ; fl 0x6 RW ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000000000 ; ms 0x000000000 ; al 0x000000010
+ [tid:120130] image: Segment 12   ty 0x6474e552 ; fl 0x4 R ; of 0x00001fef0 ; va 0x000020ef0 ; pa 0x000020ef0 ; fs 0x000001110 ; ms 0x000001110 ; al 0x000000001
+ [tid:120130] image: Section 0                  from 0x000000000, to 0x000000000, size 0, addr 0x000000000, name 0x0, type SHT_NULL, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000000
+ [tid:120130] image: Section 1 .interp          from 0x000000318, to 0x000000334, size 28, addr 0x000000318, name 0xb, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 2 .note.gnu.property  from 0x000000338, to 0x000000388, size 80, addr 0x000000338, name 0x13, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 3 .note.gnu.build-id  from 0x000000388, to 0x0000003ac, size 36, addr 0x000000388, name 0x26, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 4 .note.ABI-tag    from 0x0000003ac, to 0x0000003cc, size 32, addr 0x0000003ac, name 0x39, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 5 .note.package    from 0x0000003cc, to 0x000000458, size 140, addr 0x0000003cc, name 0x47, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 6 .gnu.hash        from 0x000000458, to 0x000000498, size 64, addr 0x000000458, name 0x55, type , entsize 0x000000000, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 7 .dynsym          from 0x000000498, to 0x000001080, size 3048, addr 0x000000498, name 0x5f, type SHT_DYNSYM, entsize 0x000000018, sh_link 0x8, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 8 .dynstr          from 0x000001080, to 0x000001666, size 1510, addr 0x000001080, name 0x67, type SHT_STRTAB, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 9 .gnu.version     from 0x000001666, to 0x000001764, size 254, addr 0x000001666, name 0x6f, type , entsize 0x000000002, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000002
+ [tid:120130] image: Section 10 .gnu.version_r   from 0x000001768, to 0x000001838, size 208, addr 0x000001768, name 0x7c, type , entsize 0x000000000, sh_link 0x8, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 11 .rela.dyn        from 0x000001838, to 0x000002d38, size 5376, addr 0x000001838, name 0x8b, type SHT_RELA, entsize 0x000000018, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 12 .rela.plt        from 0x000002d38, to 0x000003740, size 2568, addr 0x000002d38, name 0x95, type SHT_RELA, entsize 0x000000018, sh_link 0x7, sh_flags 0x000000042, sh_addralign 0x000000008
+ [tid:120130] image: Section 13 .init            from 0x000004000, to 0x00000401b, size 27, addr 0x000004000, name 0x9f, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000004
+ [tid:120130] image: Section 14 .plt             from 0x000004020, to 0x0000046e0, size 1728, addr 0x000004020, name 0x9a, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 15 .plt.sec         from 0x0000046e0, to 0x000004d90, size 1712, addr 0x0000046e0, name 0xa5, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 16 .text            from 0x000004d90, to 0x000017e72, size 78050, addr 0x000004d90, name 0xae, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 17 .fini            from 0x000017e74, to 0x000017e81, size 13, addr 0x000017e74, name 0xb4, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000004
+ [tid:120130] image: Section 18 .rodata          from 0x000018000, to 0x00001cde8, size 19944, addr 0x000018000, name 0xba, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000020
+ [tid:120130] image: Section 19 .eh_frame_hdr    from 0x00001cde8, to 0x00001d3b4, size 1484, addr 0x00001cde8, name 0xc2, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 20 .eh_frame        from 0x00001d3b8, to 0x00001f548, size 8592, addr 0x00001d3b8, name 0xd0, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 21 .init_array      from 0x00001fef0, to 0x00001fef8, size 8, addr 0x000020ef0, name 0xda, type SHT_INIT_ARRAY, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 22 .fini_array      from 0x00001fef8, to 0x00001ff00, size 8, addr 0x000020ef8, name 0xe6, type SHT_FINI_ARRAY, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 23 .data.rel.ro     from 0x00001ff00, to 0x0000209f8, size 2808, addr 0x000020f00, name 0xf2, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 24 .dynamic         from 0x0000209f8, to 0x000020c08, size 528, addr 0x0000219f8, name 0xff, type SHT_DYNAMIC, entsize 0x000000010, sh_link 0x8, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 25 .got             from 0x000020c08, to 0x000020fe8, size 992, addr 0x000021c08, name 0x108, type SHT_PROGBITS, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 26 .data            from 0x000021000, to 0x000021258, size 600, addr 0x000022000, name 0x10d, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 27 .bss             from 0x000021258, to 0x000022518, size 4800, addr 0x000022260, name 0x113, type SHT_NOBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 28 .gnu.build.attributes  from 0x000021258, to 0x0000215e0, size 904, addr 0x000025520, name 0x118, type SHT_NOTE, entsize 0x000000000, sh_link 0x10, sh_flags 0x000000080, sh_addralign 0x000000004
+ [tid:120130] image: Section 29 .gnu_debuglink   from 0x0000215e0, to 0x000021600, size 32, addr 0x000000000, name 0x12e, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000004
+ [tid:120130] image: Section 30 .gnu_debugdata   from 0x000021600, to 0x0000220ec, size 2796, addr 0x000000000, name 0x13d, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000001
+ [tid:120130] image: Section 31 .shstrtab        from 0x0000220ec, to 0x000022238, size 332, addr 0x000000000, name 0x1, type SHT_STRTAB, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000001
+ [tid:120130] image: FindCodeRanges: Sec -  addr - 0x000000000
+ [tid:120130] image: FindCodeRanges: Sec - .interp addr - 0x55beba306318
+ [tid:120130] image: FindCodeRanges: Sec - .note.gnu.property addr - 0x55beba306338
+ [tid:120130] image: FindCodeRanges: Sec - .note.gnu.build-id addr - 0x55beba306388
+ [tid:120130] image: FindCodeRanges: Sec - .note.ABI-tag addr - 0x55beba3063ac
+ [tid:120130] image: FindCodeRanges: Sec - .note.package addr - 0x55beba3063cc
+ [tid:120130] image: FindCodeRanges: Sec - .gnu.hash addr - 0x55beba306458
+ [tid:120130] image: FindCodeRanges: Sec - .dynsym addr - 0x55beba306498
+ [tid:120130] image: FindCodeRanges: Sec - .dynstr addr - 0x55beba307080
+ [tid:120130] image: FindCodeRanges: Sec - .gnu.version addr - 0x55beba307666
+ [tid:120130] image: FindCodeRanges: Sec - .gnu.version_r addr - 0x55beba307768
+ [tid:120130] image: FindCodeRanges: Sec - .rela.dyn addr - 0x55beba307838
+ [tid:120130] image: FindCodeRanges: Sec - .rela.plt addr - 0x55beba308d38
+ [tid:120130] image: FindCodeRanges: Sec - .init addr - 0x55beba30a000
+ [tid:120130] image: FindCodeRanges: added. size - 0x00000001b
+ [tid:120130] image: FindCodeRanges: Sec - .plt addr - 0x55beba30a020
+ [tid:120130] image: FindCodeRanges: added. size - 0x0000006c0
+ [tid:120130] image: FindCodeRanges: Sec - .plt.sec addr - 0x55beba30a6e0
+ [tid:120130] image: FindCodeRanges: added. size - 0x0000006b0
+ [tid:120130] image: FindCodeRanges: Sec - .text addr - 0x55beba30ad90
+ [tid:120130] image: FindCodeRanges: added. size - 0x0000130e2
+ [tid:120130] image: FindCodeRanges: Sec - .fini addr - 0x55beba31de74
+ [tid:120130] image: FindCodeRanges: added. size - 0x00000000d
+ [tid:120130] image: FindCodeRanges: Sec - .rodata addr - 0x55beba31e000
+ [tid:120130] image: FindCodeRanges: Sec - .eh_frame_hdr addr - 0x55beba322de8
+ [tid:120130] image: FindCodeRanges: Sec - .eh_frame addr - 0x55beba3233b8
+ [tid:120130] image: FindCodeRanges: Sec - .init_array addr - 0x55beba326ef0
+ [tid:120130] image: FindCodeRanges: Sec - .fini_array addr - 0x55beba326ef8
+ [tid:120130] image: FindCodeRanges: Sec - .data.rel.ro addr - 0x55beba326f00
+ [tid:120130] image: FindCodeRanges: Sec - .dynamic addr - 0x55beba3279f8
+ [tid:120130] image: FindCodeRanges: Sec - .got addr - 0x55beba327c08
+ [tid:120130] image: FindCodeRanges: Sec - .data addr - 0x55beba328000
+ [tid:120130] image: FindCodeRanges: Sec - .bss addr - 0x55beba328260
+ [tid:120130] image: FindCodeRanges: Sec - .gnu.build.attributes addr - 0x55beba32b520
+ [tid:120130] image: FindCodeRanges: Sec - .gnu_debuglink addr - 0x000000000
+ [tid:120130] image: FindCodeRanges: Sec - .gnu_debugdata addr - 0x000000000
+ [tid:120130] image: FindCodeRanges: Sec - .shstrtab addr - 0x000000000
+ [tid:120130] image: ELF Header 
+ id        ELF,
+ type      0x3,
+ machine   0x3e,
+ version   0x1,
+ entry     0x000006bb0,
+ phoff     0x000000040,
+ shoff     0x000022238,
+ flags     0x0,
+ ehsize    0x40,
+ phentsize 0x38,
+ phnum     0xd,
+ shentsize 0x40,
+ shnum     0x20,
+ shstrndx 0x1f
+ [tid:120130] image: Program headers for image "/usr/bin/ls"
+ [tid:120130] image: Segment 0   ty 0x6 ; fl 0x4 R ; of 0x000000040 ; va 0x000000040 ; pa 0x000000040 ; fs 0x0000002d8 ; ms 0x0000002d8 ; al 0x000000008
+ [tid:120130] image: Segment 1   ty 0x3 ; fl 0x4 R ; of 0x000000318 ; va 0x000000318 ; pa 0x000000318 ; fs 0x00000001c ; ms 0x00000001c ; al 0x000000001
+ [tid:120130] image: Segment 2   ty 0x1 ; fl 0x4 R ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000003740 ; ms 0x000003740 ; al 0x000001000
+ [tid:120130] image: Segment 3   ty 0x1 ; fl 0x5 RX ; of 0x000004000 ; va 0x000004000 ; pa 0x000004000 ; fs 0x000013e81 ; ms 0x000013e81 ; al 0x000001000
+ [tid:120130] image: Segment 4   ty 0x1 ; fl 0x4 R ; of 0x000018000 ; va 0x000018000 ; pa 0x000018000 ; fs 0x000007548 ; ms 0x000007548 ; al 0x000001000
+ [tid:120130] image: Segment 5   ty 0x1 ; fl 0x6 RW ; of 0x00001fef0 ; va 0x000020ef0 ; pa 0x000020ef0 ; fs 0x000001368 ; ms 0x000002630 ; al 0x000001000
+ [tid:120130] image: Segment 6   ty 0x2 ; fl 0x6 RW ; of 0x0000209f8 ; va 0x0000219f8 ; pa 0x0000219f8 ; fs 0x000000210 ; ms 0x000000210 ; al 0x000000008
+ [tid:120130] image: Segment 7   ty 0x4 ; fl 0x4 R ; of 0x000000338 ; va 0x000000338 ; pa 0x000000338 ; fs 0x000000050 ; ms 0x000000050 ; al 0x000000008
+ [tid:120130] image: Segment 8   ty 0x4 ; fl 0x4 R ; of 0x000000388 ; va 0x000000388 ; pa 0x000000388 ; fs 0x0000000d0 ; ms 0x0000000d0 ; al 0x000000004
+ [tid:120130] image: Segment 9   ty 0x6474e553 ; fl 0x4 R ; of 0x000000338 ; va 0x000000338 ; pa 0x000000338 ; fs 0x000000050 ; ms 0x000000050 ; al 0x000000008
+ [tid:120130] image: Segment 10   ty 0x6474e550 ; fl 0x4 R ; of 0x00001cde8 ; va 0x00001cde8 ; pa 0x00001cde8 ; fs 0x0000005cc ; ms 0x0000005cc ; al 0x000000004
+ [tid:120130] image: Segment 11   ty 0x6474e551 ; fl 0x6 RW ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000000000 ; ms 0x000000000 ; al 0x000000010
+ [tid:120130] image: Segment 12   ty 0x6474e552 ; fl 0x4 R ; of 0x00001fef0 ; va 0x000020ef0 ; pa 0x000020ef0 ; fs 0x000001110 ; ms 0x000001110 ; al 0x000000001
+ [tid:120130] image: Section 0                  from 0x000000000, to 0x000000000, size 0, addr 0x000000000, name 0x0, type SHT_NULL, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000000
+ [tid:120130] image: Section 1 .interp          from 0x000000318, to 0x000000334, size 28, addr 0x000000318, name 0xb, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 2 .note.gnu.property  from 0x000000338, to 0x000000388, size 80, addr 0x000000338, name 0x13, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 3 .note.gnu.build-id  from 0x000000388, to 0x0000003ac, size 36, addr 0x000000388, name 0x26, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 4 .note.ABI-tag    from 0x0000003ac, to 0x0000003cc, size 32, addr 0x0000003ac, name 0x39, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 5 .note.package    from 0x0000003cc, to 0x000000458, size 140, addr 0x0000003cc, name 0x47, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 6 .gnu.hash        from 0x000000458, to 0x000000498, size 64, addr 0x000000458, name 0x55, type , entsize 0x000000000, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 7 .dynsym          from 0x000000498, to 0x000001080, size 3048, addr 0x000000498, name 0x5f, type SHT_DYNSYM, entsize 0x000000018, sh_link 0x8, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 8 .dynstr          from 0x000001080, to 0x000001666, size 1510, addr 0x000001080, name 0x67, type SHT_STRTAB, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 9 .gnu.version     from 0x000001666, to 0x000001764, size 254, addr 0x000001666, name 0x6f, type , entsize 0x000000002, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000002
+ [tid:120130] image: Section 10 .gnu.version_r   from 0x000001768, to 0x000001838, size 208, addr 0x000001768, name 0x7c, type , entsize 0x000000000, sh_link 0x8, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 11 .rela.dyn        from 0x000001838, to 0x000002d38, size 5376, addr 0x000001838, name 0x8b, type SHT_RELA, entsize 0x000000018, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 12 .rela.plt        from 0x000002d38, to 0x000003740, size 2568, addr 0x000002d38, name 0x95, type SHT_RELA, entsize 0x000000018, sh_link 0x7, sh_flags 0x000000042, sh_addralign 0x000000008
+ [tid:120130] image: Section 13 .init            from 0x000004000, to 0x00000401b, size 27, addr 0x000004000, name 0x9f, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000004
+ [tid:120130] image: Section 14 .plt             from 0x000004020, to 0x0000046e0, size 1728, addr 0x000004020, name 0x9a, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 15 .plt.sec         from 0x0000046e0, to 0x000004d90, size 1712, addr 0x0000046e0, name 0xa5, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 16 .text            from 0x000004d90, to 0x000017e72, size 78050, addr 0x000004d90, name 0xae, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 17 .fini            from 0x000017e74, to 0x000017e81, size 13, addr 0x000017e74, name 0xb4, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000004
+ [tid:120130] image: Section 18 .rodata          from 0x000018000, to 0x00001cde8, size 19944, addr 0x000018000, name 0xba, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000020
+ [tid:120130] image: Section 19 .eh_frame_hdr    from 0x00001cde8, to 0x00001d3b4, size 1484, addr 0x00001cde8, name 0xc2, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 20 .eh_frame        from 0x00001d3b8, to 0x00001f548, size 8592, addr 0x00001d3b8, name 0xd0, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 21 .init_array      from 0x00001fef0, to 0x00001fef8, size 8, addr 0x000020ef0, name 0xda, type SHT_INIT_ARRAY, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 22 .fini_array      from 0x00001fef8, to 0x00001ff00, size 8, addr 0x000020ef8, name 0xe6, type SHT_FINI_ARRAY, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 23 .data.rel.ro     from 0x00001ff00, to 0x0000209f8, size 2808, addr 0x000020f00, name 0xf2, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 24 .dynamic         from 0x0000209f8, to 0x000020c08, size 528, addr 0x0000219f8, name 0xff, type SHT_DYNAMIC, entsize 0x000000010, sh_link 0x8, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 25 .got             from 0x000020c08, to 0x000020fe8, size 992, addr 0x000021c08, name 0x108, type SHT_PROGBITS, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 26 .data            from 0x000021000, to 0x000021258, size 600, addr 0x000022000, name 0x10d, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 27 .bss             from 0x000021258, to 0x000022518, size 4800, addr 0x000022260, name 0x113, type SHT_NOBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 28 .gnu.build.attributes  from 0x000021258, to 0x0000215e0, size 904, addr 0x000025520, name 0x118, type SHT_NOTE, entsize 0x000000000, sh_link 0x10, sh_flags 0x000000080, sh_addralign 0x000000004
+ [tid:120130] image: Section 29 .gnu_debuglink   from 0x0000215e0, to 0x000021600, size 32, addr 0x000000000, name 0x12e, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000004
+ [tid:120130] image: Section 30 .gnu_debugdata   from 0x000021600, to 0x0000220ec, size 2796, addr 0x000000000, name 0x13d, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000001
+ [tid:120130] image: Section 31 .shstrtab        from 0x0000220ec, to 0x000022238, size 332, addr 0x000000000, name 0x1, type SHT_STRTAB, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000001
+ [tid:120130] image: ELF Header 
+ id        ELF,
+ type      0x3,
+ machine   0x3e,
+ version   0x1,
+ entry     0x000006bb0,
+ phoff     0x000000040,
+ shoff     0x000022238,
+ flags     0x0,
+ ehsize    0x40,
+ phentsize 0x38,
+ phnum     0xd,
+ shentsize 0x40,
+ shnum     0x20,
+ shstrndx 0x1f
+ [tid:120130] image: Program headers for image "/usr/bin/ls"
+ [tid:120130] image: Segment 0   ty 0x6 ; fl 0x4 R ; of 0x000000040 ; va 0x000000040 ; pa 0x000000040 ; fs 0x0000002d8 ; ms 0x0000002d8 ; al 0x000000008
+ [tid:120130] image: Segment 1   ty 0x3 ; fl 0x4 R ; of 0x000000318 ; va 0x000000318 ; pa 0x000000318 ; fs 0x00000001c ; ms 0x00000001c ; al 0x000000001
+ [tid:120130] image: Segment 2   ty 0x1 ; fl 0x4 R ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000003740 ; ms 0x000003740 ; al 0x000001000
+ [tid:120130] image: Segment 3   ty 0x1 ; fl 0x5 RX ; of 0x000004000 ; va 0x000004000 ; pa 0x000004000 ; fs 0x000013e81 ; ms 0x000013e81 ; al 0x000001000
+ [tid:120130] image: Segment 4   ty 0x1 ; fl 0x4 R ; of 0x000018000 ; va 0x000018000 ; pa 0x000018000 ; fs 0x000007548 ; ms 0x000007548 ; al 0x000001000
+ [tid:120130] image: Segment 5   ty 0x1 ; fl 0x6 RW ; of 0x00001fef0 ; va 0x000020ef0 ; pa 0x000020ef0 ; fs 0x000001368 ; ms 0x000002630 ; al 0x000001000
+ [tid:120130] image: Segment 6   ty 0x2 ; fl 0x6 RW ; of 0x0000209f8 ; va 0x0000219f8 ; pa 0x0000219f8 ; fs 0x000000210 ; ms 0x000000210 ; al 0x000000008
+ [tid:120130] image: Segment 7   ty 0x4 ; fl 0x4 R ; of 0x000000338 ; va 0x000000338 ; pa 0x000000338 ; fs 0x000000050 ; ms 0x000000050 ; al 0x000000008
+ [tid:120130] image: Segment 8   ty 0x4 ; fl 0x4 R ; of 0x000000388 ; va 0x000000388 ; pa 0x000000388 ; fs 0x0000000d0 ; ms 0x0000000d0 ; al 0x000000004
+ [tid:120130] image: Segment 9   ty 0x6474e553 ; fl 0x4 R ; of 0x000000338 ; va 0x000000338 ; pa 0x000000338 ; fs 0x000000050 ; ms 0x000000050 ; al 0x000000008
+ [tid:120130] image: Segment 10   ty 0x6474e550 ; fl 0x4 R ; of 0x00001cde8 ; va 0x00001cde8 ; pa 0x00001cde8 ; fs 0x0000005cc ; ms 0x0000005cc ; al 0x000000004
+ [tid:120130] image: Segment 11   ty 0x6474e551 ; fl 0x6 RW ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000000000 ; ms 0x000000000 ; al 0x000000010
+ [tid:120130] image: Segment 12   ty 0x6474e552 ; fl 0x4 R ; of 0x00001fef0 ; va 0x000020ef0 ; pa 0x000020ef0 ; fs 0x000001110 ; ms 0x000001110 ; al 0x000000001
+ [tid:120130] image: Section 0                  from 0x000000000, to 0x000000000, size 0, addr 0x000000000, name 0x0, type SHT_NULL, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000000
+ [tid:120130] image: Section 1 .interp          from 0x000000318, to 0x000000334, size 28, addr 0x000000318, name 0xb, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 2 .note.gnu.property  from 0x000000338, to 0x000000388, size 80, addr 0x000000338, name 0x13, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 3 .note.gnu.build-id  from 0x000000388, to 0x0000003ac, size 36, addr 0x000000388, name 0x26, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 4 .note.ABI-tag    from 0x0000003ac, to 0x0000003cc, size 32, addr 0x0000003ac, name 0x39, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 5 .note.package    from 0x0000003cc, to 0x000000458, size 140, addr 0x0000003cc, name 0x47, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 6 .gnu.hash        from 0x000000458, to 0x000000498, size 64, addr 0x000000458, name 0x55, type , entsize 0x000000000, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 7 .dynsym          from 0x000000498, to 0x000001080, size 3048, addr 0x000000498, name 0x5f, type SHT_DYNSYM, entsize 0x000000018, sh_link 0x8, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 8 .dynstr          from 0x000001080, to 0x000001666, size 1510, addr 0x000001080, name 0x67, type SHT_STRTAB, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 9 .gnu.version     from 0x000001666, to 0x000001764, size 254, addr 0x000001666, name 0x6f, type , entsize 0x000000002, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000002
+ [tid:120130] image: Section 10 .gnu.version_r   from 0x000001768, to 0x000001838, size 208, addr 0x000001768, name 0x7c, type , entsize 0x000000000, sh_link 0x8, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 11 .rela.dyn        from 0x000001838, to 0x000002d38, size 5376, addr 0x000001838, name 0x8b, type SHT_RELA, entsize 0x000000018, sh_link 0x7, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 12 .rela.plt        from 0x000002d38, to 0x000003740, size 2568, addr 0x000002d38, name 0x95, type SHT_RELA, entsize 0x000000018, sh_link 0x7, sh_flags 0x000000042, sh_addralign 0x000000008
+ [tid:120130] image: Section 13 .init            from 0x000004000, to 0x00000401b, size 27, addr 0x000004000, name 0x9f, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000004
+ [tid:120130] image: Section 14 .plt             from 0x000004020, to 0x0000046e0, size 1728, addr 0x000004020, name 0x9a, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 15 .plt.sec         from 0x0000046e0, to 0x000004d90, size 1712, addr 0x0000046e0, name 0xa5, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 16 .text            from 0x000004d90, to 0x000017e72, size 78050, addr 0x000004d90, name 0xae, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 17 .fini            from 0x000017e74, to 0x000017e81, size 13, addr 0x000017e74, name 0xb4, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000004
+ [tid:120130] image: Section 18 .rodata          from 0x000018000, to 0x00001cde8, size 19944, addr 0x000018000, name 0xba, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000020
+ [tid:120130] image: Section 19 .eh_frame_hdr    from 0x00001cde8, to 0x00001d3b4, size 1484, addr 0x00001cde8, name 0xc2, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 20 .eh_frame        from 0x00001d3b8, to 0x00001f548, size 8592, addr 0x00001d3b8, name 0xd0, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 21 .init_array      from 0x00001fef0, to 0x00001fef8, size 8, addr 0x000020ef0, name 0xda, type SHT_INIT_ARRAY, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 22 .fini_array      from 0x00001fef8, to 0x00001ff00, size 8, addr 0x000020ef8, name 0xe6, type SHT_FINI_ARRAY, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 23 .data.rel.ro     from 0x00001ff00, to 0x0000209f8, size 2808, addr 0x000020f00, name 0xf2, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 24 .dynamic         from 0x0000209f8, to 0x000020c08, size 528, addr 0x0000219f8, name 0xff, type SHT_DYNAMIC, entsize 0x000000010, sh_link 0x8, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 25 .got             from 0x000020c08, to 0x000020fe8, size 992, addr 0x000021c08, name 0x108, type SHT_PROGBITS, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 26 .data            from 0x000021000, to 0x000021258, size 600, addr 0x000022000, name 0x10d, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 27 .bss             from 0x000021258, to 0x000022518, size 4800, addr 0x000022260, name 0x113, type SHT_NOBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 28 .gnu.build.attributes  from 0x000021258, to 0x0000215e0, size 904, addr 0x000025520, name 0x118, type SHT_NOTE, entsize 0x000000000, sh_link 0x10, sh_flags 0x000000080, sh_addralign 0x000000004
+ [tid:120130] image: Section 29 .gnu_debuglink   from 0x0000215e0, to 0x000021600, size 32, addr 0x000000000, name 0x12e, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000004
+ [tid:120130] image: Section 30 .gnu_debugdata   from 0x000021600, to 0x0000220ec, size 2796, addr 0x000000000, name 0x13d, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000001
+ [tid:120130] image: Section 31 .shstrtab        from 0x0000220ec, to 0x000022238, size 332, addr 0x000000000, name 0x1, type SHT_STRTAB, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000001
+ [tid:120130] image: ImgLoad(/lib64/ld-linux-x86-64.so.2, /lib64/ld-linux-x86-64.so.2, 0x7f9981852000, RT,)
+ [tid:120130] image: ELF Header 
+ id        ELF,
+ type      0x3,
+ machine   0x3e,
+ version   0x1,
+ entry     0x00001b730,
+ phoff     0x000000040,
+ shoff     0x0000d2770,
+ flags     0x0,
+ ehsize    0x40,
+ phentsize 0x38,
+ phnum     0xb,
+ shentsize 0x40,
+ shnum     0x27,
+ shstrndx 0x26
+ [tid:120130] image: Program headers for image "/lib64/ld-linux-x86-64.so.2"
+ [tid:120130] image: Segment 0   ty 0x1 ; fl 0x4 R ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000000e38 ; ms 0x000000e38 ; al 0x000001000
+ [tid:120130] image: Segment 1   ty 0x1 ; fl 0x5 RX ; of 0x000001000 ; va 0x000001000 ; pa 0x000001000 ; fs 0x000025f05 ; ms 0x000025f05 ; al 0x000001000
+ [tid:120130] image: Segment 2   ty 0x1 ; fl 0x4 R ; of 0x000027000 ; va 0x000027000 ; pa 0x000027000 ; fs 0x000009d1c ; ms 0x000009d1c ; al 0x000001000
+ [tid:120130] image: Segment 3   ty 0x1 ; fl 0x6 RW ; of 0x0000318c0 ; va 0x0000328c0 ; pa 0x0000328c0 ; fs 0x000002828 ; ms 0x000002a08 ; al 0x000001000
+ [tid:120130] image: Segment 4   ty 0x2 ; fl 0x6 RW ; of 0x000032de0 ; va 0x000033de0 ; pa 0x000033de0 ; fs 0x0000001c0 ; ms 0x0000001c0 ; al 0x000000008
+ [tid:120130] image: Segment 5   ty 0x4 ; fl 0x4 R ; of 0x0000002a8 ; va 0x0000002a8 ; pa 0x0000002a8 ; fs 0x000000040 ; ms 0x000000040 ; al 0x000000008
+ [tid:120130] image: Segment 6   ty 0x4 ; fl 0x4 R ; of 0x0000002e8 ; va 0x0000002e8 ; pa 0x0000002e8 ; fs 0x000000024 ; ms 0x000000024 ; al 0x000000004
+ [tid:120130] image: Segment 7   ty 0x6474e553 ; fl 0x4 R ; of 0x0000002a8 ; va 0x0000002a8 ; pa 0x0000002a8 ; fs 0x000000040 ; ms 0x000000040 ; al 0x000000008
+ [tid:120130] image: Segment 8   ty 0x6474e550 ; fl 0x4 R ; of 0x00002cf5c ; va 0x00002cf5c ; pa 0x00002cf5c ; fs 0x000000954 ; ms 0x000000954 ; al 0x000000004
+ [tid:120130] image: Segment 9   ty 0x6474e551 ; fl 0x6 RW ; of 0x000000000 ; va 0x000000000 ; pa 0x000000000 ; fs 0x000000000 ; ms 0x000000000 ; al 0x000000010
+ [tid:120130] image: Segment 10   ty 0x6474e552 ; fl 0x4 R ; of 0x0000318c0 ; va 0x0000328c0 ; pa 0x0000328c0 ; fs 0x000001740 ; ms 0x000001740 ; al 0x000000001
+ [tid:120130] image: Section 0                  from 0x000000000, to 0x000000000, size 0, addr 0x000000000, name 0x0, type SHT_NULL, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000000, sh_addralign 0x000000000
+ [tid:120130] image: Section 1 .note.gnu.property  from 0x0000002a8, to 0x0000002e8, size 64, addr 0x0000002a8, name 0x1b, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 2 .note.gnu.build-id  from 0x0000002e8, to 0x00000030c, size 36, addr 0x0000002e8, name 0x2e, type SHT_NOTE, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 3 .hash            from 0x000000310, to 0x00000044c, size 316, addr 0x000000310, name 0x45, type SHT_HASH, entsize 0x000000004, sh_link 0x5, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 4 .gnu.hash        from 0x000000450, to 0x0000005b0, size 352, addr 0x000000450, name 0x41, type , entsize 0x000000000, sh_link 0x5, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 5 .dynsym          from 0x0000005b0, to 0x000000970, size 960, addr 0x0000005b0, name 0x4b, type SHT_DYNSYM, entsize 0x000000018, sh_link 0x6, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 6 .dynstr          from 0x000000970, to 0x000000c31, size 705, addr 0x000000970, name 0x53, type SHT_STRTAB, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 7 .gnu.version     from 0x000000c32, to 0x000000c82, size 80, addr 0x000000c32, name 0x5b, type , entsize 0x000000002, sh_link 0x5, sh_flags 0x000000002, sh_addralign 0x000000002
+ [tid:120130] image: Section 8 .gnu.version_d   from 0x000000c88, to 0x000000d74, size 236, addr 0x000000c88, name 0x68, type , entsize 0x000000000, sh_link 0x6, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 9 .rela.dyn        from 0x000000d78, to 0x000000dc0, size 72, addr 0x000000d78, name 0x77, type SHT_RELA, entsize 0x000000018, sh_link 0x5, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 10 .rela.plt        from 0x000000dc0, to 0x000000e20, size 96, addr 0x000000dc0, name 0x81, type SHT_RELA, entsize 0x000000018, sh_link 0x5, sh_flags 0x000000042, sh_addralign 0x000000008
+ [tid:120130] image: Section 11 .relr.dyn        from 0x000000e20, to 0x000000e38, size 24, addr 0x000000e20, name 0x8b, type , entsize 0x000000008, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 12 .plt             from 0x000001000, to 0x000001050, size 80, addr 0x000001000, name 0x86, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 13 .plt.sec         from 0x000001050, to 0x000001090, size 64, addr 0x000001050, name 0x95, type SHT_PROGBITS, entsize 0x000000010, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000010
+ [tid:120130] image: Section 14 .text            from 0x0000010a0, to 0x000026f05, size 155237, addr 0x0000010a0, name 0x9e, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000006, sh_addralign 0x000000020
+ [tid:120130] image: Section 15 .rodata          from 0x000027000, to 0x00002cf58, size 24408, addr 0x000027000, name 0xa4, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000020
+ [tid:120130] image: Section 16 .stapsdt.base    from 0x00002cf58, to 0x00002cf59, size 1, addr 0x00002cf58, name 0xac, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000001
+ [tid:120130] image: Section 17 .eh_frame_hdr    from 0x00002cf5c, to 0x00002d8b0, size 2388, addr 0x00002cf5c, name 0xba, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000004
+ [tid:120130] image: Section 18 .eh_frame        from 0x00002d8b0, to 0x000030d1c, size 13420, addr 0x00002d8b0, name 0xc8, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000002, sh_addralign 0x000000008
+ [tid:120130] image: Section 19 .data.rel.ro     from 0x0000318c0, to 0x000032de0, size 5408, addr 0x0000328c0, name 0xd2, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 20 .dynamic         from 0x000032de0, to 0x000032fa0, size 448, addr 0x000033de0, name 0xdf, type SHT_DYNAMIC, entsize 0x000000010, sh_link 0x6, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 21 .got             from 0x000032fa0, to 0x000032fe8, size 72, addr 0x000033fa0, name 0xe8, type SHT_PROGBITS, entsize 0x000000008, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000008
+ [tid:120130] image: Section 22 .data            from 0x000033000, to 0x0000340e8, size 4328, addr 0x000034000, name 0xed, type SHT_PROGBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000020
+ [tid:120130] image: Section 23 .bss             from 0x0000340e8, to 0x0000342c0, size 472, addr 0x0000350f0, name 0xf3, type SHT_NOBITS, entsize 0x000000000, sh_link 0x0, sh_flags 0x000000003, sh_addralign 0x000000010
+ [tid:120130] image: Section 24 .comment         from 0x0000340e8, to 0x000034116, size 46, addr 0x000000000, name 0xf8, type SHT_PROGBITS, entsize 0x000000001, sh_link 0x0, sh_flags 0x000000030, sh_addralign 0x000000001
+ [tid:120130] image: Section 25 .annobin.notes   from 0x000034116, to 0x000037a97, size 14721, addr 0x000000000, name 0x101, type SHT_STRTAB, entsize 0x000000001, sh_link 0x0, sh_flags 0x000000030, sh_addralign 0x000000001

@@ -6,8 +6,10 @@ import matplotlib.pyplot as plt # draw plots
 import matplotlib.patches as mpatches # to manually edit the legend
 from matplotlib import colors # to create the colormap
 
+from PIL import Image
+
 options = {"in":None, "out":None, "title":None}
-ops_n2v = {'R':1, 'W':2, 'Tc':101, 'Td':102, '?':999}
+ops_n2v = {'R':0, 'W':1, 'Tc':101, 'Td':102, '?':999}
 ops_v2n = {v: k for k, v in ops_n2v.items()}
 
 class Event:
@@ -15,7 +17,6 @@ class Event:
         try:
             if ev_name not in ops_n2v:
                 ev_name = '?'
-
             self.time = time
             self.event = ops_n2v[ev_name]
             self.size = int(siz)
@@ -35,12 +36,12 @@ class Event:
 
 
 class SystemTrace:
-    def __init__(self, block_size, max_qtime, thread_count):
+    def __init__(self, block_size, max_qtime):
         """The system trace is a dictionary with thread ids as keys,
         and an array of 'Events' as values"""
         self.block_size = block_size
         self.max_qtime = max_qtime
-        self.thread_count = thread_count
+        self.thread_count = 0
         self.threads_trace = {}
         return
 
@@ -52,8 +53,13 @@ class SystemTrace:
         size = int(reg["size"])
         offset = int(reg["offset"])
 
+        # If it is not a read/write event, dismiss
+        if event != 'R' and event !='W':
+            return
+
         # If there is no knowledge of this thread, then create a trace for it.
         if threadid not in self.threads_trace:
+            self.thread_count += 1
             self.threads_trace[threadid] = []
 
         # add the thread event to that thread's trace.
@@ -143,6 +149,12 @@ def parse_args():
     return
 
 
+
+
+
+
+
+
 def draw_trace(sys_trace, fig_height=20):
 
     # obtain the matrix form of the trace.
@@ -229,21 +241,65 @@ def draw_trace(sys_trace, fig_height=20):
     return
 
 
-def read_trace_log(open_file):
-    print(f"traceplot: reading {options['in']}...")
 
-    # search for block-size, thread-count, and max-qtime in the header of the trace file
+
+
+
+def draw_png(sys_trace):
+    palette_rgb = {
+        0:  (( 31, 119, 180), (129, 190, 234)), # Blue
+        1:  ((255, 127,  14), (255, 192, 138)), # Orange
+        2:  (( 44, 160,  44), (138, 214, 138)), # Green
+        3:  ((214, 39,   40), (239, 169, 169)), # Red
+        4:  ((148, 103, 189), (205, 184, 224)), # Purple
+        5:  ((140,  86,  75), (205, 169, 162)), # Brown
+        6:  ((227, 119, 194), (242, 192, 227)), # Pink
+        7:  ((127, 127, 127), (191, 191, 191)), # Gray
+        8:  ((188, 189,  34), (235, 235, 142)), # Yellow
+        9:  (( 23, 190, 207), (140, 232, 242)), # Cyan
+        10: ((250, 200,   0), (255, 230, 128)), # Gold
+        11: ((  0, 235, 149), (128, 255, 208))  # Turquoise
+    }
+    bg_col = (255,255,255,255)
+
+    # Create a nested list with RGBA values
+    width, height = sys_trace.max_qtime+1, sys_trace.block_size
+
+
+    rgba_list = [[bg_col for _ in range(width)] for _ in range(height)]
+
+    for thr_id in sys_trace.threads_trace:
+        thr_trace = sys_trace.threads_trace[thr_id]
+        thr_color = palette_rgb[thr_id % len(palette_rgb)]
+        for eve in thr_trace:
+            for i in range(eve.size):
+                rgba_list[eve.offset+i][eve.time] = thr_color[eve.event]
+
+    # Flatten the nested list to a 1D list
+    flat_rgba_list = [value for row in rgba_list for value in row]
+
+    # Create PIL Image from the flattened list
+    image = Image.new("RGBA", (width, height))
+    image.putdata(flat_rgba_list)
+
+    # Save the image or display it
+    fname = f"plot_{sys_trace.block_size}x{sys_trace.max_qtime+1}_" \
+        +f"{sys_trace.thread_count}t"
+    print(f"Plot saved in {fname}.png")
+    image.save(fname+".png")
+
+    return
+
+def read_trace_log(open_file):
+    # search for block-size and max-qtime in the header of the trace file
     line_arr = ['']
     block_size = 0
-    thread_count = 0
     max_qtime = 0
 
     while line_arr[0] != "# DATA":
         line_arr = [x.strip() for x in next(open_file).split(':')]
         if line_arr[0] == "block-size":
             block_size = int(line_arr[1])
-        elif line_arr[0] == "thread-count":
-            thread_count =  int(line_arr[1])
         elif line_arr[0] == "max-qtime":
             max_qtime =  int(line_arr[1])
 
@@ -252,7 +308,7 @@ def read_trace_log(open_file):
                         " values for 'block-size', 'thread-count', or 'max-qtime' in its metadata.")
 
     # create the system trace
-    sys_trace = SystemTrace(block_size, max_qtime, thread_count)
+    sys_trace = SystemTrace(block_size, max_qtime)
 
 
     # Now read the actual Memory Trace data
@@ -286,11 +342,9 @@ def main():
         # read log file from mem_trace
         sys_trace = read_trace_log(open_file)
 
-        # show number of threads
-        print(f"Num of Threads: {list(sys_trace.threads_trace.keys())}")
-
-        # draw the memory trace as a mesh
-        draw_trace(sys_trace, fig_height=20)
+        # draw the memory trace
+        #draw_trace(sys_trace, fig_height=20)
+        draw_png(sys_trace)
 
     return
 

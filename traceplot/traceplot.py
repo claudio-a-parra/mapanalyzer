@@ -10,63 +10,6 @@ options = {"in":None, "out":None, "title":None}
 ops_n2v = {'R':1, 'W':2, 'Tc':101, 'Td':102, '?':999}
 ops_v2n = {v: k for k, v in ops_n2v.items()}
 
-def help():
-    global options
-    opts = "in=input_csv_file [out=output_pdf_file] [title=plot_title]"
-    print(f"    USAGE: {os.path.basename(sys.argv[0])} {opts}")
-    print("Plots the memory tracing obtained from the mem_trace pintool.")
-    # print("The 'access' parameter is to plot each byte accessed or just the access event. The\n"
-    #       +"former is useful when the instructions accessing the memory block read/write different\n"
-    #       + "ammounts of bytes in different operations. Generally (for example in a matrix of doubles)\n"
-    #       + "this is not the case. Default 'event'.")
-    return
-
-def parse_args():
-    global options
-    for arg in sys.argv[1:]:
-        eq_idx = arg.find("=")
-        arg_name = arg[:eq_idx]
-        arg_val = arg[(eq_idx+1):]
-
-        if arg_val == '':
-            print(f"ERROR: argument '{arg}' malformed. Expected 'name=value'")
-            help()
-            exit(1)
-        if  arg_name not in options:
-            print(f"ERROR: Unknown argument name '{arg_name}'.'")
-            help()
-            exit(1)
-        options[arg_name] = arg_val
-    # error if no input file was given.
-    if options["in"] == None:
-        print(f"ERROR: Input file not given.")
-        help()
-        exit(1)
-
-    # default output filename
-    if options["out"] == None:
-        options["out"] = '.'.join(options["in"].split('.')[:-1]) + ".pdf"
-    return
-
-
-# class Clock:
-#     """Clock object that keeps track of the
-#     thread or system time position"""
-#     def __init__(self, clk):
-#         self.val = clk
-#         return
-#     @property
-#     def val(self):
-#         return self._val
-#     @val.setter
-#     def val(self, v):
-#         self._val = v
-#         return
-#     @val.deleter
-#     def val(self):
-#         self._val = None
-#         return
-
 class Event:
     def __init__(self, time, ev_name, siz, off):
         try:
@@ -89,69 +32,6 @@ class Event:
     def __format__(self, format_spec):
         eve_name = ops_v2n[self.event]
         return f"[{self.time},{eve_name:2}({self.event:2}),{self.size:2},{self.offset:4}]"
-
-
-# class ThreadTrace:
-#     def __init__(self, clk:Clock, thrid):
-#         self.sys_clock_ref = clk
-#         self.threadid = thrid
-#         self.thr_clock = None
-#         self.times_list = []
-#         self.event_list = []
-#         return
-
-#     def set_mark(self, marker):
-#         # set a marker for later use in the graph.
-#         # use system_clock + 0.5 here, to signify that this event happened
-#         # after the last event, but before the next event.
-#         return
-
-#     def add_event(self, event):
-
-#         # If the thread was previously destroyed (by an event 'Td'), then the
-#         # thread clock should currently be None, otherwise the thread was not
-#         # previously destroyed, and is being created twice.
-#         if event.op_name() == 'Tc':
-#             return
-#             # if self.thr_clock == None:
-#             #     self.set_mark(event.op_name())
-#             #     # self.thr_clock = self.sys_clock_ref.val
-#             #     return
-#             # else:
-#             #     raise Exception(f"Thread {self.threadid} registered two 'Tc' "
-#             #                     +"events not separated by a 'Td' event.")
-
-#         # if the action is to destroy the thread, then the thread should
-#         # reset its clock, so if it ever comes back alive, it shall take
-#         # the system's clock.
-#         if event.op_name() == 'Td':
-#             self.thr_clock = None
-#             self.set_mark(event.op_name())
-#             return
-
-#         # if the thread was supposedly destroyed, but we receive some event
-#         # on it different from 'Tc' (catched above), then let's assume a
-#         # 'Tc' and move on.
-#         if self.thr_clock == None:
-#             self.set_mark(event.op_name())
-#             self.thr_clock = self.sys_clock_ref.val
-
-#         # now actually adding the event to the trace
-#         self.thr_clock += 1
-#         self.times_list.append(self.thr_clock)
-#         self.event_list.append(event)
-
-#         # if this thread's time is the leading one, then update the system's clock
-#         if self.thr_clock > self.sys_clock_ref.val:
-#             self.sys_clock_ref.val = self.thr_clock
-#         return
-
-#     def __format__(self, format_spec):
-#         rtn  = f"thread  : {self.threadid}\n"
-#         rtn += f"thr_clk : {self.thr_clock}\n"
-#         for t,ac in zip(self.times_list,self.event_list):
-#             rtn += f"t:{t:4}, a:{ac}\n"
-#         return rtn
 
 
 class SystemTrace:
@@ -181,10 +61,6 @@ class SystemTrace:
         self.threads_trace[threadid].append(eve0)
 
         return
-
-    #def num_threads(self):
-    #    return len(self.threads_trace)
-
 
     def to_matrix_form(self):
         """creates a list of dictionaries {'id','trace'}.
@@ -222,13 +98,49 @@ class SystemTrace:
             # add this thread_matrix_trace to the list to be returned
             rtn_list.append(thread_trace_matrix)
         return rtn_list
-    
+
     def __format__(self, format_spec):
         rtn  = f"blk_size:{self.block_size}\n"
         rtn += f"sys_clk :{self.max_qtime}\n\n"
         for tt in self.threads_trace:
             rtn += f"{self.threads_trace[tt]}\n"
         return rtn
+
+
+def help():
+    global options
+    opts = "in=input_csv_file [out=output_pdf_file] [title=plot_title]"
+    print(f"    USAGE: {os.path.basename(sys.argv[0])} {opts}")
+    print("Plots the memory tracing obtained from the mem_trace pintool.")
+    return
+
+
+def parse_args():
+    global options
+    for arg in sys.argv[1:]:
+        eq_idx = arg.find("=")
+        arg_name = arg[:eq_idx]
+        arg_val = arg[(eq_idx+1):]
+
+        if arg_val == '':
+            print(f"ERROR: argument '{arg}' malformed. Expected 'name=value'")
+            help()
+            exit(1)
+        if  arg_name not in options:
+            print(f"ERROR: Unknown argument name '{arg_name}'.'")
+            help()
+            exit(1)
+        options[arg_name] = arg_val
+    # error if no input file was given.
+    if options["in"] == None:
+        print(f"ERROR: Input file not given.")
+        help()
+        exit(1)
+
+    # default output filename
+    if options["out"] == None:
+        options["out"] = '.'.join(options["in"].split('.')[:-1]) + ".pdf"
+    return
 
 
 def draw_trace(sys_trace, fig_height=20):
@@ -316,6 +228,7 @@ def draw_trace(sys_trace, fig_height=20):
     fig.savefig(options["out"], bbox_inches='tight')
     return
 
+
 def read_trace_log(open_file):
     print(f"traceplot: reading {options['in']}...")
 
@@ -380,6 +293,7 @@ def main():
         draw_trace(sys_trace, fig_height=20)
 
     return
+
 
 if __name__ == "__main__":
     main()

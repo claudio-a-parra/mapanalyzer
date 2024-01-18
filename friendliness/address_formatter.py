@@ -23,15 +23,17 @@ class AddressFormatter:
 
     def format_addr(self, address):
         tag, index, offset = self.split(address)
-        padded_hex = \
-            self.pad(tag,    16, self.max_tag)   + "|" +\
-            self.pad(index,  16, self.max_index) + "|" +\
-            self.pad(offset, 16, self.max_offset)
         padded_bin = \
-            self.pad(tag,    2, self.max_tag)   + "|" +\
-            self.pad(index,  2, self.max_index) + "|" +\
-            self.pad(offset, 2, self.max_offset)
-        return ("hex:"+padded_hex+"|", "bin:"+padded_bin+"|")
+            "|T:"  + self.pad(tag,    2, self.max_tag)  +\
+            "| I:" + self.pad(index,  2, self.max_index) +\
+            "| O:" + self.pad(offset, 2, self.max_offset)+\
+            "|"
+        padded_hex = \
+            "|T:"  + self.pad(tag,    16, self.max_tag)  +\
+            "| I:" + self.pad(index,  16, self.max_index) +\
+            "| O:" + self.pad(offset, 16, self.max_offset)+\
+            "|"
+        return ("bin:"+padded_bin, "hex:"+padded_hex)
 
     def split(self, address):
         # print(f"split: addr:{address}")

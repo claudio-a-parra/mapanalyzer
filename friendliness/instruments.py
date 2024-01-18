@@ -6,6 +6,8 @@ class InstrCounter:
         self.counter = 0
     def step(self):
         self.counter += 1
+    def set(self, new_val):
+        self.counter = new_val
     def val(self):
         return self.counter
 
@@ -19,6 +21,10 @@ class Instruments:
         self.line_usage = LineUsage(instr_counter, line_size_bytes)
         self.siu_eviction = SIUEviction(instr_counter)
 
+    def report(self):
+        """Report the logs of every instrument"""
+        pass
+        return
 
 
 class Alias:

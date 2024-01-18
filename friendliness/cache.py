@@ -4,7 +4,7 @@ from address_formatter import log2, AddressFormatter
 class Line:
     def __init__(self, line_size_bytes, tag=None, last_time_used=0):
         self.tag = tag # line tag
-        self.accessed_bytes = [False] * line_size_bytes # accessed bytes in the line
+        self.accessed_bytes = [False] * line_size_bytes # accessed bytes
         self.last_time_used = last_time_used # last time the line was used
 
     def access(self, offset, n_bytes, clock):
@@ -35,8 +35,8 @@ class Set:
         self.instr=instr # instruments
 
     def access(self, tag, offset, n_bytes, clock):
-        """Find the Line in this Set that contains a given tag, and access n bytes
-        from it. Handle cache misses."""
+        """Find the Line in this Set that contains a given tag, and access
+        n bytes from it. Handle cache misses."""
         self.instr.alias.append(self.set_index)
         # find line
         index, line = None, None
@@ -88,9 +88,6 @@ class Set:
 
 
 
-
-
-
 class Cache:
     def __init__(self, arch_size_bits, cache_size_bytes,
                  line_size_bytes, associativity, instr=None):
@@ -108,8 +105,6 @@ class Cache:
         self.num_sets = self.cache_size_bytes//(self.associativity*self.line_size_bytes)
         self.index_bits = log2(self.num_sets)
         self.tag_bits = self.arch_size_bits - self.index_bits - self.offset_bits
-
-        self.describe_cache()
 
         self.sets = [Set(self.associativity, self.line_size_bytes,
                          set_index=i, instr=self.instr)
@@ -149,44 +144,50 @@ class Cache:
             s.flush()
 
     def describe_cache(self):
-        print("-- Cache Configuration -----------------")
+        print("── Cache Configuration ─────────────────")
         print(f"Address size  : {self.arch_size_bits} bits")
         print(f"Cache size    : {self.cache_size_bytes} bytes")
         print(f"Number of sets: {self.num_sets}")
         print(f"Associativity : {self.associativity} lines")
         print(f"Line size     : {self.line_size_bytes} bytes")
         print(f"Tag size      : {self.tag_bits} bits")
-        print("-- Instruments -------------------------")
+        print("── Instruments ─────────────────────────")
         print("Line Usage     : Percentage of cache line used.")
         print("SIU Evictions  : Still-in-use Evictions.")
         print("Alias Access   : Cache Aliasing detection.")
         print("Cache hits     : Cache hit ratio.")
         print("TLB trashing   : *TODO* work in progress.")
         print("False sharing  : *TODO* major work.")
-        print("----------------------------------------")
 
-    def describe_line(self, set_index, line_index, line):
-        tag_padding = (self.tag_bits + 3) // 4
-        line_index = "?" if line_index == None else line_index
-        if line.tag == None:
-           tag = " " * tag_padding
-        else:
-            tag = hex(line.tag)[2:].zfill(tag_padding)
-        return f"S{set_index} L{line_index} [{tag}] {line.last_time_used}"
+    def dump(self, show_last=True):
+        """print a representation of all cache sets and their content"""
 
-    def dump(self):
-        """print a representation of the whole cache"""
-        set_number_width = len(str(self.num_sets))
-        set_filler = " " * set_number_width
-        # set, line, tag, last time used
+        # invalid, valid, accessed, and 'right-now-accessing' bytes
+        # For copy/paste: ░ ▒ ▓ █ ← ⇐ ─
+        inv_b, val_b, acc_b, now_b = ' ', '░', '▒', '█'
+
+        set_label_width = len(str(self.num_sets))
+        line_label_width = len(str(self.associativity))
         padding = (self.tag_bits + 3) // 4
+
+        # for each set
         for i,s in enumerate(self.sets):
-            set_name = f"S{str(i).zfill(set_number_width)}"
-            for j,l in reversed(list(enumerate(s.lines))):
+            set_label = f"s{str(i).zfill(set_label_width)} "
+            no_set_label = ' ' * len(set_label)
+            # for each line in the set (line zero on the right)
+            for j,l in enumerate(s.lines):
+                used = l.last_time_used
+                hl = now_b if used == self.clock and show_last else acc_b
+                arr = ' <───' if hl == now_b else ''
+                line_label = f'l{str(j).zfill(line_label_width)} '
                 if l.tag == None:
-                    tag = " " * padding
+                    line_tag_label = ' ' * padding
+                    line_data_label = inv_b * len(l.accessed_bytes)
                 else:
-                    tag = hex(l.tag)[2:].zfill(padding)
-                print(f"{set_name} L{j} [{tag}] {l.last_time_used}")
-                set_name = " "+set_filler
-            # print()
+                    line_tag_label = hex(l.tag)[2:].zfill(padding)
+                    line_data_label =  ''.join(
+                        [hl if b else val_b for b in l.accessed_bytes])
+                print(f"{set_label}{line_label}{line_data_label} "
+                      f"tag:{line_tag_label} acc:{used}{arr}")
+                set_label = no_set_label
+            print()

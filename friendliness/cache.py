@@ -144,20 +144,21 @@ class Cache:
             s.flush()
 
     def describe_cache(self):
-        print("── Cache Configuration ─────────────────")
+        print("\n── Cache Configuration ─────────────────")
         print(f"Address size  : {self.arch_size_bits} bits")
         print(f"Cache size    : {self.cache_size_bytes} bytes")
         print(f"Number of sets: {self.num_sets}")
         print(f"Associativity : {self.associativity} lines")
         print(f"Line size     : {self.line_size_bytes} bytes")
         print(f"Tag size      : {self.tag_bits} bits")
-        print("── Instruments ─────────────────────────")
+        print("\n── Instruments ─────────────────────────")
         print("Line Usage     : Percentage of cache line used.")
         print("SIU Evictions  : Still-in-use Evictions.")
         print("Alias Access   : Cache Aliasing detection.")
         print("Cache hits     : Cache hit ratio.")
-        print("TLB trashing   : *TODO* work in progress.")
-        print("False sharing  : *TODO* major work.")
+        print("False sharing  : *TODO*.")
+        print("TLB trashing   : *TODO* (future work).")
+
 
     def dump(self, show_last=True):
         """print a representation of all cache sets and their content"""

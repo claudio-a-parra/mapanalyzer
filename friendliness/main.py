@@ -121,9 +121,6 @@ def get_cache_specs(specs_map, file_name=None):
 
 def interactive_mode(specs):
     get_cache_specs(specs)
-    print(f'{specs}')
-    print('bye')
-    exit(0)
 
     # Init Instruction Counter, Instruments, Address Formatter, and Cache
     ic = InstrCounter()
@@ -136,7 +133,7 @@ def interactive_mode(specs):
     cache.describe_cache()
 
     max_address = hex(2**cache.arch_size_bits - 1)
-    print("── Interactive Mode ────────────────────")
+    print("\n── Interactive Mode ────────────────────")
     print("Input lines with the following format:\n"
           "    <hex address>,<number of bytes to read>\n"
           "The address must start with '0x'. To exit, type 'exit'.\n"

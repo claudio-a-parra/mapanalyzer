@@ -1,5 +1,0 @@
-# Cache Configuration
-line_size_bytes: 16
-associativity: 2
-cache_size_bytes: 256
-arch_size_bits: 16

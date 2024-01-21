@@ -6,7 +6,9 @@ class Line:
         self.tag = tag # line tag
         self.accessed_bytes = [False] * line_size_bytes # accessed bytes
         self.last_time_used = last_time_used # last time the line was used
-
+        # the last (offset,n_bytes) of accessed bytes. Used to highlight
+        # the last access.
+        self.last_accessed_bytes = (0, 0)
     def access(self, offset, n_bytes, clock):
         """access n bytes in this line starting from offset."""
         # Raise an exception if attempting to access bytes passed the end
@@ -17,6 +19,7 @@ class Line:
             exit(1)
         # Mark bytes as accessed and timestamp
         if n_bytes > 0:
+            self.last_accessed_bytes = (offset, n_bytes)
             self.accessed_bytes[offset:offset+n_bytes] = [True] * n_bytes
             self.last_time_used = clock
 
@@ -36,26 +39,32 @@ class Set:
 
     def access(self, tag, offset, n_bytes, clock):
         """Find the Line in this Set that contains a given tag, and access
-        n bytes from it. Handle cache misses."""
-        self.instr.alias.append(self.set_index)
+        n bytes from it. Handle cache misses. Error if trying to access
+        bytes outside of the selected line"""
         # find line
         index, line = None, None
         for i,l in enumerate(self.lines):
             if l.tag == tag:
                 index,line = i,l
                 break;
-        # handle miss/hit
-        if line != None:
-            # cache hit
-            self.instr.hit_miss.append_hit()
-        else:
+
+        # handle miss
+        if line == None:
             # cache miss
-            self.instr.hit_miss.append_miss()
+            self.instr.miss_counter.append_miss()
+            self.instr.alias.append(self.set_index)
             line = self.lru_line()
             self.evict(line)
             self.fetch(line, tag)
-        # access data in line
+
+        # access data in line, but pay attention to how many bytes are
+        # freshly accessed, these will count towards line_usage.
+        before_access = line.count_accessed()
         line.access(offset, n_bytes, clock)
+        after_access = line.count_accessed()
+        if after_access > before_access:
+            new_access = after_access - before_access
+            self.instr.line_usage.update(new_access, 0)
 
     def lru_line(self):
         """return the least recently used line"""
@@ -68,16 +77,19 @@ class Set:
     def evict(self, line):
         if line.tag == None:
             return
-        self.instr.siu_eviction.append_evict(self.set_index, line.tag)
-        accessed_count = line.count_accessed()
-        self.instr.line_usage.append(accessed_count)
+        self.instr.block_transport.append_evict(self.set_index, line.tag)
+        # these bytes are leaving the cache, so they are negative
+        self.instr.line_usage.update(
+            -line.count_accessed(), -self.line_size_bytes)
         # reset access and tag
         line.accessed_bytes = [False] * len(line.accessed_bytes)
         line.tag = None
+        line.last_time_used = 0
         return
 
     def fetch(self, line, tag):
-        self.instr.siu_eviction.append_fetch(self.set_index, tag)
+        self.instr.block_transport.append_fetch(self.set_index, tag)
+        self.instr.line_usage.update(0, self.line_size_bytes)
         line.tag = tag
         return
 
@@ -89,20 +101,21 @@ class Set:
 
 
 class Cache:
-    def __init__(self, arch_size_bits, cache_size_bytes,
-                 line_size_bytes, associativity, instr=None):
-        self.arch_size_bits = int(arch_size_bits)
-        self.cache_size_bytes = int(cache_size_bytes)
-        self.line_size_bytes = int(line_size_bytes)
-        self.associativity = int(associativity)
+    def __init__(self, specs, instr=None):
+        # arch_size_bits, cache_size_bytes,line_size_bytes, associativity
+        self.arch_size_bits = int(specs['arch'])
+        self.cache_size_bytes = int(specs['size'])
+        self.line_size_bytes = int(specs['line'])
+        self.associativity = int(specs['asso'])
+
         self.clock = 0
         self.instr = instr # instruments
-        self.af = AddressFormatter(arch_size_bits, cache_size_bytes,
-                                   line_size_bytes, associativity)
+        self.af = AddressFormatter(specs)
         # compute the number of bits needed for byte addressing in the line,
         # set selection, and line-tag
         self.offset_bits = log2(self.line_size_bytes)
-        self.num_sets = self.cache_size_bytes//(self.associativity*self.line_size_bytes)
+        self.num_sets = self.cache_size_bytes// \
+            (self.associativity*self.line_size_bytes)
         self.index_bits = log2(self.num_sets)
         self.tag_bits = self.arch_size_bits - self.index_bits - self.offset_bits
 
@@ -143,6 +156,9 @@ class Cache:
         for s in self.sets:
             s.flush()
 
+    def reset_clock(self):
+        self.clock = 0
+
     def describe_cache(self):
         print("\n── Cache Configuration ─────────────────")
         print(f"Address size  : {self.arch_size_bits} bits")
@@ -167,28 +183,42 @@ class Cache:
         # For copy/paste: ░ ▒ ▓ █ ← ⇐ ─
         inv_b, val_b, acc_b, now_b = ' ', '░', '▒', '█'
 
-        set_label_width = len(str(self.num_sets))
-        line_label_width = len(str(self.associativity))
+        set_label_width = len(hex(self.num_sets)[2:])
+        line_label_width = len(hex(self.associativity)[2:])
         padding = (self.tag_bits + 3) // 4
 
-        # for each set
+        # for each set in the cache
         for i,s in enumerate(self.sets):
-            set_label = f"s{str(i).zfill(set_label_width)} "
+            i_hex = hex(i)[2:]
+            set_label = f"s{i_hex.zfill(set_label_width)} "
             no_set_label = ' ' * len(set_label)
-            # for each line in the set (line zero on the right)
+            # for each line in the set
             for j,l in enumerate(s.lines):
-                used = l.last_time_used
-                hl = now_b if used == self.clock and show_last else acc_b
-                arr = ' <───' if hl == now_b else ''
-                line_label = f'l{str(j).zfill(line_label_width)} '
-                if l.tag == None:
-                    line_tag_label = ' ' * padding
-                    line_data_label = inv_b * len(l.accessed_bytes)
-                else:
-                    line_tag_label = hex(l.tag)[2:].zfill(padding)
-                    line_data_label =  ''.join(
-                        [hl if b else val_b for b in l.accessed_bytes])
-                print(f"{set_label}{line_label}{line_data_label} "
-                      f"tag:{line_tag_label} acc:{used}{arr}")
+                j_hex = hex(j)[2:]
+                last_access = l.last_time_used
+
+                # create line label (lX)
+                line_label = f'l{j_hex.zfill(line_label_width)} '
+
+                arrow = ''
+                if l.tag == None: # if it is an invalid line:
+                    tag_label = ' ' * padding
+                    data = inv_b * self.line_size_bytes
+                else: # if this is a valid line
+                    tag_label = hex(l.tag)[2:].zfill(padding)
+                    line = [acc_b if b else val_b
+                            for b in l.accessed_bytes]
+                    # if this line was just accessed, highlight it
+                    if last_access == self.clock and show_last:
+                        arrow = ' <───'
+                        lo,lb = l.last_accessed_bytes
+                        line[lo:lo+lb] = now_b * lb
+                    data = ''.join(line)
+                # print line
+                print(f"{set_label}{line_label}{data} "
+                      f"tag:{tag_label} acc:{last_access}{arrow}")
+                # invisible set label for next lines in the same set
                 set_label = no_set_label
-            print()
+            # skip one line for the next set
+            if i+1 < self.num_sets:
+                print()

@@ -1,0 +1,35 @@
+line_size_bytes: 16
+associativity: 2
+cache_size_bytes: 128
+arch_size_bits: 16
+# TEST: STILL-IN-USE EVICTIONS
+# read bytes from different lines untill fetching one line
+# to each set.
+0x0000,4
+0x0010,4
+0x0020,4
+0x0030,4
+
+# read bytes from different lines that will also end up one
+# in each set.
+0x0104,4
+0x0214,4
+0x0324,4
+0x0434,4
+
+# at this point the cache is full. reading addresses similar to
+# the ones in the first group will trigger evictions of the lines
+# containing the first set of addresses...
+0x0508,4
+0x0618,4
+0x0728,4
+0x0838,4
+
+# ... so if we now request addresses from the lines that were evicted,
+# then the previous cache evictions would have been 'still-in-use' eviction.
+0x000c,4
+0x001c,4
+0x002c,4
+0x003c,4
+
+exit

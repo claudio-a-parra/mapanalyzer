@@ -4,16 +4,15 @@ def log2(x):
     return x.bit_length() - 1
 
 class AddressFormatter:
-    def __init__(self, arch_size_bits, cache_size_bytes,
-                 line_size_bytes, associativity):
-        self.arch_size_bits = int(arch_size_bits)
-        line_size_bytes = int(line_size_bytes)
-        cache_size_bytes = int(cache_size_bytes)
-        associativity = int(associativity)
+    def __init__(self, specs):
+        self.arch_size_bits = int(specs['arch'])
+        line_size_bytes = int(specs['line'])
+        cache_size_bytes = int(specs['size'])
+        associativity = int(specs['asso'])
 
         self.offset_bits = int(log2(line_size_bytes))
         self.index_bits = int(log2(
-            cache_size_bytes // (associativity*line_size_bytes)))
+            cache_size_bytes//(associativity*line_size_bytes)))
         self.tag_bits = int(
             self.arch_size_bits - self.index_bits - self.offset_bits)
 

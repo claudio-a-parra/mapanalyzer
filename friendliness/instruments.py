@@ -19,252 +19,6 @@ class InstrCounter:
 
 
 
-#-------------------------------------------
-class Instruments:
-    def __init__(self, instr_counter, specs, verb=False):
-        self.num_sets = specs['size']//(specs['asso']*specs['line'])
-        self.line_size_bytes = specs['line']
-        self.verb = verb
-        self.ic = instr_counter
-        self.alias = Alias(instr_counter, self.num_sets)
-        self.miss_counter = MissCounter(instr_counter)
-        self.line_usage = LineUsage(instr_counter, specs['line'])
-        self.block_transport = BlockTransport(instr_counter)
-        self.set_verbose(verb)
-        self.metadata = {
-            # (filename, title, unit, min_y, max_y)
-            'al':('_plot_01-aliasing', 'Aliasing', 'rate',
-                  0, 1),
-            'mc':('_plot_02-miss-counter', 'Cache Miss Count', 'count',
-                  0, 1),
-            'lu':('_plot_03-line-usage', 'Line Usage Ratio', 'rate',
-                  0, 1),
-            'su':('_plot_04-siu-evictions', 'Still-in-Use Evictions', 'count',
-                  0, 1),
-            }
-
-        # Each instrument has its own log, where each entry is a tuple:
-        #    (instr, value)
-        # instr: the instruction that registered some value for that
-        #        instrument.
-        # value: the registered value corresponding to that instruction.
-        #
-        # If a given instruction did NOT trigger a given instrument, then
-        # the instrument's log just doesn't have an entry for that
-        # instruction. So these instrument-logs are 'compressed' to just
-        # what is necessary.
-        #
-        # The master_log expands all individual instrument logs into
-        # strictly one entry per instruction, by calling each instrument's
-        # 'deque' method. Then, master_log is a dictionary with one array
-        # per instrument:
-        #     master_log['al'] = [ al_0, al_1, ...., al_(n-1)]
-        #     master_log['mc'] = [ mc_0, mc_1, ...., mc_(n-1)]
-        #     master_log['lu'] = [ lu_0, lu_1, ...., lu_(n-1)]
-        #     master_log['su'] = [ su_0, su_1, ...., su_(n-1)]
-        # al: alias counter: Each al_i is a tuple with the set-ids involved
-        #                    in evictions for that instruction.
-        # mc: miss counter : Each mc_i is an integer with all the cache
-        #                    misses produced by that instruction.
-        # lu: line usage   : Each lu_i is a tuple with two elements:
-        #                    - number of lines evicted
-        #                    - total number of bytes used in those lines
-        # su: siu evictions: Each su_i is an integer with all the
-        #                    still-in-use evictions performed by that
-        #                    instruction.
-        # n: the total number of instructions. All arrays have n elements.
-        self.master_log = {
-            'al': [],
-            'mc': [],
-            'lu': [],
-            'su': []
-        }
-        self.fml = { # filtered master log
-            'al': [],
-            'mc': [],
-            'lu': [],
-            'su': []
-        }
-
-
-    def enable_all(self):
-        self.alias.enabled = True
-        self.miss_counter.enabled = True
-        self.line_usage.enabled = True
-        self.block_transport.enabled = True
-
-
-    def disable_all(self):
-        self.alias.enabled = False
-        self.miss_counter.enabled = False
-        self.line_usage.enabled = False
-        self.block_transport.enabled = False
-
-
-    def prepare_for_second_pass(self):
-        self.alias.enabled = False
-        self.miss_counter.enabled = False
-        self.line_usage.enabled = False
-        self.block_transport.enabled = True
-        self.block_transport.mode = 'evict'
-
-
-    def set_verbose(self, verb=False):
-        self.alias.verbose = verb
-        self.miss_counter.verbose = verb
-        self.line_usage.verbose = verb
-        self.block_transport.verbose = verb
-
-
-    def build_master_log(self):
-        """Compute the master log as an aggregation of all the instruments'
-        logs. Check comments in __init__() function"""
-        if self.verb:
-            print("Master Log:")
-        for ic in range(self.ic.val()+1):
-            al = self.alias.deque(ic)
-            mc = self.miss_counter.deque(ic)
-            lu = self.line_usage.deque(ic)
-            su = self.block_transport.deque(ic)
-            if self.verb:
-                print(f"  Instruction: {ic}:\n"
-                      f"    alias         : {al}\n"
-                      f"    miss_counter  : {mc}\n"
-                      f"    line_usage    : {lu}\n"
-                      f"    SIU evictions : {su}\n")
-            self.master_log['al'].append(al)
-            self.master_log['mc'].append(mc)
-            self.master_log['lu'].append(lu)
-            self.master_log['su'].append(su)
-        return
-
-
-    # BUG
-    def avg_window(self, al_arr, mc_arr, lu_arr, su_arr):
-        """Given a slice of each component of the master log, compute the
-        average for each of them"""
-
-        # Alias --------------------
-        #   Range: [0, 1]
-        #   - 0: cache misses are equally distributed across sets.
-        #   - 1: cache misses are falling all in the same set.
-        #   Target: Minimize.
-        hist = {}
-        # Count frequency of each set
-        for tup in al_arr:
-            for set_index in tup:
-                # create or increment counter for this set
-                if set_index not in hist:
-                    hist[set_index] = 1
-                else:
-                    hist[set_index] +=1
-        # if no set was registered for the whole array, then there
-        # is no aliasing.
-        if len(hist) == 0:
-            al_avg =  0
-        else:
-            # if there is only one set in the system, then any miss will
-            # land in this set.
-            if self.num_sets == 1:
-                al_avg = 1
-            # otherwise, obtain and normalize the ratio
-            raw_ratio = max(hist.values()) / sum(hist.values())
-            normalized_ratio = (raw_ratio - (1/self.num_sets)) * \
-                (self.num_sets/(self.num_sets-1))
-            al_avg = normalized_ratio
-
-        # Miss Counter ---------------------
-        #   Range: [0, inf]
-        #   - 0: there were no cache misses.
-        #   - n: there was a total of n cache misses in this array.
-        #   Target: Minimize
-        mc_sum = sum(mc_arr)
-
-        # Line Usage -----------------------
-        #   Range: [0, 1]
-        #   - 0: none of the valid bytes in cache have been accessed.
-        #   - 1: all valid bytes in the cache have been accessed.
-        #   Target: Maximize
-        lu_avg = sum(lu_arr)/len(lu_arr)
-
-        # Still-in-use Evictions ----------
-        #   Range: [0, inf]
-        #   - 0: there were no SIU evictions.
-        #   - n: there was a total of n SIU evictions.
-        su_sum = sum(su_arr)
-
-        return (al_avg, mc_sum, lu_avg, su_sum)
-
-
-    def filter_log(self, win=5):
-        if len(self.master_log) == 0:
-            raise ValueError("The master log is empty. Cannot filter it.")
-        # the length of the inner arrays, not the dict itself.
-        n = len(self.master_log[next(iter(self.master_log))])
-        if win <= 0 or win > n:
-            raise ValueError(f"Invalid window size {win} for master_log of "
-                             f"size {n}.")
-        self.fml = {
-            'al': [0] * (win-1),
-            'mc': [0] * (win-1),
-            'lu': [0] * (win-1),
-            'su': [0] * (win-1),
-        }
-        for left in range(n - win + 1):
-            right = left + win
-            al_arr = self.master_log['al'][left:right]
-            mc_arr = self.master_log['mc'][left:right]
-            lu_arr = self.master_log['lu'][left:right]
-            su_arr = self.master_log['su'][left:right]
-
-            avg = self.avg_window(al_arr, mc_arr, lu_arr, su_arr)
-
-            self.fml['al'].append(avg[0])
-            self.fml['mc'].append(avg[1])
-            self.fml['lu'].append(avg[2])
-            self.fml['su'].append(avg[3])
-
-
-    def plot_data(self, fname, win=5):
-        """Return a filtered version of the master log."""
-        self.filter_log(win=win)
-        # the length of the inner arrays, not the dict itself.
-        n = len(self.master_log[next(iter(self.master_log))])
-
-        if self.verb:
-            print(f"Filtered Log (win={win})")
-            for ic in range(n):
-                al = self.fml['al'][ic]
-                mc = self.fml['mc'][ic]
-                lu = self.fml['lu'][ic]
-                su = self.fml['su'][ic]
-                print(f"  Instruction: {ic}:\n"
-                      f"    f_alias         : {al}\n"
-                      f"    f_miss_counter  : {mc}\n"
-                      f"    f_line_usage    : {lu}\n"
-                      f"    f_SIU evictions : {su}\n")
-
-        x = range(n)
-        colors = ['red', 'green', 'blue', 'orange', 'black']
-        for i,instrument in enumerate(self.fml):
-            y = self.fml[instrument]
-            fname_sufix,title,unit,min_y,max_y = self.metadata[instrument]
-            col = colors[i%len(colors)]
-
-            fig, ax = plt.subplots(figsize=(8, 6))
-            ax.plot(x, y, color=col, linewidth=1.5)
-            #ax.step(x, y, color=col, linewidth=1.5, where='post')
-            ax.set_title(title+f' (window={win})')
-            ax.set_ylim(min_y, max(max_y, max(y)))
-            ax.set_ylabel(unit)
-            fig.savefig(fname+fname_sufix+'.png', dpi=300,
-                        bbox_inches='tight')
-
-
-
-
-
-
 
 #-------------------------------------------
 class Alias:
@@ -312,8 +66,6 @@ class Alias:
 
 
 
-
-
 #-------------------------------------------
 class MissCounter:
     """Keep track of hits and misses."""
@@ -349,11 +101,6 @@ class MissCounter:
             return 0
         _, cache_misses = self.log.popleft()
         return cache_misses
-
-
-
-
-
 
 
 
@@ -422,8 +169,6 @@ class LineUsage:
         if valid != 0:
             self.last_ratio = acc/valid
         return self.last_ratio
-
-
 
 
 
@@ -528,3 +273,307 @@ class BlockTransport:
             return 0
         _, siu_count = self.log.popleft()
         return siu_count
+
+
+
+
+
+#-------------------------------------------
+class Instruments:
+    def __init__(self, instr_counter, specs, ap, plots_dims=(8,6), ap_factor=10000,
+                 verb=False):
+        self.num_sets = specs['size']//(specs['asso']*specs['line'])
+        self.line_size_bytes = specs['line']
+        self.access_pattern = ap
+        self.verb = verb
+        self.ic = instr_counter
+        self.alias = Alias(instr_counter, self.num_sets)
+        self.miss_counter = MissCounter(instr_counter)
+        self.line_usage = LineUsage(instr_counter, specs['line'])
+        self.block_transport = BlockTransport(instr_counter)
+        self.set_verbose(verb)
+        self.metadata = {
+            # (filename, title, unit, min_y, max_y)
+            'al':('_plot-01-aliasing',
+                  'Aliasing',
+                  '(less is better)',
+                  'Rate',
+                  0, 1),
+            'mc':('_plot-02-miss-counter',
+                  'Cache Miss Count',
+                  '(less is better)',
+                  'Count',
+                  0, 1),
+            'lu':('_plot-03-line-usage',
+                  'Line Usage Ratio',
+                  '(more is better)',
+                  'Rate',
+                  0, 1),
+            'su':('_plot-04-siu-evictions',
+                  'Still-in-Use Evictions',
+                  '(less is better)',
+                  'Count',
+                  0, 1),
+            }
+
+        # Each instrument has its own log, where each entry is a tuple:
+        #    (instr, value)
+        # instr: the instruction that registered some value for that
+        #        instrument.
+        # value: the registered value corresponding to that instruction.
+        #
+        # If a given instruction did NOT trigger a given instrument, then
+        # the instrument's log just doesn't have an entry for that
+        # instruction. So these instrument-logs are 'compressed' to just
+        # what is necessary.
+        #
+        # The master_log expands all individual instrument logs into
+        # strictly one entry per instruction, by calling each instrument's
+        # 'deque' method. Then, master_log is a dictionary with one array
+        # per instrument:
+        #     master_log['al'] = [ al_0, al_1, ...., al_(n-1)]
+        #     master_log['mc'] = [ mc_0, mc_1, ...., mc_(n-1)]
+        #     master_log['lu'] = [ lu_0, lu_1, ...., lu_(n-1)]
+        #     master_log['su'] = [ su_0, su_1, ...., su_(n-1)]
+        # al: alias counter: Each al_i is a tuple with the set-ids involved
+        #                    in evictions for that instruction.
+        # mc: miss counter : Each mc_i is an integer with all the cache
+        #                    misses produced by that instruction.
+        # lu: line usage   : Each lu_i is a tuple with two elements:
+        #                    - number of lines evicted
+        #                    - total number of bytes used in those lines
+        # su: siu evictions: Each su_i is an integer with all the
+        #                    still-in-use evictions performed by that
+        #                    instruction.
+        # n: the total number of instructions. All arrays have n elements.
+
+        # Master Log of all instruments
+        self.master_log = {
+            'al': [],
+            'mc': [],
+            'lu': [],
+            'su': []
+        }
+        # Filtered master log
+        self.fml = {
+            'al': [],
+            'mc': [],
+            'lu': [],
+            'su': []
+        }
+        # Sliding window size used in fml.
+        self.fml_window = None
+
+        # Plot parameters and access pattern coordinates.
+        self.plot_width_height = plots_dims # Plots dimensions
+        self.ap_factor = ap_factor # factor by which the dimensions are expanded.
+        # Log of compressed coordinates within the space memory x time. Handled by
+        # self.add_access()
+        self.ap_coord = {'x':[], 'y':[]}
+
+
+    def enable_all(self):
+        self.alias.enabled = True
+        self.miss_counter.enabled = True
+        self.line_usage.enabled = True
+        self.block_transport.enabled = True
+
+
+    def disable_all(self):
+        self.alias.enabled = False
+        self.miss_counter.enabled = False
+        self.line_usage.enabled = False
+        self.block_transport.enabled = False
+
+
+    def prepare_for_second_pass(self):
+        self.alias.enabled = False
+        self.miss_counter.enabled = False
+        self.line_usage.enabled = False
+        self.block_transport.enabled = True
+        self.block_transport.mode = 'evict'
+
+
+    def set_verbose(self, verb=False):
+        self.alias.verbose = verb
+        self.miss_counter.verbose = verb
+        self.line_usage.verbose = verb
+        self.block_transport.verbose = verb
+
+
+    def build_master_log(self):
+        """Compute the master log as an aggregation of all the instruments'
+        logs. Check comments in __init__() function"""
+        if self.verb:
+            print("Master Log:")
+        for ic in range(self.ic.val()+1):
+            al = self.alias.deque(ic)
+            mc = self.miss_counter.deque(ic)
+            lu = self.line_usage.deque(ic)
+            su = self.block_transport.deque(ic)
+            if self.verb:
+                print(f"  Instruction: {ic}:\n"
+                      f"    alias         : {al}\n"
+                      f"    miss_counter  : {mc}\n"
+                      f"    line_usage    : {lu}\n"
+                      f"    SIU evictions : {su}\n")
+            self.master_log['al'].append(al)
+            self.master_log['mc'].append(mc)
+            self.master_log['lu'].append(lu)
+            self.master_log['su'].append(su)
+        return
+
+
+    def avg_window(self, al_arr, mc_arr, lu_arr, su_arr):
+        """Given a slice of each component of the master log, compute the
+        average for each of them"""
+
+        # Alias --------------------
+        #   Range: [0, 1]
+        #   - 0: cache misses are equally distributed across sets.
+        #   - 1: cache misses are falling all in the same set.
+        #   Target: Minimize.
+        hist = {}
+        # Count frequency of each set
+        for tup in al_arr:
+            for set_index in tup:
+                # create or increment counter for this set
+                if set_index not in hist:
+                    hist[set_index] = 1
+                else:
+                    hist[set_index] +=1
+        # if no set was registered for the whole array, then there
+        # is no aliasing.
+        if len(hist) == 0:
+            al_avg =  0
+        else:
+            # if there is only one set in the system, then any miss will
+            # land in this set.
+            if self.num_sets == 1:
+                al_avg = 1
+            # otherwise, obtain and normalize the ratio
+            raw_ratio = max(hist.values()) / sum(hist.values())
+            normalized_ratio = (raw_ratio - (1/self.num_sets)) * \
+                (self.num_sets/(self.num_sets-1))
+            al_avg = normalized_ratio
+
+        # Miss Counter ---------------------
+        #   Range: [0, inf]
+        #   - 0: there were no cache misses.
+        #   - n: there was a total of n cache misses in this array.
+        #   Target: Minimize
+        mc_sum = sum(mc_arr)
+
+        # Line Usage -----------------------
+        #   Range: [0, 1]
+        #   - 0: none of the valid bytes in cache have been accessed.
+        #   - 1: all valid bytes in the cache have been accessed.
+        #   Target: Maximize
+        lu_avg = sum(lu_arr)/len(lu_arr)
+
+        # Still-in-use Evictions ----------
+        #   Range: [0, inf]
+        #   - 0: there were no SIU evictions.
+        #   - n: there was a total of n SIU evictions.
+        su_sum = sum(su_arr)
+
+        return (al_avg, mc_sum, lu_avg, su_sum)
+
+
+    def filter_log(self, win=10):
+        if len(self.master_log) == 0:
+            raise ValueError("The master log is empty. Cannot filter it.")
+        # the length of the inner arrays, not the dict itself.
+        n = len(self.master_log[next(iter(self.master_log))])
+        if win <= 0 or win > n:
+            print(f"Invalid window size {win} for master_log of size {n}.")
+            sys.exit(1)
+        self.fml = {
+            'al': [0] * (win-1),
+            'mc': [0] * (win-1),
+            'lu': [0] * (win-1),
+            'su': [0] * (win-1),
+        }
+        self.fml_window = win
+        if self.verb:
+            print(f"Filtered Log (win={win})")
+        for left in range(n - win + 1):
+            right = left + win
+            al_arr = self.master_log['al'][left:right]
+            mc_arr = self.master_log['mc'][left:right]
+            lu_arr = self.master_log['lu'][left:right]
+            su_arr = self.master_log['su'][left:right]
+
+            avg = self.avg_window(al_arr, mc_arr, lu_arr, su_arr)
+            if self.verb:
+                print(f"  Instrs {left}-{right}:\n"
+                      f"    f_alias         : {avg[0]}\n"
+                      f"    f_miss_counter  : {avg[1]}\n"
+                      f"    f_line_usage    : {avg[2]}\n"
+                      f"    f_SIU evictions : {avg[3]}\n")
+            self.fml['al'].append(avg[0])
+            self.fml['mc'].append(avg[1])
+            self.fml['lu'].append(avg[2])
+            self.fml['su'].append(avg[3])
+
+
+    def add_access(self, access):
+        # get the time of access and the offset within the observed memory block
+        exec_time = access.time
+        block_offset = access.addr - self.access_pattern.base_addr
+        # make x and y range from 0.0 to 1.0
+        x_coord = exec_time / self.access_pattern.time_size
+        y_coord = block_offset / self.access_pattern.block_size
+        # scale up to plot size
+        x_coord = x_coord * self.plot_width_height[0] * self.ap_factor
+        y_coord = y_coord * self.plot_width_height[1] * self.ap_factor
+        # append coordinates
+        self.ap_coord['x'].append(x_coord)
+        self.ap_coord['y'].append(y_coord)
+
+
+    def plot_access_pattern(self, base_name):
+        fig, ax = plt.subplots(figsize=self.plot_width_height)
+        x = self.ap_coord['x']
+        y = self.ap_coord['y']
+        ax.set_title(base_name+': Access Pattern')
+        ax.scatter(x,y, color='magenta', marker='s', s=0.05, label='Access Pattern')
+        ax.invert_yaxis()
+        ax.legend()
+        ax.set_xlim(0,self.access_pattern.time_size)
+        ax.set_xlabel('Memory Access (time)')
+        ax.set_ylabel('Memory Address (space)')
+        fig.savefig(base_name+'_plot-00-access-pattern.pdf', dpi=1200,
+                    bbox_inches='tight')
+
+
+    def plot_data(self, base_name):
+        # plot the access pattern itself.
+        self.plot_access_pattern(base_name)
+        # obtain the number of entries registered by the instruments.
+        n = len(self.master_log[next(iter(self.master_log))])
+        if n == 0:
+            print('Error: Log not filtered yet. Call '
+                  'Instruments.filter_log() before Instruments.plot_data()')
+            sys.exit(1)
+
+        x = range(n)
+        colors = ['red', 'green', 'blue', 'orange', 'black']
+        for i,instrument in enumerate(self.fml):
+            y = self.fml[instrument]
+            sufix,title,subtitle,unit,min_y,max_y = \
+                self.metadata[instrument]
+            col = colors[i%len(colors)]
+
+            fig, ax = plt.subplots(figsize=self.plot_width_height)
+            ax.plot(x, y, color=col, linewidth=1.5)
+            #ax.step(x, y, color=col, linewidth=1.5, where='post')
+
+            ax.set_title(base_name+': '+title+f' (w={self.fml_window})\n'+
+                         subtitle)
+            ax.set_xlim(0,self.access_pattern.time_size)
+            ax.set_ylim(min_y, max(max_y, max(y)))
+            ax.set_ylabel(unit)
+            ax.set_xlabel('Memory Access Instruction')
+            fig.savefig(base_name+sufix+'.pdf', dpi=600,
+                        bbox_inches='tight')

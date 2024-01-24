@@ -123,19 +123,32 @@ class Cache:
                          set_index=i, instr=self.instr)
                      for i in range(self.num_sets)] # the array of sets
 
-    def access(self, addr, n_bytes):
+    def access(self, access):
         """
         Access 'n bytes' starting from address 'addr'. If this requires to access
         multiple cache lines, then generate multiple accesses.
         """
-        # the potentially many lines are all accessed at the same time
+        # ignore Thread creation and destroying
+        if access.event in ('Tc', 'Td'):
+            return
+
+        # TODO: Do something with the other members of the access object:
+        # - (USED) addr: address of access
+        # - (USED)size: the number of bytes accessed
+        # - event: read or write event {'R', 'W'}
+        # - thread: the thread accessing data
+        # - time: the timestamp of the instruction.
+        addr = access.addr
+        n_bytes = access.size
+        self.instr.add_access(access)
+        # the potentially many lines are all accessed at the same time (cache.clock)
         self.clock += 1
         if addr.bit_length() > self.arch_size_bits:
             raise ValueError("Access issued to address beyond architecture word size")
             exit(1)
         while n_bytes > 0:
             v_tag, index, offset = self.af.split(addr)
-            # v_tag, index, offset = self.decompose_addr(addr)
+            # TODO: implement TLB and physical addresses
             p_tag = v_tag
 
             # handle multi-line accesses

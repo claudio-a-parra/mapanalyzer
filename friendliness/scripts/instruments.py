@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+import sys
 from collections import deque
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
 class InstrCounter:
     """Instruction Counter"""
@@ -280,7 +282,7 @@ class BlockTransport:
 
 #-------------------------------------------
 class Instruments:
-    def __init__(self, instr_counter, specs, ap, plots_dims=(8,6), ap_factor=10000,
+    def __init__(self, instr_counter, specs, ap, plots_dims=(8,6), ap_factor=100,
                  verb=False):
         self.num_sets = specs['size']//(specs['asso']*specs['line'])
         self.line_size_bytes = specs['line']
@@ -297,23 +299,23 @@ class Instruments:
             'al':('_plot-01-aliasing',
                   'Aliasing',
                   '(less is better)',
-                  'Rate',
-                  0, 1),
+                  'Aliasing Rate',
+                  0, 1.05),
             'mc':('_plot-02-miss-counter',
                   'Cache Miss Count',
                   '(less is better)',
-                  'Count',
-                  0, 1),
+                  'Cache Miss Count',
+                  0, 1.05),
             'lu':('_plot-03-line-usage',
-                  'Line Usage Ratio',
+                  'Cache Usage Ratio',
                   '(more is better)',
-                  'Rate',
-                  0, 1),
+                  'Cache Usage Rate',
+                  0, 1.05),
             'su':('_plot-04-siu-evictions',
                   'Still-in-Use Evictions',
                   '(less is better)',
-                  'Count',
-                  0, 1),
+                  'SIU Evictions Count',
+                  0, 1.05),
             }
 
         # Each instrument has its own log, where each entry is a tuple:
@@ -364,12 +366,28 @@ class Instruments:
         # Sliding window size used in fml.
         self.fml_window = None
 
-        # Plot parameters and access pattern coordinates.
-        self.plot_width_height = plots_dims # Plots dimensions
-        self.ap_factor = ap_factor # factor by which the dimensions are expanded.
-        # Log of compressed coordinates within the space memory x time. Handled by
-        # self.add_access()
-        self.ap_coord = {'x':[], 'y':[]}
+        # Plot sizes
+        self.plot_width = plots_dims[0]
+        self.plot_height = plots_dims[1]
+
+        # if you handle the matrix [Mem x Time], this shit blows up.
+        # So we will map all accesses to a reduced version of that matrix:
+        # the access_matrix.
+        # That matrix has the size of a plot, but amplified by ap_factor.
+        # however, for small [Mem x Time] situations, ap_factor*plot_height
+        # may end up being bigger than just the extension of Mem.
+        if ap_factor*self.plot_height > \
+           self.access_pattern.block_size:
+            self.ap_factor = \
+                round(self.access_pattern.block_size / self.plot_height)
+        else:
+            self.ap_factor = ap_factor
+
+        # matrix of (ap_factor*plots_dims[x]) columns and
+        # (ap_factor*plots_dims[y]) rows. The access pattern is mapped to this space.
+        # Matrix populated by self.add_access()
+        self.access_matrix = [[0] * self.ap_factor*self.plot_width
+                              for _ in range(self.ap_factor*self.plot_height)]
 
 
     def enable_all(self):
@@ -518,62 +536,213 @@ class Instruments:
 
 
     def add_access(self, access):
-        # get the time of access and the offset within the observed memory block
-        exec_time = access.time
-        block_offset = access.addr - self.access_pattern.base_addr
-        # make x and y range from 0.0 to 1.0
-        x_coord = exec_time / self.access_pattern.time_size
-        y_coord = block_offset / self.access_pattern.block_size
-        # scale up to plot size
-        x_coord = x_coord * self.plot_width_height[0] * self.ap_factor
-        y_coord = y_coord * self.plot_width_height[1] * self.ap_factor
-        # append coordinates
-        self.ap_coord['x'].append(x_coord)
-        self.ap_coord['y'].append(y_coord)
+        """The idea is to take an access happening at (addr, time), and map it
+        to (y,x) in self.access_matrix."""
+        for i in range(access.size):
+            # obtain the original coordinates
+            addr = access.addr - self.access_pattern.base_addr + i
+            time = access.time
+            # transform to a percentage form [0-1)
+            addr = addr / self.access_pattern.block_size
+            time = time / self.access_pattern.time_size
+            # obtain the size of the access matrix
+            acc_addr_size = len(self.access_matrix)
+            acc_time_size = len(self.access_matrix[0])
+            # now map the coordinate to the access_matrix. -1 so we don't overflow
+            addr_acc = round(addr * (acc_addr_size-1))
+            time_acc = round(time * (acc_time_size-1))
+            # store the value in the matrix. The stored value is the thread
+            # number + 1 so empty cells remain 0 and used cells become 1, 2, 3, ...
+            #print(f"dim(access_matrix) = {acc_addr_size}, {acc_time_size}")
+            #print(f"access_matrix[{addr_acc}][{time_acc}] = 1+{access.thread}")
+            # input('cont?')
+            self.access_matrix[addr_acc][time_acc] = 1+access.thread
 
 
-    def plot_access_pattern(self, base_name):
-        fig, ax = plt.subplots(figsize=self.plot_width_height)
-        x = self.ap_coord['x']
-        y = self.ap_coord['y']
-        ax.set_title(base_name+': Access Pattern')
-        ax.scatter(x,y, color='magenta', marker='s', s=0.05, label='Access Pattern')
-        ax.invert_yaxis()
-        ax.legend()
-        ax.set_xlim(0,self.access_pattern.time_size)
-        ax.set_xlabel('Memory Access (time)')
-        ax.set_ylabel('Memory Address (space)')
-        fig.savefig(base_name+'_plot-00-access-pattern.pdf', dpi=1200,
-                    bbox_inches='tight')
+        # # get the time of access and the offset within the observed memory
+        # # block
+        # exec_time = access.time
+        # block_offset = access.addr - self.access_pattern.base_addr
+        # # make x and y range from 0.0 to 1.0
+        # x_coord = exec_time / self.access_pattern.time_size
+        # y_coord = block_offset / self.access_pattern.block_size
+        # # scale up to plot size
+        # x_coord = x_coord * self.plot_width_height[0] * self.ap_factor
+        # y_coord = y_coord * self.plot_width_height[1] * self.ap_factor
+        # # append coordinates
+        # self.ap_coord['x'].append(x_coord)
+        # self.ap_coord['y'].append(y_coord)
 
 
-    def plot_data(self, base_name):
-        # plot the access pattern itself.
-        self.plot_access_pattern(base_name)
-        # obtain the number of entries registered by the instruments.
-        n = len(self.master_log[next(iter(self.master_log))])
-        if n == 0:
-            print('Error: Log not filtered yet. Call '
-                  'Instruments.filter_log() before Instruments.plot_data()')
-            sys.exit(1)
 
-        x = range(n)
-        colors = ['red', 'green', 'blue', 'orange', 'black']
+    def plot(self, base_name):
+        """Create all instrument plots with the access pattern in the
+        background"""
+        #### Plot Access Pattern
+        # obtain as many different colors as threads in the access pattern.
+        colors_needed = self.access_pattern.thread_count
+        palette = {
+            0 :('#1f77b4','#81beea'), # Steel Blue
+            1 :('#ff7f0e','#ffc08a'), # Dark Orange
+            2 :('#2ca02c','#8ad68a'), # Dark Green
+            3 :('#d62728','#efa9a9'), # Red
+            4 :('#9467bd','#cdb8e0'), # Slate Blue
+            5 :('#8c564b','#cda9a2'), # Sienna
+            6 :('#e377c2','#f2c0e3'), # Orchid Pink
+            7 :('#7f7f7f','#bfbfbf'), # Gray
+            8 :('#bcbd22','#ebeb8e'), # Olive Green
+            9 :('#17becf','#8ce8f2'), # Cyan
+            10:('#fac800','#ffe680'), # Yellow
+            11:('#00eb95','#80ffd0')} # Turquoise Green
+        if colors_needed > len(palette):
+            print(f'Warning: The Access Pattern has more threads than colors '
+                  'available to plot. Different threads will share colors.')
+        cmap = ListedColormap(
+            ['#ffffff'] + [palette[i%len(palette)][0]
+                       for i in range(colors_needed)])
+        # create figure and axe
+        # fig_ap,ax_ap = plt.subplots(figsize=(self.plot_width,self.plot_height))
+        # access_pattern = ax_ap.pcolor(self.access_matrix, cmap=cmap)
+        # ax_ap.invert_yaxis()
+        # ax_ap.set_ylabel('Memory')
+        # ax_ap.set_title('Memory Access Pattern')
+
+
+        # fig_instr, ax_instr = plt.subplots()
+        # line_plot1, = ax_instr.plot(x, y_line1, linestyle='-', color='red', label='Line Plot 1')
+        # ax_instr.set_xlabel('X-axis')
+        # ax_instr.set_ylabel('Line Y-axis 1', color='red')
+        # ax_instr.set_title('Line Plot 1')
+        # ax_instr.legend([pcolor, line_plot1], ['Pseudocolor Plot', 'Line Plot 1'])
+
+        #### Plot instruments
+        # Instruments colors and plots
+        col_instr = ['red', 'green', 'blue', 'orange', 'black']
+        plt_instr = []
+        # # the X axis represents time (of the instruction)
+        # shared_x = range(self.access_pattern.time_size)
         for i,instrument in enumerate(self.fml):
-            y = self.fml[instrument]
-            sufix,title,subtitle,unit,min_y,max_y = \
-                self.metadata[instrument]
-            col = colors[i%len(colors)]
+            print(f'    {instrument}...')
+            # get data
+            instr_x = range(len(self.fml[instrument]))
+            instr_y = self.fml[instrument]
+            col_i = col_instr[i%len(col_instr)]
+            sufix,title,subtitle,unit,min_y,max_y = self.metadata[instrument]
+            max_y = max(max(instr_y), max_y) * 1.05
+            # do the drawings
+            plt.imshow(
+                self.access_matrix,
+                cmap=cmap,
+                aspect='auto',
+                extent=[0, len(self.fml[instrument])-1, 0, max_y]
+            )
+            # plt.pcolor(self.access_matrix, cmap=cmap,
+            #            extent=[min(instr_x), max(instr_x), 0, len(instr_y)])
 
-            fig, ax = plt.subplots(figsize=self.plot_width_height)
-            ax.plot(x, y, color=col, linewidth=1.5)
-            #ax.step(x, y, color=col, linewidth=1.5, where='post')
+            plt.ylim(min_y, max_y)
+            plt.xlabel('Instruction')
+            plt.ylabel(unit)
+            plt.title(base_name+': '+title+f' (w={self.fml_window})\n'+subtitle)
+            plt.step(
+                instr_x,
+                instr_y,
+                color=col_i,
+                linewidth=1.5,
+                where='post')
 
-            ax.set_title(base_name+': '+title+f' (w={self.fml_window})\n'+
-                         subtitle)
-            ax.set_xlim(0,self.access_pattern.time_size)
-            ax.set_ylim(min_y, max(max_y, max(y)))
-            ax.set_ylabel(unit)
-            ax.set_xlabel('Memory Access Instruction')
-            fig.savefig(base_name+sufix+'.pdf', dpi=600,
+            plt.savefig(base_name+sufix+'.png', dpi=600,
                         bbox_inches='tight')
+            plt.clf()
+
+
+
+
+
+
+            # fig_ap,ax_ap = plt.subplots(figsize=(self.plot_width,self.plot_height))
+            # access_pattern = ax_ap.pcolor(self.access_matrix, cmap=cmap)
+            # ax_ap.invert_yaxis()
+            # ax_ap.set_ylabel('Memory')
+            # ax_ap.set_title('Memory Access Pattern')
+
+
+
+            # # Instrument
+            # instr_x = range(len(self.fml[instrument]))
+            # instr_y = self.fml[instrument]
+            # sufix,title,subtitle,unit,min_y,max_y = self.metadata[instrument]
+            # col_i = col_instr[i%len(col_instr)]
+
+            # plt_instr, ax_instr = plt.subplots(
+            #     figsize=(self.plot_width, self.plot_height))
+            # instr_plot = plt_instr[1].plot(x, y, color=col_i, linewidth=1.5)
+            # #plt_instr[1]step(x, y, color=col, linewidth=1.5, where='post')
+
+            # plt_instr[1].set_title(
+            #     base_name+': '+title+f' (w={self.fml_window})\n'+subtitle)
+            # plt_instr[1].set_xlim(0,self.access_pattern.time_size)
+            # plt_instr[1].set_ylim(min_y, max(max_y, max(y)))
+            # plt_instr[1].set_ylabel(unit)
+            # plt_instr[1].set_xlabel('Memory Access Instruction')
+            # plt_instr[1].legend([access_pattern, instr_plot],
+            #                     ['Access Pattern', title])
+            # plt_instr[0].savefig(base_name+sufix+'.png', dpi=600,
+            #             bbox_inches='tight')
+
+
+
+
+
+
+
+    #   fig_ap.savefig(base_name+'_plot-00-access-pattern.png', dpi=600,
+    #                bbox_inches='tight')
+
+
+
+    # def plot_access_pattern(self, base_name):
+    #     fig, ax = plt.subplots(figsize=self.plot_width_height)
+    #     x = self.ap_coord['x']
+    #     y = self.ap_coord['y']
+    #     ax.set_title(base_name+': Access Pattern')
+    #     ax.scatter(x,y, color='magenta', marker='s', s=0.05,
+    #                label='Access Pattern')
+    #     ax.invert_yaxis()
+    #     ax.legend()
+    #     ax.set_xlim(0,self.access_pattern.time_size)
+    #     ax.set_xlabel('Memory Access (time)')
+    #     ax.set_ylabel('Memory Address (space)')
+    #     fig.savefig(base_name+'_plot-00-access-pattern.pdf', dpi=1200,
+    #                 bbox_inches='tight')
+
+
+    # def plot_data(self, base_name):
+    #     # plot the access pattern itself.
+    #     self.plot_access_pattern(base_name)
+    #     # obtain the number of entries registered by the instruments.
+    #     n = len(self.master_log[next(iter(self.master_log))])
+    #     if n == 0:
+    #         print('Error: Log not filtered yet. Call '
+    #               'Instruments.filter_log() before Instruments.plot_data()')
+    #         sys.exit(1)
+
+    #     x = range(n)
+    #     colors = ['red', 'green', 'blue', 'orange', 'black']
+    #     for i,instrument in enumerate(self.fml):
+    #         y = self.fml[instrument]
+    #         sufix,title,subtitle,unit,min_y,max_y = \
+    #             self.metadata[instrument]
+    #         col = colors[i%len(colors)]
+
+    #         fig, ax = plt.subplots(figsize=self.plot_width_height)
+    #         ax.plot(x, y, color=col, linewidth=1.5)
+    #         #ax.step(x, y, color=col, linewidth=1.5, where='post')
+
+    #         ax.set_title(base_name+': '+title+f' (w={self.fml_window})\n'+
+    #                      subtitle)
+    #         ax.set_xlim(0,self.access_pattern.time_size)
+    #         ax.set_ylim(min_y, max(max_y, max(y)))
+    #         ax.set_ylabel(unit)
+    #         ax.set_xlabel('Memory Access Instruction')
+    #         fig.savefig(base_name+sufix+'.pdf', dpi=600,
+    #                     bbox_inches='tight')

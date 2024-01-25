@@ -163,19 +163,18 @@ def draw_trace(sys_trace, fig_height=20):
     print("Log to Matrix format: OK")
 
     # create discrete colormap
-    palette = {0 :('#1f77b4','#81beea'),
-               1 :('#ff7f0e','#ffc08a'),
-               2 :('#2ca02c','#8ad68a'),
-               3 :('#d62728','#efa9a9'),
-               4 :('#9467bd','#cdb8e0'),
-               5 :('#8c564b','#cda9a2'),
-               6 :('#e377c2','#f2c0e3'),
-               7 :('#7f7f7f','#bfbfbf'),
-               8 :('#bcbd22','#ebeb8e'),
-               9 :('#17becf','#8ce8f2'),
-               10:('#fac800','#ffe680'),
-               11:('#00eb95','#80ffd0')}
-
+    palette = {0 :('#1f77b4','#81beea'), # Steel Blue
+               1 :('#ff7f0e','#ffc08a'), # Dark Orange
+               2 :('#2ca02c','#8ad68a'), # Dark Green
+               3 :('#d62728','#efa9a9'), # Red
+               4 :('#9467bd','#cdb8e0'), # Slate Blue
+               5 :('#8c564b','#cda9a2'), # Sienna
+               6 :('#e377c2','#f2c0e3'), # Orchid Pink
+               7 :('#7f7f7f','#bfbfbf'), # Gray
+               8 :('#bcbd22','#ebeb8e'), # Olive Green
+               9 :('#17becf','#8ce8f2'), # Cyan
+               10:('#fac800','#ffe680'), # Yellow
+               11:('#00eb95','#80ffd0')} # Turquoise Green
 
     if len(access_matrices) > len(palette):
         print("Warning! There are more threads than colors.")

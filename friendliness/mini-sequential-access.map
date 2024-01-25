@@ -1,0 +1,29 @@
+# METADATA
+comment      : sequential access
+start-addr   : 0xff000
+end-addr     : 0xfffef
+block-size   : 128
+owner-thread : 0
+slice-size   : 129
+thread-count : 1
+event-count  : 16
+max-qtime    : 16
+
+# DATA
+time,thread,event,size,offset
+1,0,R,8,0
+2,0,R,8,8
+3,0,W,8,16
+4,0,W,8,24
+5,0,R,8,32
+6,0,R,8,40
+7,0,W,8,48
+8,0,W,8,56
+9,0,R,8,64
+10,0,R,8,72
+11,0,W,8,80
+12,0,W,8,88
+13,0,R,8,96
+14,0,R,8,104
+15,0,W,8,112
+16,0,W,8,120

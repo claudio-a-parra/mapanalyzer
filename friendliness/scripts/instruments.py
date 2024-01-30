@@ -22,171 +22,295 @@ class InstrCounter:
 
 
 
-#-------------------------------------------
-class Alias:
-    """Triggered at each Cache miss. Logs which set is the one effecting
-    the fetching."""
-    def __init__(self, instr_counter, num_sets):
-        self.enabled = True
-        self.verbose = False
-        self.ic = instr_counter
-        # Array of nested tuples:
-        #    (ic , (s0, s1, ...))
-        # ic: instruction counter
-        # sn: set index where a miss happened. (A single instruction could
-        #     trigger more than a single line eviction.)
-        self.log = deque()
-
-    def append(self, index):
-        if not self.enabled:
-            return
-        if self.verbose:
-            i = hex(index)[2:]
-            print(f"  [!] {self.__class__.__name__}: S{index}")
-
-        self.log_append_increment(self.ic.val(), index)
-
-    def log_append_increment(self, curr_instr, index):
-        # append to log, or increment tuple of last log entry.
-        if len(self.log) == 0 or self.log[-1][0] != curr_instr:
-            self.log.append((curr_instr,(index,)))
-        else:
-            instr,indices_indices = self.log[-1]
-            new_indices_tuple = indices_indices + (index,)
-            self.log[-1] = (curr_instr, new_indices_tuple)
-
-    def deque(self, query_instr):
-        """If the instruction query_instr triggered cache misses, return
-        a tuple with all the sets involved in those misses. Otherwise
-        return an empty tuple"""
-        if len(self.log) == 0 or self.log[0][0] != query_instr:
-            return ()
-        _, sets_involved = self.log.popleft()
-        return sets_involved
-
-
-
-
-
-#-------------------------------------------
-class MissCounter:
-    """Keep track of hits and misses."""
+class GenericInstrument:
     def __init__(self, instr_counter):
         self.enabled = True
         self.verbose = False
         self.ic = instr_counter
-        # Array of tuples:
-        #     (ic, cm)
-        # ic: instruction counter
-        # cm: number of cache misses produced by this instruction
-        self.log = deque()
+        self.events = deque()
+        # event to dequeue from self.events if the queried instruction did not
+        # generate events. if self.last_is_default == True, then the default is
+        # constantly updated to the last real event.
+        self.default_event = None
+        self.last_is_default = False
+        # log with as much events as instructions, and the filtered log with
+        # averages of sliding windows.
+        self.full_events_log = []
+        self.filtered_avg_log = []
+        self.avg_window = -1
+        # details for the plots of this instrument.
+        self.plot_details = ('_sufix', 'title', 'subtitle', 'y-axis',
+                             0, 1) #min and max range
+    def mix_events(self, base, new):
+        """Return a mixed event based on two events 'base' and 'new'"""
+        raise NotImplementedError("Overwrite this method")
 
-    def append_miss(self):
-        if not self.enabled:
-            return
-        if self.verbose:
-            print(f"  [!] {self.__class__.__name__}: MISS")
-        self.log_append_increment(self.ic.val())
+    def avg_events(self, events_slice):
+        """Given a slice of the full_events_log, compute and return its average"""
+        raise NotImplementedError("Overwrite this method")
 
-    def log_append_increment(self, curr_instr):
-        # append to log, or increment tuple of last log entry.
-        if len(self.log) == 0 or self.log[-1][0] != curr_instr:
-            self.log.append((curr_instr,1))
+    def queue_event(self, new_event):
+        """Add event related to the current instruction to the events queue. If
+        there is already an event for the current instruction, mix both events."""
+        ic = self.ic.val()
+        if len(self.events) == 0 or self.events[-1][0] != ic:
+            self.events.append((ic,new_event))
         else:
-            instr,count = self.log[-1]
-            self.log[-1] = (curr_instr, count+1)
+            curr_event = self.events[-1][1]
+            mixed_event = self.mix_events(curr_event, new_event)
+            self.events[-1] = (ic, mixed_event)
 
-    def deque(self, query_instr):
-        """If the instruction query_instr triggered cache misses,
-        return the number of cache misses, otherwise return 0"""
-        if len(self.log) == 0 or self.log[0][0] != query_instr:
-            return 0
-        _, cache_misses = self.log.popleft()
-        return cache_misses
+    def deque_event(self, query_instr):
+        """Return the event produced by query_instr, or default_event."""
+        if len(self.events) == 0 or self.events[0][0] != query_instr:
+            return self.default_event
+        _, curr_event = self.events.popleft()
+        # update default event
+        if self.last_is_default:
+            self.default_event = curr_event
+        return curr_event
 
+    def build_log(self, instruction_ids_list):
+        """Build this instrument's log with exactly one entry per
+        instruction. If a given instruction produced no event, then
+        fill the gap with the default event"""
+        if self.verbose:
+            print(f"{self.__class__.__name__}.full_events_log: ")
+        for ic in instruction_ids_list:
+            event = self.deque_event(ic)
+            if self.verbose:
+                print(f"    {event}")
+            self.full_events_log.append(event)
+        return
 
-
+    def filter_log(self, win):
+        """Compute a moving avg window from self.full_events_log and populate
+        self.filtered_avg_log. Use self.avg_slice() to reduce a slice to
+        the single value that represents this instrument."""
+        n = len(self.full_events_log)
+        # check if empty full_events_log or window is too large
+        if n == 0:
+            print(f"Error: {self.__class__.__name__}: self.full_events_log is empty. "
+                  "Cannot filter it.")
+            sys.exit(1)
+        # check invalid window
+        if win <= 0 or n < win:
+            print(f"Error: {self.__class__.__name__}: Invalid given window "
+                  f"size {win} for self.full_events_log of size {n}.")
+            sys.exit(1)
+        self.avg_window = win
+        # fill the first (win-1) elements with 0, as there are no averages yet.
+        self.filtered_avg_log = [0] * (win-1)
+        for left in range(n - win+1):
+            right = left + win
+            raw_slice = self.full_events_log[left:right]
+            avg = self.avg_events(raw_slice)
+            self.filtered_avg_log.append(avg)
 
 
 
 #-------------------------------------------
-class LineUsage:
-    """Keep track of the ratio of line usage by the time the line gets
-    evicted"""
+class AliasRatio(GenericInstrument):
+    """
+    - Definition : How evenly the different cache sets perform fetches.
+    - Range      : 0: all block fetches are evenly performed by all sets. Good
+                   1: all block fetches are performed by a single set. Bad.
+    - Events     : Tuple of all Set-Indices fetching blocks due to a given
+                   instruction. (s0, s1, ... ). the same set may appear several
+                   times.
+    - Trigger    : Block fetches
+    """
+    def __init__(self, instr_counter, num_sets):
+        super().__init__(instr_counter)
+        self.default_event = ()
+        self.num_sets = num_sets
+        self.plot_details = ('_plot-01-alias-ratio', # file sufix
+                             'Aliasing', # plot title
+                             'less is better', # subtitle
+                             'Aliasing Ratio', # Y axis name
+                             0, 1.05) # min-max
+
+
+    def register_set_usage(self, index):
+        if not self.enabled:
+            return
+        if self.verbose:
+            i = hex(index)[2:]
+            print(f"  [!] {self.__class__.__name__}: S{i}")
+        self.queue_event((index,))
+
+    def mix_events(self, base, new):
+        return base + new
+
+    def avg_events(self, events_slice):
+        # if there is only one set in the system, then that set will do
+        # all fetches
+        if self.num_sets == 1:
+            return 1
+        # Count frequency of each set (create a histogram)
+        hist = {}
+        for tup in events_slice:
+            for set_index in tup:
+                # create or increment counter for this set
+                if set_index not in hist:
+                    hist[set_index] = 1
+                else:
+                    hist[set_index] +=1
+        # if no set was registered for the whole array, then there
+        # is no aliasing.
+        if len(hist) == 0:
+            return 0
+        # otherwise, obtain ratio. Range: [1/n, 1]
+        raw_ratio = max(hist.values()) / sum(hist.values())
+        # and normalize it. Range: [0, 1]
+        normalized_ratio = (raw_ratio - (1/self.num_sets)) * \
+            (self.num_sets/(self.num_sets-1))
+        return normalized_ratio
+
+
+
+#-------------------------------------------
+class MissRatio(GenericInstrument):
+    """
+    - Definition : The proportion of Cache misses with respect to all miss or
+                   hits (miss/(miss+hit))
+    - Range      : 0: no instruction triggers a cache miss. Good.
+                   1: all instructions trigger cache misses. Bad.
+    - Events     : i-th event is a tuple of two counters: (cm, ch), that is,
+                   cache miss count and cache hit count produced by the
+                   i-th instruction.
+    - Trigger    : Every access to memory (because it will trigger either a
+                   miss or a hit). A single instruction may access multiple
+                   blocks.
+    """
+    def __init__(self, instr_counter):
+        super().__init__(instr_counter)
+        self.default_event = (0,0)
+        self.plot_details = ('_plot-02-miss-ratio', # file sufix
+                             'Cache Miss Ratio', # plot title
+                             'less is better', # subtitle
+                             'Cache Miss Ratio', # Y axis name
+                             0, 1.05) # min-max
+
+    def register_miss(self):
+        if not self.enabled:
+            return
+        if self.verbose:
+            print(f"  [!] {self.__class__.__name__}: MISS")
+        self.queue_event((1,0)) # add one miss
+
+    def register_hit(self):
+        if not self.enabled:
+            return
+        if self.verbose:
+            print(f"  [!] {self.__class__.__name__}: HIT")
+        self.queue_event((0,1)) # add one hit
+
+    def mix_events(self, base, new):
+        mc,hc = base
+        new_mc,new_hc = new
+        return (mc+new_mc, hc+new_hc)
+
+    def avg_events(self, events_slice):
+        miss,total = 0,0
+        for tup in events_slice:
+            miss += tup[0]
+            total += tup[0] + tup[1]
+        if total == 0:
+            print(f"Error: {self.__class__.__name__}: total miss+hit in slice "
+                  "is 0. This should be impossible.")
+            sys.exit(1)
+        return miss/total
+
+
+
+#-------------------------------------------
+class ByteUsageRatio(GenericInstrument):
+    """
+    - Definition: Ratio measuring valid bytes in cache that were actually
+                  accessed vs the total number of valid bytes in the cache.
+                  (valid_accessed)/(total_valid)
+    - Range     : 0: none of the valid bytes has been accessed. Only achievable
+                     by manually fetching blocks to cache. Bad.
+                  1: all bytes in cache have been accessed at least once. (Good)
+    - Event     : Tuple with two counters: (acc, val), that is, current count
+                  for accessed valid bytes in cache, and current total valid
+                  bytes in cache.
+    - Trigger   : Evictions, Fetches, and Accesses to valid lines:
+                  - Evictions: remove (valid) accessed bytes, remove valid
+                               bytes.
+                  - Fetches: add new valid bytes.
+                  - Access (to valid lines): add accessed bytes.
+    """
     def __init__(self, instr_counter, line_size_bytes):
-        self.enabled = True
-        self.verbose = False
-        self.ic = instr_counter
+        super().__init__(instr_counter)
+        self.default_event = (0,0)
+        self.last_is_default = True
         self.line_size_bytes = line_size_bytes
         self.accessed_bytes = 0
         self.valid_bytes = 0
-        self.last_ratio = 0
-        # Array of tuples:
-        #     (ic, (acc,tot))
-        # ic : instruction counter. (log[i][0] < log[i+0][0])
-        # acc: number of bytes accessed relative to...
-        # tot: the total number of valid bytes in the cache.
-        # Each tuple (nl,ac) is a copy of curr_valid_lines and
-        # curr_tot_access
-        self.log = deque()
+        self.plot_details = ('_plot-03-byte-access-ratio', # file sufix
+                             'Ratio of Valid Bytes Accessed', # plot title
+                             'more is better', # subtitle
+                             'Bytes Access Ratio', # Y axis name
+                             0, 1.05) # min-max
 
-
-    def update(self, delta_access, delta_valid):
+    def register_delta(self, delta_access, delta_valid):
         """Update the counters:
-        - Number of bytes accessed from the current total of valid bytes.
-        - Total number of valid bytes in Cache."""
+        - positive delta_access: newly accessed bytes.
+        - negative delta_access: bytes that have been accessed are now evicted.
+        - positive delta_valid: fetching block.
+        - negative delta_valid: evicting block."""
         if not self.enabled:
             return
-        # update counters
+        # update current counters
         self.accessed_bytes += delta_access
         self.valid_bytes += delta_valid
         if self.verbose:
             print(f"  [!] {self.__class__.__name__}: "
                   f"{self.accessed_bytes}/{self.valid_bytes}")
 
-        # if the log is empty or there is NOT an entry for this
-        # instruction, then add a new entry.
-        curr_instr = self.ic.val()
-        if len(self.log) == 0 or self.log[-1][0] != curr_instr:
-            self.log.append((curr_instr,
-                             (self.accessed_bytes, self.valid_bytes)))
-        else:
-            # if there was already an entry for this instruction,
-            # disregard the previous (not complete) count and replace
-            # it with the updated one.
-            self.log[-1] = (curr_instr,
-                            (self.accessed_bytes, self.valid_bytes))
+        event = (self.accessed_bytes, self.valid_bytes)
+        self.queue_event(event)
 
+    def mix_events(self, base, new):
+        """ the new counter just replace the old one, as this is more updated"""
+        return new
 
-    def deque(self, query_instr):
-        """Return the ratio accessed_bytes/valid_bytes resulting after
-        the execution of query_instr. If this query_instr made no
-        changes (it is not in the log), then return the last ratio
-        known (which is still valid for query_instr)"""
-        if len(self.log) == 0 or self.log[0][0] != query_instr:
-            return self.last_ratio
-        _,acc_and_valid = self.log.popleft()
-        acc,valid = acc_and_valid
-        self.last_ratio = 0
-        if valid != 0:
-            self.last_ratio = acc/valid
-        return self.last_ratio
-
-
-
+    def avg_events(self, events_slice):
+        if len(events_slice) == 0:
+            print(f"Error: {self.__class__.__name__}: Slice of size 0")
+            sys.exit(1)
+        used, valid = list(zip(*events_slice))
+        tot_used = sum(used)
+        tot_valid = sum(valid)
+        if tot_valid == 0:
+            # not having valid bytes is a problem if there are also "accessed"
+            # bytes.
+            if tot_used > 0:
+                print(f"Error: {self.__class__.__name__}: Total valid bytes is 0 "
+                      "for the given slice.")
+                sys.exit(1)
+            else:
+                return 0
+        return tot_used / tot_valid
 
 
 #-------------------------------------------
-class BlockTransport:
+class SIURatio(GenericInstrument):
     """
-    Let's define:
-    - block         : group of bytes (data)
-    - line          : space in Cache to store a block
-    - line fetching : bringing a block from RAM.
-    - line evicting : writing a block back to RAM.
-    - SIU Eviction  : 'still-in-use' Eviction, eviction of a block that will
-                      later be fetched back to Cache again.
-    This counter works in two passes:
+    - Definition: Ratio between number of evictions on blocks that will later
+                  be fetched again, vs the total number of evictions done.
+    - Range     : 0: every block eviction is final.
+                  1: every block evicted by this instruction (or slice) is
+                     later fetched back to memory.
+    - Event     : tuple with two counters (siu_evictions, total_evictions)
+    - Trigger   : In the first pass, only fetches trigger the instrument; but
+                  the actual SIU counting happens in the second pass with
+                  every eviction.
+
+    This is an special counter, because it needs to pass through the memory
+    access pattern two times in order to be computed.
       - First pass: Fetch mode: We count all the times each block was fetched.
         Each fetch is a +1 to the counter of that particular block.
       - Second pass: Evict mode: With each eviction of a given block, we
@@ -195,36 +319,36 @@ class BlockTransport:
         later, so this is a 'still-in-use' eviction.
     """
     def __init__(self, instr_counter):
-        self.enabled = True
-        self.verbose = False
-        self.ic = instr_counter
+        super().__init__(instr_counter)
+        self.default_event = (0,0)
+        # to register the fetches number of fetches performed on each block.
         self.fetch_counters = {}
-        # We run the first pass in fetch mode to fill the fetches-per-block
-        # counters. The second pass runs in evict mode to use the previous
-        # counters to check for 'still-in-use evictions'
+        # We run the first pass in fetch mode to fill the block's fetch counter.
+        # The second pass runs in evict mode to use the previous counters to
+        # check for 'still-in-use evictions'
         self.mode = 'fetch'
+        self.plot_details = ('_plot-04-siu-eviction-ratio', # file sufix
+                             'Ratio of Still-in-Use Block Evictions.', # plot title
+                             'less is better', # subtitle
+                             '"I\'ll be back" Ratio', # Y axis name
+                             0, 1.05) # min-max
 
-        # Array of tuples:
-        #     (ic, su)
-        # ic: instruction counter. (log[i][0] < log[i+1][0])
-        # su: still-in-use evictions triggered by this instruction.
-        self.log = deque()
-
-    def append_fetch(self, index, tag):
+    def register_fetch(self, index, tag):
         if not self.enabled or self.mode != 'fetch':
             return
-        if (index, tag) in self.fetch_counters:
-            self.fetch_counters[(index, tag)] += 1
+        block_id = (index, tag)
+        if block_id in self.fetch_counters:
+            self.fetch_counters[block_id] += 1
         else:
-            self.fetch_counters[(index, tag)] = 1
+            self.fetch_counters[block_id] = 1
         if self.verbose:
             t = hex(tag)[2:]
             i = hex(index)[2:]
             print(f"  [!] {self.__class__.__name__}: "
-                  f"fetch(s:{i},tag:{t})={self.fetch_counters[(index, tag)]}")
+                  f"fetch(s:{i},tag:{t})={self.fetch_counters[block_id]}")
         return 0
 
-    def append_evict(self, index: int, tag: int):
+    def register_evict(self, index: int, tag: int):
         """
         Given the first pass, we already know how many times we ever fetch
         each block. Now, in this eviction, check whether the current block
@@ -235,48 +359,56 @@ class BlockTransport:
             return
         # for every earlier fetch of a block, there should be an eviction,
         # then, this eviction decrements the fetch counter of this block.
-        if (index, tag) in self.fetch_counters:
-           self.fetch_counters[(index, tag)] -= 1
+        block_id = (index, tag)
+        if block_id in self.fetch_counters:
+           self.fetch_counters[block_id] -= 1
         else:
             raise Exception("Trying to register eviction without a previous "
                             "fetch")
         # detect still-in-use eviction: if after the above decrementing the
         # counter is still greater than 0, then we are evicting an
         # 'still-in-use' block.
-        fetches = self.fetch_counters[(index, tag)]
-        if fetches > 0: # the block is later fetched again.
+        resulting_fetches = self.fetch_counters[block_id]
+        if resulting_fetches > 0: # the block is later fetched again.
+            new_event = (1, 1)
             if self.verbose:
                 print(f" [!] {self.__class__.__name__}: "
                       "still-in-use eviction!")
-            self.log_append_increment(self.ic.val())
-        elif fetches == 0:
+        elif resulting_fetches == 0:
+            new_event = (0, 1)
             if self.verbose:
                 print(f" [!] {self.__class__.__name__}: "
                       "last eviction")
-                # no siu-eviction -> nothing to add to the log.
         else:
             raise Exception(f"There are more evictions than fetches for "
                             f"tag:{hex(tag)}, index:{hex(index)}")
+
+        self.queue_event(new_event)
         return
 
-    def log_append_increment(self, curr_instr):
-        # append to log, or increment counter of last log entry.
-        if len(self.log) == 0 or self.log[-1][0] != curr_instr:
-            self.log.append((curr_instr,1))
-        else:
-            instr,counter = self.log[-1]
-            self.log[-1] = (curr_instr,counter+1)
+    def mix_events(self, base, new):
+        curr_siu,curr_tot = base
+        new_siu,new_tot = new
+        return (curr_siu+new_siu, curr_tot+new_tot)
 
-    def deque(self, query_instr):
-        """If the instruction query_instr registered a siu-eviction,
-        return that count, otherwise return 0
-        """
-        if len(self.log) == 0 or self.log[0][0] != query_instr:
-            return 0
-        _, siu_count = self.log.popleft()
-        return siu_count
-
-
+    def avg_events(self, events_slice):
+        if len(events_slice) == 0:
+            print(f"Error: {self.__class__.__name__}: Slice of size 0")
+            sys.exit(1)
+        siu, evics = list(zip(*events_slice))
+        tot_siu = sum(siu)
+        tot_evics = sum(evics)
+        if tot_evics == 0:
+            if tot_siu > 0:
+                print(f"Error: {self.__class__.__name__}: Total evictions is 0 "
+                      f"for the given slice, but {tot_siu} evictions are "
+                      "reported to be SIU")
+                sys.exit(1)
+            else:
+                # no siu or other evictions means we are just reading from
+                # valid caches. That is good -> return 0
+                return 0
+        return tot_siu / tot_evics
 
 
 
@@ -287,84 +419,22 @@ class Instruments:
         self.num_sets = specs['size']//(specs['asso']*specs['line'])
         self.line_size_bytes = specs['line']
         self.access_pattern = ap
+        self.saving_ids = True # save instruction ids only in the first pass
         self.verb = verb
+        self.instruction_ids = [] # registry of all instructions ids processed
         self.ic = instr_counter
-        self.alias = Alias(instr_counter, self.num_sets)
-        self.miss_counter = MissCounter(instr_counter)
-        self.line_usage = LineUsage(instr_counter, specs['line'])
-        self.block_transport = BlockTransport(instr_counter)
+
+        # Instruments
+        self.alias = AliasRatio(instr_counter, self.num_sets)
+        self.miss = MissRatio(instr_counter)
+        self.usage = ByteUsageRatio(instr_counter, specs['line'])
+        self.siu = SIURatio(instr_counter)
+
         self.set_verbose(verb)
-        self.metadata = {
-            # (filename, title, unit, min_y, max_y)
-            'al':('_plot-01-aliasing',
-                  'Aliasing',
-                  '(less is better)',
-                  'Aliasing Rate',
-                  0, 1.05),
-            'mc':('_plot-02-miss-counter',
-                  'Cache Miss Count',
-                  '(less is better)',
-                  'Cache Miss Count',
-                  0, 1.05),
-            'lu':('_plot-03-line-usage',
-                  'Cache Usage Ratio',
-                  '(more is better)',
-                  'Cache Usage Rate',
-                  0, 1.05),
-            'su':('_plot-04-siu-evictions',
-                  'Still-in-Use Evictions',
-                  '(less is better)',
-                  'SIU Evictions Count',
-                  0, 1.05),
-            }
-
-        # Each instrument has its own log, where each entry is a tuple:
-        #    (instr, value)
-        # instr: the instruction that registered some value for that
-        #        instrument.
-        # value: the registered value corresponding to that instruction.
-        #
-        # If a given instruction did NOT trigger a given instrument, then
-        # the instrument's log just doesn't have an entry for that
-        # instruction. So these instrument-logs are 'compressed' to just
-        # what is necessary.
-        #
-        # The master_log expands all individual instrument logs into
-        # strictly one entry per instruction, by calling each instrument's
-        # 'deque' method. Then, master_log is a dictionary with one array
-        # per instrument:
-        #     master_log['al'] = [ al_0, al_1, ...., al_(n-1)]
-        #     master_log['mc'] = [ mc_0, mc_1, ...., mc_(n-1)]
-        #     master_log['lu'] = [ lu_0, lu_1, ...., lu_(n-1)]
-        #     master_log['su'] = [ su_0, su_1, ...., su_(n-1)]
-        # al: alias counter: Each al_i is a tuple with the set-ids involved
-        #                    in evictions for that instruction.
-        # mc: miss counter : Each mc_i is an integer with all the cache
-        #                    misses produced by that instruction.
-        # lu: line usage   : Each lu_i is a tuple with two elements:
-        #                    - number of lines evicted
-        #                    - total number of bytes used in those lines
-        # su: siu evictions: Each su_i is an integer with all the
-        #                    still-in-use evictions performed by that
-        #                    instruction.
-        # n: the total number of instructions. All arrays have n elements.
-
-        # Master Log of all instruments
-        self.master_log = {
-            'al': [],
-            'mc': [],
-            'lu': [],
-            'su': []
-        }
-        # Filtered master log
-        self.fml = {
-            'al': [],
-            'mc': [],
-            'lu': [],
-            'su': []
-        }
-        # Sliding window size used in fml.
-        self.fml_window = None
+        self.metadata = {'alias':self.alias.plot_details,
+                         'miss':self.miss.plot_details,
+                         'usage':self.usage.plot_details,
+                         'siu':self.siu.plot_details}
 
         # Plot sizes
         self.plot_width = plots_dims[0]
@@ -376,168 +446,64 @@ class Instruments:
         # That matrix has the size of a plot, but amplified by ap_factor.
         # however, for small [Mem x Time] situations, ap_factor*plot_height
         # may end up being bigger than just the extension of Mem.
-        if ap_factor*self.plot_height > \
-           self.access_pattern.block_size:
+        if ap_factor*self.plot_height > self.access_pattern.block_size:
             self.ap_factor = \
                 round(self.access_pattern.block_size / self.plot_height)
         else:
             self.ap_factor = ap_factor
 
-        # matrix of (ap_factor*plots_dims[x]) columns and
-        # (ap_factor*plots_dims[y]) rows. The access pattern is mapped to this space.
-        # Matrix populated by self.add_access()
+        # matrix where to draw the memory access pattern. It's size is not
+        # the potentially huge [Mem x Time], but a smaller [cols x rows].
+        #   cols = ap_factor*plots_width
+        #   rows = ap_factor*plots_height
+        # The real coordinates of the memory access pattern are mapped to
+        # this space. This matrix populated by self.add_access()
         self.access_matrix = [[0] * self.ap_factor*self.plot_width
                               for _ in range(self.ap_factor*self.plot_height)]
 
-
     def enable_all(self):
         self.alias.enabled = True
-        self.miss_counter.enabled = True
-        self.line_usage.enabled = True
-        self.block_transport.enabled = True
-
+        self.missr.enabled = True
+        self.usage.enabled = True
+        self.siu.enabled = True
 
     def disable_all(self):
         self.alias.enabled = False
-        self.miss_counter.enabled = False
-        self.line_usage.enabled = False
-        self.block_transport.enabled = False
-
+        self.miss.enabled = False
+        self.usage.enabled = False
+        self.siu.enabled = False
 
     def prepare_for_second_pass(self):
         self.alias.enabled = False
-        self.miss_counter.enabled = False
-        self.line_usage.enabled = False
-        self.block_transport.enabled = True
-        self.block_transport.mode = 'evict'
-
+        self.miss.enabled = False
+        self.usage.enabled = False
+        self.siu.enabled = True
+        self.siu.mode = 'evict'
+        self.saving_ids = False
 
     def set_verbose(self, verb=False):
         self.alias.verbose = verb
-        self.miss_counter.verbose = verb
-        self.line_usage.verbose = verb
-        self.block_transport.verbose = verb
+        self.miss.verbose = verb
+        self.usage.verbose = verb
+        self.siu.verbose = verb
 
+    def build_log(self):
+        self.alias.build_log(self.instruction_ids)
+        self.miss.build_log(self.instruction_ids)
+        self.usage.build_log(self.instruction_ids)
+        self.siu.build_log(self.instruction_ids)
 
-    def build_master_log(self):
-        """Compute the master log as an aggregation of all the instruments'
-        logs. Check comments in __init__() function"""
-        if self.verb:
-            print("Master Log:")
-        for ic in range(self.ic.val()+1):
-            al = self.alias.deque(ic)
-            mc = self.miss_counter.deque(ic)
-            lu = self.line_usage.deque(ic)
-            su = self.block_transport.deque(ic)
-            if self.verb:
-                print(f"  Instruction: {ic}:\n"
-                      f"    alias         : {al}\n"
-                      f"    miss_counter  : {mc}\n"
-                      f"    line_usage    : {lu}\n"
-                      f"    SIU evictions : {su}\n")
-            self.master_log['al'].append(al)
-            self.master_log['mc'].append(mc)
-            self.master_log['lu'].append(lu)
-            self.master_log['su'].append(su)
-        return
+    def filter_log(self, win):
+        self.alias.filter_log(win)
+        self.miss.filter_log(win)
+        self.usage.filter_log(win)
+        self.siu.filter_log(win)
 
-
-    def avg_window(self, al_arr, mc_arr, lu_arr, su_arr):
-        """Given a slice of each component of the master log, compute the
-        average for each of them"""
-
-        # Alias --------------------
-        #   Range: [0, 1]
-        #   - 0: cache misses are equally distributed across sets.
-        #   - 1: cache misses are falling all in the same set.
-        #   Target: Minimize.
-        hist = {}
-        # Count frequency of each set
-        for tup in al_arr:
-            for set_index in tup:
-                # create or increment counter for this set
-                if set_index not in hist:
-                    hist[set_index] = 1
-                else:
-                    hist[set_index] +=1
-        # if no set was registered for the whole array, then there
-        # is no aliasing.
-        if len(hist) == 0:
-            al_avg =  0
-        else:
-            # if there is only one set in the system, then any miss will
-            # land in this set.
-            if self.num_sets == 1:
-                al_avg = 1
-            # otherwise, obtain and normalize the ratio
-            raw_ratio = max(hist.values()) / sum(hist.values())
-            normalized_ratio = (raw_ratio - (1/self.num_sets)) * \
-                (self.num_sets/(self.num_sets-1))
-            al_avg = normalized_ratio
-
-        # Miss Counter ---------------------
-        #   Range: [0, inf]
-        #   - 0: there were no cache misses.
-        #   - n: there was a total of n cache misses in this array.
-        #   Target: Minimize
-        mc_sum = sum(mc_arr)
-
-        # Line Usage -----------------------
-        #   Range: [0, 1]
-        #   - 0: none of the valid bytes in cache have been accessed.
-        #   - 1: all valid bytes in the cache have been accessed.
-        #   Target: Maximize
-        lu_avg = sum(lu_arr)/len(lu_arr)
-
-        # Still-in-use Evictions ----------
-        #   Range: [0, inf]
-        #   - 0: there were no SIU evictions.
-        #   - n: there was a total of n SIU evictions.
-        su_sum = sum(su_arr)
-
-        return (al_avg, mc_sum, lu_avg, su_sum)
-
-
-    def filter_log(self, win=10):
-        if len(self.master_log) == 0:
-            raise ValueError("The master log is empty. Cannot filter it.")
-        # the length of the inner arrays, not the dict itself.
-        n = len(self.master_log[next(iter(self.master_log))])
-        if win <= 0 or win > n:
-            print(f"Invalid window size {win} for master_log of size {n}.")
-            sys.exit(1)
-        self.fml = {
-            'al': [0] * (win-1),
-            'mc': [0] * (win-1),
-            'lu': [0] * (win-1),
-            'su': [0] * (win-1),
-        }
-        self.fml_window = win
-        if self.verb:
-            print(f"Filtered Log (win={win})")
-        for left in range(n - win + 1):
-            right = left + win
-            al_arr = self.master_log['al'][left:right]
-            mc_arr = self.master_log['mc'][left:right]
-            lu_arr = self.master_log['lu'][left:right]
-            su_arr = self.master_log['su'][left:right]
-
-            avg = self.avg_window(al_arr, mc_arr, lu_arr, su_arr)
-            if self.verb:
-                print(f"  Instrs {left}-{right}:\n"
-                      f"    f_alias         : {avg[0]}\n"
-                      f"    f_miss_counter  : {avg[1]}\n"
-                      f"    f_line_usage    : {avg[2]}\n"
-                      f"    f_SIU evictions : {avg[3]}\n")
-            self.fml['al'].append(avg[0])
-            self.fml['mc'].append(avg[1])
-            self.fml['lu'].append(avg[2])
-            self.fml['su'].append(avg[3])
-
-
-    def add_access(self, access):
+    def register_access(self, access):
         """The idea is to take an access happening at (addr, time), and map it
         to (y,x) in self.access_matrix."""
+        if self.saving_ids:
+            self.instruction_ids.append(access.time) # save instruction id
         for i in range(access.size):
             # obtain the original coordinates
             addr = access.addr - self.access_pattern.base_addr + i
@@ -553,27 +519,7 @@ class Instruments:
             time_acc = round(time * (acc_time_size-1))
             # store the value in the matrix. The stored value is the thread
             # number + 1 so empty cells remain 0 and used cells become 1, 2, 3, ...
-            #print(f"dim(access_matrix) = {acc_addr_size}, {acc_time_size}")
-            #print(f"access_matrix[{addr_acc}][{time_acc}] = 1+{access.thread}")
-            # input('cont?')
             self.access_matrix[addr_acc][time_acc] = 1+access.thread
-
-
-        # # get the time of access and the offset within the observed memory
-        # # block
-        # exec_time = access.time
-        # block_offset = access.addr - self.access_pattern.base_addr
-        # # make x and y range from 0.0 to 1.0
-        # x_coord = exec_time / self.access_pattern.time_size
-        # y_coord = block_offset / self.access_pattern.block_size
-        # # scale up to plot size
-        # x_coord = x_coord * self.plot_width_height[0] * self.ap_factor
-        # y_coord = y_coord * self.plot_width_height[1] * self.ap_factor
-        # # append coordinates
-        # self.ap_coord['x'].append(x_coord)
-        # self.ap_coord['y'].append(y_coord)
-
-
 
     def plot(self, base_name):
         """Create all instrument plots with the access pattern in the
@@ -598,22 +544,8 @@ class Instruments:
             print(f'Warning: The Access Pattern has more threads than colors '
                   'available to plot. Different threads will share colors.')
         cmap = ListedColormap(
-            ['#ffffff'] + [palette[i%len(palette)][0]
+            ['#eeeeee'] + [palette[i%len(palette)][0]
                        for i in range(colors_needed)])
-        # create figure and axe
-        # fig_ap,ax_ap = plt.subplots(figsize=(self.plot_width,self.plot_height))
-        # access_pattern = ax_ap.pcolor(self.access_matrix, cmap=cmap)
-        # ax_ap.invert_yaxis()
-        # ax_ap.set_ylabel('Memory')
-        # ax_ap.set_title('Memory Access Pattern')
-
-
-        # fig_instr, ax_instr = plt.subplots()
-        # line_plot1, = ax_instr.plot(x, y_line1, linestyle='-', color='red', label='Line Plot 1')
-        # ax_instr.set_xlabel('X-axis')
-        # ax_instr.set_ylabel('Line Y-axis 1', color='red')
-        # ax_instr.set_title('Line Plot 1')
-        # ax_instr.legend([pcolor, line_plot1], ['Pseudocolor Plot', 'Line Plot 1'])
 
         #### Plot instruments
         # Instruments colors and plots
@@ -621,128 +553,45 @@ class Instruments:
         plt_instr = []
         # # the X axis represents time (of the instruction)
         # shared_x = range(self.access_pattern.time_size)
-        for i,instrument in enumerate(self.fml):
-            print(f'    {instrument}...')
+        instruments = (self.alias, self.miss, self.usage, self.siu)
+        for color_index,instr in enumerate(instruments):
+            sufix,title,subtitle,y_label,min_y,max_y = instr.plot_details
+            print(f'    plotting {title}...')
             # get data
-            instr_x = range(len(self.fml[instrument]))
-            instr_y = self.fml[instrument]
-            col_i = col_instr[i%len(col_instr)]
-            sufix,title,subtitle,unit,min_y,max_y = self.metadata[instrument]
-            max_y = max(max(instr_y), max_y) * 1.05
+            # instr_y = self.fml[instrument]
+            instr_y = instr.filtered_avg_log
+            #instr_x = range(len(self.fml[instrument]))
+            instr_x = self.instruction_ids # range(len(instr_y))
+            if len(col_instr) <= color_index:
+                print('[!] Warning, there are more instruments than colors '
+                'for them.')
+            col_i = col_instr[color_index % len(col_instr)]
+
+            max_y = max(max(instr_y), max_y) * 1.02 # 2% margin
             # do the drawings
             plt.imshow(
                 self.access_matrix,
                 cmap=cmap,
                 aspect='auto',
-                extent=[0, len(self.fml[instrument])-1, 0, max_y]
+                extent=[instr_x[0]-1, instr_x[-1]+1, 0, max_y]
             )
             # plt.pcolor(self.access_matrix, cmap=cmap,
             #            extent=[min(instr_x), max(instr_x), 0, len(instr_y)])
 
             plt.ylim(min_y, max_y)
             plt.xlabel('Instruction')
-            plt.ylabel(unit)
-            plt.title(base_name+': '+title+f' (w={self.fml_window})\n'+subtitle)
+            plt.ylabel(y_label)
+            plt.title(base_name+': '+
+                      title+f'\n'
+                      f'(w={instr.avg_window}, '+subtitle+')')
             plt.step(
                 instr_x,
                 instr_y,
                 color=col_i,
                 linewidth=1.5,
                 where='post')
-
+            plt.xlim(instr_x[0]-1, instr_x[-1]+1)
+            plt.grid(axis='x', linestyle='-', alpha=0.7, linewidth=0.3, which='both')
             plt.savefig(base_name+sufix+'.png', dpi=600,
                         bbox_inches='tight')
             plt.clf()
-
-
-
-
-
-
-            # fig_ap,ax_ap = plt.subplots(figsize=(self.plot_width,self.plot_height))
-            # access_pattern = ax_ap.pcolor(self.access_matrix, cmap=cmap)
-            # ax_ap.invert_yaxis()
-            # ax_ap.set_ylabel('Memory')
-            # ax_ap.set_title('Memory Access Pattern')
-
-
-
-            # # Instrument
-            # instr_x = range(len(self.fml[instrument]))
-            # instr_y = self.fml[instrument]
-            # sufix,title,subtitle,unit,min_y,max_y = self.metadata[instrument]
-            # col_i = col_instr[i%len(col_instr)]
-
-            # plt_instr, ax_instr = plt.subplots(
-            #     figsize=(self.plot_width, self.plot_height))
-            # instr_plot = plt_instr[1].plot(x, y, color=col_i, linewidth=1.5)
-            # #plt_instr[1]step(x, y, color=col, linewidth=1.5, where='post')
-
-            # plt_instr[1].set_title(
-            #     base_name+': '+title+f' (w={self.fml_window})\n'+subtitle)
-            # plt_instr[1].set_xlim(0,self.access_pattern.time_size)
-            # plt_instr[1].set_ylim(min_y, max(max_y, max(y)))
-            # plt_instr[1].set_ylabel(unit)
-            # plt_instr[1].set_xlabel('Memory Access Instruction')
-            # plt_instr[1].legend([access_pattern, instr_plot],
-            #                     ['Access Pattern', title])
-            # plt_instr[0].savefig(base_name+sufix+'.png', dpi=600,
-            #             bbox_inches='tight')
-
-
-
-
-
-
-
-    #   fig_ap.savefig(base_name+'_plot-00-access-pattern.png', dpi=600,
-    #                bbox_inches='tight')
-
-
-
-    # def plot_access_pattern(self, base_name):
-    #     fig, ax = plt.subplots(figsize=self.plot_width_height)
-    #     x = self.ap_coord['x']
-    #     y = self.ap_coord['y']
-    #     ax.set_title(base_name+': Access Pattern')
-    #     ax.scatter(x,y, color='magenta', marker='s', s=0.05,
-    #                label='Access Pattern')
-    #     ax.invert_yaxis()
-    #     ax.legend()
-    #     ax.set_xlim(0,self.access_pattern.time_size)
-    #     ax.set_xlabel('Memory Access (time)')
-    #     ax.set_ylabel('Memory Address (space)')
-    #     fig.savefig(base_name+'_plot-00-access-pattern.pdf', dpi=1200,
-    #                 bbox_inches='tight')
-
-
-    # def plot_data(self, base_name):
-    #     # plot the access pattern itself.
-    #     self.plot_access_pattern(base_name)
-    #     # obtain the number of entries registered by the instruments.
-    #     n = len(self.master_log[next(iter(self.master_log))])
-    #     if n == 0:
-    #         print('Error: Log not filtered yet. Call '
-    #               'Instruments.filter_log() before Instruments.plot_data()')
-    #         sys.exit(1)
-
-    #     x = range(n)
-    #     colors = ['red', 'green', 'blue', 'orange', 'black']
-    #     for i,instrument in enumerate(self.fml):
-    #         y = self.fml[instrument]
-    #         sufix,title,subtitle,unit,min_y,max_y = \
-    #             self.metadata[instrument]
-    #         col = colors[i%len(colors)]
-
-    #         fig, ax = plt.subplots(figsize=self.plot_width_height)
-    #         ax.plot(x, y, color=col, linewidth=1.5)
-    #         #ax.step(x, y, color=col, linewidth=1.5, where='post')
-
-    #         ax.set_title(base_name+': '+title+f' (w={self.fml_window})\n'+
-    #                      subtitle)
-    #         ax.set_xlim(0,self.access_pattern.time_size)
-    #         ax.set_ylim(min_y, max(max_y, max(y)))
-    #         ax.set_ylabel(unit)
-    #         ax.set_xlabel('Memory Access Instruction')
-    #         fig.savefig(base_name+sufix+'.pdf', dpi=600,
-    #                     bbox_inches='tight')

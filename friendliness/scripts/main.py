@@ -169,7 +169,7 @@ def main():
                                  verb=args.verbosity)
 
     print("Building Instruments Log...")
-    instruments.build_master_log()
+    instruments.build_log()
 
     window = args.window
     if window < 0 or window > access_pattern.event_count:
@@ -184,7 +184,6 @@ def main():
     if prefix == '':
         prefix = os.path.basename(os.path.splitext(args.input_file)[0])
     print(f'Plotting Results...')
-    # instruments.plot_data(prefix)
     instruments.plot(prefix)
 
     print('Done.')

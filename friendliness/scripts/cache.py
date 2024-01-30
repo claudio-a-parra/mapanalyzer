@@ -48,23 +48,25 @@ class Set:
                 index,line = i,l
                 break;
 
-        # handle miss
+        # Handle a possible cache miss.
         if line == None:
             # cache miss
-            self.instr.miss_counter.append_miss()
-            self.instr.alias.append(self.set_index)
+            self.instr.miss.register_miss()
             line = self.lru_line()
             self.evict(line)
             self.fetch(line, tag)
+        else: # cache hit
+            self.instr.miss.register_hit()
 
-        # access data in line, but pay attention to how many bytes are
-        # freshly accessed, these will count towards line_usage.
+        # Now the cache line is valid. Access data, but pay attention to
+        # how many bytes are freshly accessed, as these will count towards
+        # byte usage.
         before_access = line.count_accessed()
         line.access(offset, n_bytes, clock)
         after_access = line.count_accessed()
         if after_access > before_access:
             new_access = after_access - before_access
-            self.instr.line_usage.update(new_access, 0)
+            self.instr.usage.register_delta(new_access, 0)
 
     def lru_line(self):
         """return the least recently used line"""
@@ -77,19 +79,22 @@ class Set:
     def evict(self, line):
         if line.tag == None:
             return
-        self.instr.block_transport.append_evict(self.set_index, line.tag)
+        self.instr.siu.register_evict(self.set_index, line.tag)
         # these bytes are leaving the cache, so they are negative
-        self.instr.line_usage.update(
-            -line.count_accessed(), -self.line_size_bytes)
-        # reset access and tag
+        self.instr.usage.register_delta(-line.count_accessed(),
+                                   -self.line_size_bytes)
+        # imagine that here you write the block back to memory...
+        # and now reset the line's access count and tag
         line.accessed_bytes = [False] * len(line.accessed_bytes)
         line.tag = None
         line.last_time_used = 0
         return
 
     def fetch(self, line, tag):
-        self.instr.block_transport.append_fetch(self.set_index, tag)
-        self.instr.line_usage.update(0, self.line_size_bytes)
+        self.instr.siu.register_fetch(self.set_index, tag)
+        self.instr.alias.register_set_usage(self.set_index)
+        self.instr.usage.register_delta(0, self.line_size_bytes)
+        # imagine that here you bring the data... and now you mark the tag
         line.tag = tag
         return
 
@@ -140,7 +145,7 @@ class Cache:
         # - time: the timestamp of the instruction.
         addr = access.addr
         n_bytes = access.size
-        self.instr.add_access(access)
+        self.instr.register_access(access)
         # the potentially many lines are all accessed at the same time (cache.clock)
         self.clock += 1
         if addr.bit_length() > self.arch_size_bits:

@@ -61,7 +61,7 @@ KNOB<std::string> trace_output_fname(KNOB_MODE_WRITEONCE, "pintool", "o",
  measuring real time events and if we go down to the OS to request memory
  at runtime, well... we fuck up all the measurments. */
 const UINT16 MAX_THREADS = 32;
-const UINT32 MAX_THR_EVENTS = 64000;
+const UINT32 MAX_THR_EVENTS = 6000000;
 std::stringstream metadata;
 std::stringstream data;
 std::stringstream error;

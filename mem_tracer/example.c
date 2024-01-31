@@ -1,4 +1,6 @@
 // example.c
+// Have two threads modifying a piece of data in an alternating fashion.
+// They use pthread_locks to make sure they interleave their work.
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -8,6 +10,7 @@ int N=512;
 int shared=0;
 pthread_mutex_t m;
 volatile double *chunk;
+
 void *thread_work(void* tid){
     int id = *((int*) tid);
     for(int i=0; i<N; i++){

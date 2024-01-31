@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/bash
 
 # check if the script was sourced
 (return 0 2>/dev/null) && sourced=1 || sourced=0
@@ -10,47 +10,49 @@ fi
 
 SCRIPT_DIR=$(dirname "$(realpath ${BASH_SOURCE[0]})")
 
-create_link(){
-    local name="$1"
-    local tool="$2"
-    local lnk="$3"
-    if [[ ! -f $lnk ]]; then
-        echo -e "\n$name: Link to Tool"
-        ln -s $tool $lnk
-        echo "$lnk -> $tool"
-    elif [[ -L $lnk ]]; then
-        local rlk="$(readlink $lnk)"
-        if [[ "$rlk" != $tool ]]; then
-            echo -e "\n$name: Link to Tool"
-            echo "Current: $lnk -> $rlk"
-            rm $lnk
-            ln -s $tool $lnk
-            echo "New    : $lnk -> $tool"
-        fi
-    else
-        echo "$lnk exists, but it is NOT a link"
-    fi
-}
-
 create_var(){
-    local name="$1"
-    local varname="$2"
-    local varvalue="$3"
-    pin_root="$SCRIPT_DIR/pin"
+    # export environment variable. If it was already defined,
+    # print its previous value before exporting.
+    local varname="$1"
+    local varvalue="$2"
 
     if [[ "${!varname}" != $varvalue ]]; then
-        echo -e "\n$name: Environment Variable"
-        if [[ -z "${!varname}" ]]; then
-            echo "$varname=$varvalue"
-        else
-            echo "Current: $varname=${!varname}"
-            echo "New    : $varname=$varvalue"
+        if [[ -n "${!varname}" ]]; then
+            echo "[!] Overwriting current variable: $varname=${!varname}"
         fi
+        echo "$varname=$varvalue"
         eval "export $varname=$varvalue"
     fi
 }
 
-create_var PIN PIN_ROOT "$SCRIPT_DIR/pin"
-create_var MEM_TRACER MEM_TRACER "$SCRIPT_DIR/mem_tracer/obj-intel64/mem_tracer.so"
-create_link PIN "$SCRIPT_DIR/pin/pin" ~/bin/pin
-create_link TRACEPLOT "$SCRIPT_DIR/traceplot/traceplot.py" ~/bin/traceplot
+create_link(){
+    # create a link to a given binary.
+    local lnk="$1"
+    local tool="$2"
+
+    # if there is no file called as the link to be created,
+    # then just create it.
+    if [[ ! -f $lnk ]]; then
+        ln -s $tool $lnk
+        echo "$lnk -> $tool"
+
+    # if there is a file with that path, and it happens to
+    # be a link, then check its target
+    elif [[ -L $lnk ]]; then
+        local rlk="$(readlink $lnk)"
+        if [[ "$rlk" != "$tool" ]]; then
+            echo "[!] Overwriting current link: $lnk -> $rlk"
+            rm $lnk
+            ln -s $tool $lnk
+            echo "$lnk -> $tool"
+        fi
+    else
+        echo "[!]File $lnk exists, but it is NOT a link. Nothing done with it."
+    fi
+}
+
+create_var  PIN_ROOT        "$SCRIPT_DIR/pin"
+create_var  MEM_TRACER      "$SCRIPT_DIR/mem_tracer/obj-intel64/mem_tracer.so"
+create_link ~/bin/pin       "$SCRIPT_DIR/pin/pin"
+create_link ~/bin/traceplot "$SCRIPT_DIR/traceplot/traceplot.py"
+create_link ~/bin/friendliness "$SCRIPT_DIR/friendliness/scripts/main.py"

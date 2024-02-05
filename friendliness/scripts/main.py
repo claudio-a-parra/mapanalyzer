@@ -10,12 +10,12 @@ from cache import Cache
 from mem_access_pattern import MemAP
 
 
-# Default cache configuration. Small for debugging.
+# Default cache configuration. typical Intel i7 L1d
 cache_specs = {
-    'line': ("Line size [bytes]", 16),
-    'asso': ("Associativity [lines]", 2),
-    'size': ("Total Cache size [bytes]" , 256),
-    'arch': ("Architecture word size [bits]", 16)}
+    'line': ("Line size [bytes]", 64),
+    'asso': ("Associativity [lines]", 8),
+    'size': ("Total Cache size [bytes]" , 32768),
+    'arch': ("Architecture word size [bits]", 64)}
 
 
 def get_cache_specs_from_file(specs, file_name):
@@ -55,17 +55,32 @@ def get_cache_specs_from_file(specs, file_name):
                           f"Using default value ({default_val}).")
                     specs[key] = int(default_val)
 
+            # missing parameters filled from default specs config
+            for key in sepecs:
+                if not type(specs[key]) == int:
+                    specs[key] = specs[key][1]
 
     except FileNotFoundError:
-        print(f"File {file_name} does not exist. Using default configuration.")
+        print(f"[!]    File {file_name} does not exist. Using default configuration.")
+        specs['line'] = specs['line'][1]
+        specs['asso'] = specs['asso'][1]
+        specs['size'] = specs['size'][1]
+        specs['arch'] = specs['arch'][1]
+
+    print(f'    line size     : {specs["line"]}\n'
+          f'    associativity : {specs["asso"]}\n'
+          f'    cache size    : {specs["size"]}\n'
+          f'    architecture  : {specs["arch"]}')
 
 
-
-def run_simulation(specs, access_pattern, plots_dims, verb=False):
+def run_simulation(specs, access_pattern, ap_resolution, plots_dims,
+                   verb=False):
     # Init Instruction Counter, Instruments, Address Formatter, and Cache
     ic = InstrCounter()
-    instr = Instruments(ic, specs, ap=access_pattern,
-                        plots_dims=plots_dims, verb=verb)
+    instr = Instruments(
+        ic, specs, ap=access_pattern,
+        ap_resolution=ap_resolution,
+        plots_dims=plots_dims, verb=verb)
     af = AddressFormatter(specs)
     cache = Cache(specs, instr=instr)
 
@@ -114,7 +129,7 @@ def command_line_args_parser():
             "  If running with verbose mode on, all addresses, set indices,\n"
             "  line offsets, and tags are in hexadecimal unless explicitly\n"
             "  indicated otherwise. Clocks and other numbers are decimal.")
-    signature = ("By Claudio A. Parra.\n"
+    signature = ("By Claudio A. Parra. 2024.\n"
                  "parraca@uci.edu")
 
     parser = argparse.ArgumentParser(
@@ -135,7 +150,7 @@ def command_line_args_parser():
         '-o', '--output', dest='output', type=str, default='',
         help="Prefix of output files (by default the same as input file).")
     parser.add_argument(
-        '-w', '--window', dest='window', type=int, default=-1,
+        '-w', '--window', dest='window', type=int, default=None,
         help=("Moving average filter window size for data plotting. "
               "(Default: 5%% of total number of instructions in the "
               "input file.)"))
@@ -143,8 +158,26 @@ def command_line_args_parser():
         '-px', '--plot-x', dest='px', type=int, default=8,
         help="Width of the plots.")
     parser.add_argument(
-        '-py', '--plot-y', dest='py', type=int, default=6,
+        '-py', '--plot-y', dest='py', type=int, default=4,
         help="Height of the plots.")
+    parser.add_argument(
+        '-f', '--format', dest='format', choices=['png', 'pdf'], default='pdf',
+        help='Choose the output format of the plots.')
+    def check_res(val):
+        min_res = 10
+        max_res = 600
+        def_res = 150
+        val = int(val)
+        if min_res < val < max_res:
+            return val
+        else:
+            print(f'[!]    Warning: resolution value must be between {min_res} and '
+                  f'{max_res}. Using default value {def_res}.')
+            return def_res
+    parser.add_argument(
+        '-r', '--resolution', dest='resolution', type=check_res, default=150,
+        help=('Resolution of the Memory Access Pattern plot (value between '
+              '10 and 600).'))
     parser.add_argument(
         '-v', '--verbose', dest='verbosity', action="store_true",
         help="Print all the fun stuff.")
@@ -156,39 +189,30 @@ def command_line_args_parser():
 
 def main():
     global cache_specs
-
     args = command_line_args_parser()
 
-    print(f'Reading cache configuration: {args.cache}...')
+    print(f'Reading cache configuration: {args.cache}')
     get_cache_specs_from_file(cache_specs, args.cache)
 
-    print(f'Running mem. access pattern: {args.input_file}...')
+    print(f'Tracing Memory Access Pattern: {args.input_file}')
     access_pattern = MemAP(args.input_file)
-    instruments = run_simulation(cache_specs, access_pattern,
+    instruments = run_simulation(cache_specs, access_pattern, args.resolution,
                                  plots_dims=(args.px, args.py),
                                  verb=args.verbosity)
 
-    print("Building Instruments Log...")
+    print('Building Instruments Log')
     instruments.build_log()
 
-    window = args.window
-    if window < 0 or window > access_pattern.event_count:
-        if window > access_pattern.event_count:
-            print(f'[!] Warning: the given avg window ({window}) is larger '
-                  'than the number of events. Using default value.')
-        window = max(round(access_pattern.event_count * 0.05), 1)
-    print(f'Filtering Log (win={window})...')
-    instruments.filter_log(win=window)
+    print(f'Filtering Log')
+    instruments.filter_log(win=args.window)
 
+    print(f'Plotting Results ({args.format})')
     prefix = args.output
     if prefix == '':
         prefix = os.path.basename(os.path.splitext(args.input_file)[0])
-    print(f'Plotting Results...')
-    instruments.plot(prefix)
+    instruments.plot(prefix, args.format)
 
-    print('Done.')
 
-        
 if __name__ == "__main__":
     try:
         main()

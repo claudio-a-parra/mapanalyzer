@@ -9,7 +9,6 @@ class MemAccess:
         self.addr = addr
         return
 
-
     def __str__(self):
         return (f'tim:{self.time}, thr:{self.thread}, '
                 f'eve:{self.event}, addr:{self.addr}, '

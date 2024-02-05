@@ -50,7 +50,7 @@ struct tracked_malloc_block tracked_block
    Option for the pin command line tool. In this case: '-o output_filename'.
    Its default value is 'mem_trace_log.out' */
 KNOB<std::string> trace_output_fname(KNOB_MODE_WRITEONCE, "pintool", "o",
-                                     "mem_trace_log.out","Output filename");
+                                     "mem_access_pattern.map","Output filename");
 
 
 /* Where to store the logs of each thread.
@@ -61,7 +61,7 @@ KNOB<std::string> trace_output_fname(KNOB_MODE_WRITEONCE, "pintool", "o",
  measuring real time events and if we go down to the OS to request memory
  at runtime, well... we fuck up all the measurments. */
 const UINT16 MAX_THREADS = 32;
-const UINT32 MAX_THR_EVENTS = 6000000;
+const UINT32 MAX_THR_EVENTS = 900000000;
 std::stringstream metadata;
 std::stringstream data;
 std::stringstream error;

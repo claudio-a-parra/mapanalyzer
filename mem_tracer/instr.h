@@ -36,12 +36,15 @@ void __attribute__((optimize("O0")))
 instr_stop_tracing(void) {}
 
 
-// aligned allocator
-// bytes: writable bytes to request
-// alignment: byte alignment. Powers of two accepted. Undefined otherwise
-//            For example, if 64 is passed, then make sure that the last
-//            6 bits of the pointer returned are 0
-void *PTR;
+// Aligned Memory Allocator: gets a block of memory where the first byte
+// of the returned address is aligned to blocks of <alignment> bytes.
+// So for example, if 64 is passed, then make sure that the last 6 bytes
+// of the returned pointer are 0. ONLY Powers of two accepted. Undefined
+// otherwise.
+//
+// Arguments:
+//     bytes     : Number of writable bytes to request
+//     alignment : Number of bytes to align the block.
 void *aligned_malloc(size_t bytes, size_t alignment){
     size_t ptr_size = sizeof(void*);
     // get space for data, align shift, and to store the real pointer
@@ -59,25 +62,11 @@ void *aligned_malloc(size_t bytes, size_t alignment){
     // store original pointer at the left of the aligned pointer
     aligned_ptr[-1] = (uintptr_t)original_ptr;
 
-    PTR = original_ptr;
-    char equal = 'N';
-    if((void*)aligned_ptr[-1] == original_ptr){
-        equal = 'Y';
-    }
-    printf("%10p %10p %c\n", original_ptr, aligned_ptr, equal);
-    if(equal == 'N')
-        exit(1);
     return (void*)aligned_ptr;
 }
 
 void aligned_free(void *ptr){
     //get the address right at the left of the given pointer
     void *original_ptr = (void *)( ((uintptr_t*)ptr)[-1] );
-    printf("%10p\n", original_ptr);
-    if(PTR != original_ptr){
-        printf("ERROR\n");
-        exit(1);
-    }
-
     free(original_ptr);
 }

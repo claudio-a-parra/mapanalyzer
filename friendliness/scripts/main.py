@@ -18,33 +18,52 @@ cache_specs = {
     'arch': ("Architecture word size [bits]", 64)}
 
 
-def get_cache_specs_from_file(specs, file_name):
+def get_cache_specs(specs, cache_filename=None):
     file_to_spec_key_map = {
         'line_size_bytes': 'line',
         'associativity': 'asso',
         'cache_size_bytes': 'size',
         'arch_size_bits': 'arch'
     }
-    try:
-        with open(file_name, 'r') as cache_config_file:
-            for line in cache_config_file:
+    def complete_cache_specs(specs):
+        # missing parameters filled from default specs config
+        for key in specs:
+            if not type(specs[key]) == int:
+                specs[key] = specs[key][1]
+        print(f'    line size     : {specs["line"]}\n'
+              f'    associativity : {specs["asso"]}\n'
+              f'    cache size    : {specs["size"]}\n'
+              f'    architecture  : {specs["arch"]}')
 
-                if line == '' or line[0] == '#': # skip empty or comment
+    # if no file was given
+    if cache_filename == None:
+        complete_cache_specs(specs)
+        return
+
+    try:
+        with open(cache_filename, 'r') as cache_config_file:
+            for line in cache_config_file:
+                # skip empty or comment
+                if line == '' or line[0] == '#':
                     continue
                 key_val_arr = line.split(':')
 
-                if len(key_val_arr) != 2: # ignore lines not like <name>:<value>
-                    print(f"File {file_name}: Invalid line:\n"
+                # ignore lines not like <name>:<value>
+                if len(key_val_arr) != 2:
+                    print(f"File {cache_filename}: Invalid line:\n"
                           ">>>>{line}\n"
                           "Ignoring.")
                     continue
                 name,val = key_val_arr[0].strip(), key_val_arr[1].strip()
 
-                if name not in file_to_spec_key_map: # ignore weird names
-                    print(f"File {file_name}: Unknown parameter name:\n"
+                # ignore weird names
+                if name not in file_to_spec_key_map:
+                    print(f"File {cache_filename}: Unknown parameter name:\n"
                           f">>>>{line}\n"
                           "Ignoring.")
                     continue
+
+                # potential good 'name:value' found
                 key = file_to_spec_key_map[name]
                 default_val = specs[key][1]
                 try:
@@ -54,23 +73,9 @@ def get_cache_specs_from_file(specs, file_name):
                           f">>>>{file_user_input}\n"
                           f"Using default value ({default_val}).")
                     specs[key] = int(default_val)
-
-            # missing parameters filled from default specs config
-            for key in sepecs:
-                if not type(specs[key]) == int:
-                    specs[key] = specs[key][1]
-
     except FileNotFoundError:
-        print(f"[!]    File {file_name} does not exist. Using default configuration.")
-        specs['line'] = specs['line'][1]
-        specs['asso'] = specs['asso'][1]
-        specs['size'] = specs['size'][1]
-        specs['arch'] = specs['arch'][1]
-
-    print(f'    line size     : {specs["line"]}\n'
-          f'    associativity : {specs["asso"]}\n'
-          f'    cache size    : {specs["size"]}\n'
-          f'    architecture  : {specs["arch"]}')
+        print(f"[!]    File {cache_filename} does not exist. Using default configuration.")
+    complete_cache_config(specs)
 
 
 def run_simulation(specs, access_pattern, ap_resolution, plots_dims,
@@ -83,6 +88,11 @@ def run_simulation(specs, access_pattern, ap_resolution, plots_dims,
         plots_dims=plots_dims, verb=verb)
     af = AddressFormatter(specs)
     cache = Cache(specs, instr=instr)
+
+    _,_,byte = af.split(access_pattern.base_addr)
+    if byte != 0:
+        print(f'[!] Warning: Memory block is not cache aligned. First byte at '
+              f'offset {byte}.')
 
     # First Pass
     for access in access_pattern:
@@ -143,7 +153,7 @@ def command_line_args_parser():
         help='Path of the input Memory Access Pattern file.')
     parser.add_argument(
         '-c', '--cache', metavar='cache.conf', dest='cache', type=str,
-        default="cache.conf",
+        default=None,
         help=("File describing the shape of the cache. See "
               "'cache.conf' section."))
     parser.add_argument(
@@ -171,7 +181,7 @@ def command_line_args_parser():
         if min_res < val < max_res:
             return val
         else:
-            print(f'[!]    Warning: resolution value must be between {min_res} and '
+            print(f'[!] Warning: resolution value must be between {min_res} and '
                   f'{max_res}. Using default value {def_res}.')
             return def_res
     parser.add_argument(
@@ -191,8 +201,8 @@ def main():
     global cache_specs
     args = command_line_args_parser()
 
-    print(f'Reading cache configuration: {args.cache}')
-    get_cache_specs_from_file(cache_specs, args.cache)
+    print(f'Setting Cache Parameters:')
+    get_cache_specs(cache_specs, cache_filename=args.cache)
 
     print(f'Tracing Memory Access Pattern: {args.input_file}')
     access_pattern = MemAP(args.input_file)
@@ -211,6 +221,17 @@ def main():
     if prefix == '':
         prefix = os.path.basename(os.path.splitext(args.input_file)[0])
     instruments.plot(prefix, args.format)
+
+    # print('Full (miss, hit):')
+    # for i,x in zip(instruments.instruction_ids,instruments.miss.full_events_log):
+    #     print(f'{i:3}: {x}')
+
+    # print('Filtered (avg on window):')
+    # for i,x in zip(instruments.instruction_ids,instruments.miss.filtered_avg_log):
+    #     print(f'{i:3}: {x}')
+
+
+
 
 
 if __name__ == "__main__":

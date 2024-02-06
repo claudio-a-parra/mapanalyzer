@@ -146,7 +146,7 @@ class AliasRatio(GenericInstrument):
             return
         if self.verbose:
             i = hex(index)[2:]
-            print(f"[!]    {self.__class__.__name__}: S{i}")
+            print(f"[!] {self.__class__.__name__}: S{i}")
         self.queue_event((index,))
 
     def mix_events(self, base, new):
@@ -230,14 +230,14 @@ class MissRatio(GenericInstrument):
         if not self.enabled:
             return
         if self.verbose:
-            print(f"[!]    {self.__class__.__name__}: MISS")
+            print(f"[!] {self.__class__.__name__}: MISS")
         self.queue_event((1,0)) # add one miss
 
     def register_hit(self):
         if not self.enabled:
             return
         if self.verbose:
-            print(f"[!]    {self.__class__.__name__}: HIT")
+            print(f"[!] {self.__class__.__name__}: HIT")
         self.queue_event((0,1)) # add one hit
 
     def mix_events(self, base, new):
@@ -314,7 +314,7 @@ class ByteUsageRatio(GenericInstrument):
         self.accessed_bytes += delta_access
         self.valid_bytes += delta_valid
         if self.verbose:
-            print(f"[!]    {self.__class__.__name__}: "
+            print(f"[!] {self.__class__.__name__}: "
                   f"{self.accessed_bytes}/{self.valid_bytes}")
 
         event = (self.accessed_bytes, self.valid_bytes)
@@ -403,7 +403,7 @@ class SIURatio(GenericInstrument):
         if self.verbose:
             t = hex(tag)[2:]
             i = hex(index)[2:]
-            print(f"[!]    {self.__class__.__name__}: "
+            print(f"[!] {self.__class__.__name__}: "
                   f"fetch(s:{i},tag:{t})={self.fetch_counters[block_id]}")
         return 0
 
@@ -431,12 +431,12 @@ class SIURatio(GenericInstrument):
         if resulting_fetches > 0: # the block is later fetched again.
             new_event = (1, 1)
             if self.verbose:
-                print(f"[!]    {self.__class__.__name__}: "
+                print(f"[!] {self.__class__.__name__}: "
                       "still-in-use eviction!")
         elif resulting_fetches == 0:
             new_event = (0, 1)
             if self.verbose:
-                print(f"[!]    {self.__class__.__name__}: "
+                print(f"[!] {self.__class__.__name__}: "
                       "last eviction")
         else:
             raise Exception(f"There are more evictions than fetches for "
@@ -580,15 +580,16 @@ class Instruments:
                 is_msg = f'larger than the number of events ({ap_tot_events})'
             else:
                 is_msg = 'less than one'
-            print(f'[!]    Warning: the given avg window ({win}) is '
-                  f'{is_msg}. Using default value ({new_win}).')
+            print(f'[!] Warning: the given avg window ({win}) is '
+                  f'{is_msg}. Using default value ({auto_win}).')
             win = auto_win
 
         # filter instruments' logs
         instruments = (self.alias, self.miss, self.usage, self.siu)
-        for i in instruments:
-            print(f'    Filtering {i.plot_details[1]} (w={win})')
-            i.filter_log(win)
+        windows = [win, win, 1, win]
+        for i,w in zip(instruments,windows):
+            print(f'    Filtering {i.plot_details[1]} (w={w})')
+            i.filter_log(w)
 
 
     def register_access(self, access):
@@ -615,29 +616,17 @@ class Instruments:
             # become 1, 2, 3, ...
             self.access_matrix[addr_acc][time_acc] = 1+access.thread
 
+
     def plot(self, base_name, out_format):
         """Create all instrument plots with the access pattern in the
         background"""
-        # palette = {
-        #     0 :('#1f77b4','#81beea'), # Steel Blue
-        #     1 :('#ff7f0e','#ffc08a'), # Dark Orange
-        #     2 :('#2ca02c','#8ad68a'), # Dark Green
-        #     3 :('#d62728','#efa9a9'), # Red
-        #     4 :('#9467bd','#cdb8e0'), # Slate Blue
-        #     5 :('#8c564b','#cda9a2'), # Sienna
-        #     6 :('#e377c2','#f2c0e3'), # Orchid Pink
-        #     7 :('#7f7f7f','#bfbfbf'), # Gray
-        #     8 :('#bcbd22','#ebeb8e'), # Olive Green
-        #     9 :('#17becf','#8ce8f2'), # Cyan
-        #     10:('#fac800','#ffe680'), # Yellow
-        #     11:('#00eb95','#80ffd0')} # Turquoise Green
 
         # Memory Access Pattern color-map creation
         threads_palette = ['#db000066'] # dark red
-        threads_bg = '#FFFFFF55' # last two digits is transparency
+        threads_bg = '#FFFFFF44' # last two digits is transparency
         colors_needed = self.access_pattern.thread_count # one color per thread
         if colors_needed > len(threads_palette):
-            print(f'[!]    Warning: The Access Pattern has more threads '
+            print(f'[!] Warning: The Access Pattern has more threads '
                   'than colors available to plot. Different threads will '
                   'share colors.')
         cmap = ListedColormap([threads_bg] +
@@ -646,7 +635,7 @@ class Instruments:
 
         # Instruments and their colors
         instruments = (self.alias, self.miss, self.usage, self.siu)
-        col_instr = [('#ffa500ff','#ffa50066'), # orange (opaque, 40% transp.)
+        col_instr = [('#ffa500ff','#ffa50066'), # orange ((100%, 40%) opaque)
                      ('#0000ffff','#0000ff66'), # blue
                      ('#008080ff','#00808066'), # teal
                      ('#ff00ffff','#ff00ff66'), # magenta
@@ -654,63 +643,95 @@ class Instruments:
                      ('#008000ff','#00800066'), # green
                      ]
         if len(col_instr) < len(instruments):
-            print('[!]    Warning: Less colors than instruments. Different '
+            print('[!] Warning: Less colors than instruments. Different '
                   'instruments will share colors.')
 
         # Down-Sample if there are too many data points (Matplotlib limitation)
         max_data_len = 4000
+        max_data_len = 800000
         if max_data_len < len(self.instruction_ids):
-            print('[!]    Warning: Too many data points. Down-sampling to '
+            print('[!] Warning: Too many data points. Down-sampling to '
                   f'~ {max_data_len}.')
             step = len(self.instruction_ids) // max_data_len
             self.instruction_ids = self.instruction_ids[::step]
             for inst in instruments:
                 inst.filtered_avg_log = inst.filtered_avg_log[::step]
 
-        # Plot instruments
+
+
+
+        #### Plot instruments
+        # Create instruments layer (axes)
+        fig, instr_layer = plt.subplots(figsize=(self.plot_width, self.plot_height))
+
+        # get shared x values, and x limits
+        instr_x = self.instruction_ids
+        min_x,max_x = instr_x[0]-1, instr_x[-1]+1
+
+
+        # find a label_step 1, 5, 10, 50, 100... such that we print
+        # at most `max_labels` labels
+        max_labels = 20
+        label_step, tot_labels = 1, len(instr_x)
+        for i in range(13):
+            pow_ten = 10 ** i
+            if tot_labels // pow_ten < max_labels:
+                label_step = pow_ten
+                break
+            five_pow_ten = 5 * pow_ten
+            if tot_labels // five_pow_ten < max_labels:
+                label_step = five_pow_ten
+                break
+            label_step = five_pow_ten # at least a dent to humongous tot_labels
+        x_ticks = instr_x[::label_step]
+
+        # create mem access pattern layer and draw it
+        map_layer = instr_layer.twinx()
+        map_layer.tick_params(axis='y', which='both', left=False, right=False,
+                              labelleft=False, labelright=False)
+
         for color_index,instr in enumerate(instruments):
             sufix,title,subtitle,y_label,min_y,max_y = instr.plot_details
             print(f'    Plotting {title}...')
 
-            # get data and color
+            # get instrument data and set Y label
             instr_y = instr.filtered_avg_log
-            instr_x = self.instruction_ids
+
+            # get instrument color
             col_line = col_instr[color_index % len(col_instr)][0]
             col_fill = col_instr[color_index % len(col_instr)][1]
 
-            # set figure size and plots limits
-            plt.figure(figsize=(self.plot_width, self.plot_height))
+            # set title
+            instr_layer.set_title(f'{title} ({subtitle})\n'
+                                  f'{base_name}, w={instr.window_size}')
+
+            # set X limits and label
+            instr_layer.set_xlim(min_x, max_x)
+            instr_layer.set_xlabel('Instruction')
+
+            # set Y limits and label
             max_y = max(max(instr_y), max_y)
             y_margin = (max_y - min_y) * 0.01 # 1% margin
             min_y,max_y = min_y-y_margin, max_y+y_margin
-            min_x,max_x = instr_x[0]-1, instr_x[-1]+1
-            plt.ylim(min_y, max_y)
-            plt.xlim(min_x, max_x)
+            instr_layer.set_ylim(min_y, max_y)
+            instr_layer.set_ylabel(y_label)
 
-            # set plot labels and title
-            plt.xlabel('Instruction')
-            plt.ylabel(y_label)
-            plt.title(f'{title} ({subtitle})\n'
-                      f'{base_name}, w={instr.window_size}')
+            # plot instrument
+            instr_layer.bar(instr_x, instr_y, width=1,
+                            color=col_line, zorder=1)
+            instr_layer.axhline(y=0, color=col_line, linestyle='-',
+                                linewidth=1, zorder=2)
 
-            # plot instrument measurements
-            plt.fill_between(instr_x, 0, instr_y,
-                             color=col_line, facecolor=col_fill,
-                             step='post', linewidth=1.2)
-            plt.grid(axis='x', linestyle='-', alpha=0.7, linewidth=0.3,
-                     which='both')
+            # plot memory access pattern
+            map_layer.imshow(self.access_matrix, cmap=cmap, aspect='auto',
+                             extent=(min_x, max_x+1, min_y, max_y), zorder=3)
 
-            # plot Memory Access Pattern and hide the second axis
-            ax2 = plt.twinx()
-            ax2.imshow(self.access_matrix, cmap=cmap, aspect='auto',
-                       extent=(min_x, max_x, min_y, max_y))
-                      #instr_x[0]-1, instr_x[-1]+1, 0, max_y])
-            ax2.tick_params(axis='y', which='both',
-                            left=False, right=False,
-                            labelleft=False, labelright=False)
+            # make sure the grid is above the plot itself
+            instr_layer.grid(axis='x', linestyle='-', alpha=0.7,
+                             linewidth=0.8, which='both', zorder=4)
 
             # save figure and reset the plot
             filename=f'{base_name}{sufix}.{out_format}'
-            print(f'      Saving file: {filename}')
-            plt.savefig(filename, dpi=300, bbox_inches='tight')
-            plt.clf()
+            print(f'        {filename}')
+            fig.savefig(filename, dpi=900, bbox_inches='tight')
+            instr_layer.cla()

@@ -5,13 +5,14 @@ import argparse # to get command line arguments
 
 
 from address_formatter import log2, AddressFormatter
-from instruments import InstrCounter, Instruments
+from instruction_counter import InstrCounter
+from instruments import Instruments
 from cache import Cache
-from mem_access_pattern import MemAP
+from map_file_reader import MapFileReader
 
 
 # Default cache configuration. typical Intel i7 L1d
-cache_specs = {
+default_cache_specs = {
     'line': ("Line size [bytes]", 64),
     'asso': ("Associativity [lines]", 8),
     'size': ("Total Cache size [bytes]" , 32768),
@@ -25,7 +26,7 @@ def get_cache_specs(specs, cache_filename=None):
         'cache_size_bytes': 'size',
         'arch_size_bits': 'arch'
     }
-    def complete_cache_specs(specs):
+    def _complete_cache_specs(specs):
         # missing parameters filled from default specs config
         for key in specs:
             if not type(specs[key]) == int:
@@ -37,7 +38,7 @@ def get_cache_specs(specs, cache_filename=None):
 
     # if no file was given
     if cache_filename == None:
-        complete_cache_specs(specs)
+        _complete_cache_specs(specs)
         return
 
     try:
@@ -74,54 +75,53 @@ def get_cache_specs(specs, cache_filename=None):
                           f"Using default value ({default_val}).")
                     specs[key] = int(default_val)
     except FileNotFoundError:
-        print(f"[!]    File {cache_filename} does not exist. Using default configuration.")
+        print(f"[!]    File {cache_filename} does not exist. Using default "
+              "configuration.")
     complete_cache_config(specs)
 
 
-def run_simulation(specs, access_pattern, ap_resolution, plots_dims,
-                   verb=False):
-    # Init Instruction Counter, Instruments, Address Formatter, and Cache
-    ic = InstrCounter()
-    instr = Instruments(
-        ic, specs, ap=access_pattern,
-        ap_resolution=ap_resolution,
-        plots_dims=plots_dims, verb=verb)
-    af = AddressFormatter(specs)
-    cache = Cache(specs, instr=instr)
+#def run_simulation(cache_specs, map_reader, map_plotter, verb=False):
+def run_simulation(map_reader, instruments, cache_system, verb=False):
+    ic = instruments.ic
 
-    _,_,byte = af.split(access_pattern.base_addr)
+    #instruments = Instruments(ic, cache_specs, map_plotter=mat_plotter,
+    #                          verb=verb)
+    #af = cache_system.af
+    #cache = Cache(cache_specs, instr=instruments)
+
+    _,_,byte = cache_system.af.split(map_reader.base_addr)
     if byte != 0:
         print(f'[!] Warning: Memory block is not cache aligned. First byte at '
               f'offset {byte}.')
 
     # First Pass
-    for access in access_pattern:
+    for access in map_reader:
         ic.counter = access.time
-        cache.access(access)
+        cache_system.access(access)
         if verb:
-            cache.dump()
+            cache_system.dump()
             print()
 
     # Prepare for second pass
-    instr.disable_all()
+    instruments.disable_all()
     ic.step()
-    cache.flush()
+    cache_system.flush()
     ic.reset()
-    instr.prepare_for_second_pass()
-    cache.reset_clock()
+    instruments.prepare_for_second_pass()
+    cache_system.reset_clock()
 
     # Second Pass
-    for access in access_pattern:
+    for access in map_reader:
         ic.counter = access.time
-        cache.access(access)
+        cache_system.access(access)
         if verb:
-            cache.dump()
+            cache_system.dump()
             print()
-    instr.disable_all()
+    instruments.disable_all()
     ic.step()
-    cache.flush()
+    cache_system.flush()
 
-    return instr
+    return
 
 
 def command_line_args_parser():
@@ -156,9 +156,6 @@ def command_line_args_parser():
         default=None,
         help=("File describing the shape of the cache. See "
               "'cache.conf' section."))
-    parser.add_argument(
-        '-o', '--output', dest='output', type=str, default='',
-        help="Prefix of output files (by default the same as input file).")
     parser.add_argument(
         '-w', '--window', dest='window', type=int, default=None,
         help=("Moving average filter window size for data plotting. "
@@ -198,29 +195,43 @@ def command_line_args_parser():
     
 
 def main():
-    global cache_specs
+    global default_cache_specs
+    cache_specs = default_cache_specs
+
+    # parse command line arguments
     args = command_line_args_parser()
 
-    print(f'Setting Cache Parameters:')
+    print(f'Reading Cache Parameters.')
     get_cache_specs(cache_specs, cache_filename=args.cache)
 
+    print(f'Creating MAP Reader, Instruments, and Cache System.')
+    map_reader = MapFileReader(args.input_file)
+    map_metadata = map_reader.get_metadata()
+    instruments = Instruments(cache_specs, map_metadata,
+                              args.px, args.py, args.resolution)
+    cache_system = Cache(cache_specs, instr=instruments)
+
+
+    #map_plotter = MapPlotter(metadata, args.px, args.py, args.resolution)
+    #ic = InstrCounter()
+    #instruments = Instruments(ic, cache_specs,
+    #                          map_plotter=mat_plotter)
+
+
+
     print(f'Tracing Memory Access Pattern: {args.input_file}')
-    access_pattern = MemAP(args.input_file)
-    instruments = run_simulation(cache_specs, access_pattern, args.resolution,
-                                 plots_dims=(args.px, args.py),
-                                 verb=args.verbosity)
+    run_simulation(map_reader, instruments, cache_system)
+    #instruments = run_simulation(cache_specs, map_reader, map_plotter, verb=args.verbosity)
 
-    print('Building Instruments Log')
-    instruments.build_log()
+    # print('Building Instruments Log')
+    # instruments.build_log()
 
-    print(f'Filtering Log')
-    instruments.filter_log(win=args.window)
+    # print(f'Filtering Log')
+    # instruments.filter_log(win=args.window)
 
     print(f'Plotting Results ({args.format})')
-    prefix = args.output
-    if prefix == '':
-        prefix = os.path.basename(os.path.splitext(args.input_file)[0])
-    instruments.plot(prefix, args.format)
+    prefix = os.path.basename(os.path.splitext(args.input_file)[0])
+    instruments.plot(args.window, prefix, args.format)
 
     # print('Full (miss, hit):')
     # for i,x in zip(instruments.instruction_ids,instruments.miss.full_events_log):

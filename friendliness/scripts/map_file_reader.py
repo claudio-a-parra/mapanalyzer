@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import sys
+
 class MemAccess:
+    """One register from the map file."""
     def __init__(self, time, thread, event, size, addr):
         self.time = time
         self.thread = thread
@@ -15,7 +17,8 @@ class MemAccess:
                 f'siz:{self.size}')
 
 
-class MemAP:
+class MapFileReader:
+    """iterates over the map file, reading one register at the time."""
     def __init__(self, file_path):
         self.file_path = file_path
         self.base_addr = -1
@@ -92,6 +95,13 @@ class MemAP:
 
         self.rewind()
         return
+
+    def get_metadata(self):
+        return (self.base_addr,
+                self.block_size,
+                self.thread_count,
+                self.event_count,
+                self.time_size)
 
     def rewind(self):
         if self.file.closed:

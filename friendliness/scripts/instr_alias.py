@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 import sys
-import random # DEBUG
+import math # log function
 from collections import deque
-import matplotlib as mpl
-# increase memory for big plots. Bruh...
-mpl.rcParams['agg.path.chunksize'] = 10000000000000
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
+import matplotlib.ticker as ticker
 import matplotlib.colors as mcolors # to create shades of colors from list
 
 from instr_generic import GenericInstrument
@@ -14,79 +11,100 @@ from instr_generic import GenericInstrument
 #-------------------------------------------
 class Alias(GenericInstrument):
     """
-    - Definition : The distribution of sets usage. Y-axis is the list of all
-                   sets, and for each instruction, every set shows their "share"
-                   of usage.
-    - Range      : Each set in a given instruction can have values from 0 to 1.
-                   0: this set has not been used so far (not in this instruction
-                      or previous ones
-                   1: this set has been the only one ever used.
-    - Events     : Array of cumulative counters, one for each set.
-    - Trigger    : Block fetches.
+    Definition:
+        The distribution of sets usage. Y-axis is the list of all sets, and for
+        each instruction, every set shows the proportion of fetches they have
+        effected.
+
+    Captured Events:
+        An event is captured at every cache block fetching.
+        Each event is an array of S counters, where S is the total number of
+        sets. The counter keeps track of all the fetches effected by that
+        cache set.
+
+    Plot Interpretation:
+        In every point of time where a cache block fetch is done, all sets
+        show their updated proportion of the total number of fetches ever done
+        so far.
+        If at some point of time no cache block fetch is triggered, then show
+        nothing.
+        The proportion of cache fetches is shown as boxes that range from
+        transparent (0) to opaque (1):
+            - 0: this set has attended between 0 to 1/S of the total number of
+                 fetches. This is good, a perfect distribution is S sets, each
+                 sharing 1/S of the total number of fetches.
+            - 1: this set has attended all the fetches.
     """
     def __init__(self, instr_counter, num_sets):
         super().__init__(instr_counter)
 
         self.num_sets = num_sets
+        self.last_counter = [0] * num_sets
+        self.zero_counter = [0] * num_sets
 
-        self.plot_filename_sufix = '_plot-01-alias'
-        self.plot_title = 'Aliasing'
-        self.plot_subtitle = 'transparent is better'
-        self.plot_y_label = 'Set Index'
-        self.plot_x_label = 'Instruction'
-        self.plot_min = 0
-        self.plot_max = 1
-        self.plot_color_fg1 = '#ffa500ff' # orange 100% opaque
-        self.plot_color_fg2 = '#ffa50066' # orange  40% opaque
-        self.plot_color_bg =  '#FFFFFF00' # white    0% opaque, transparent.
-
-
-    def _fill_events_list(self, next_index):
-        # pad self.events such that upon appending a new element, its
-        # index becomes next_index. If self.events already has next_index
-        # on it, do not touch self.events.
-        if len(self.events) < next_index:
-            if len(self.events) == 0:
-                self.events.append([0]*self.num_sets)
-            while len(self.events) < next_index:
-                self.events.append(self.events[-1])
+        self.plot_name_sufix  = '_plot-01-alias'
+        self.plot_title       = 'Aliasing'
+        self.plot_subtitle    = 'transparent is better'
+        self.plot_y_label     = 'Set Index'
+        self.plot_color_text  = '#E09200'   # dark orange
+        self.plot_color_boxes = '#ffa500'   # orange
+        self.plot_color_bg    = '#FFFFFF00' # transparent
+        return
 
 
-    def _new_counter(self, set_index):
-        if len(self.events) == 0:
-            new_counter = [0] * self.num_sets
-        else:
-            new_counter = [x for x in self.events[-1]]
-        new_counter[set_index] += 1 #register usage.
-        return new_counter
+    def _pad_events_list(self, new_index):
+        # Always true: new_index >= len(self.events)
+        if len(self.events) != 0:
+            # save last real counter
+            self.last_counter = self.events[-1]
+        while len(self.events) < new_index:
+            # and pad with zeroes
+            self.events.append(self.zero_counter)
+        return
 
 
-    def _update_or_append_event(self, index, subindex):
-        # if self.events[index] exists, then update its value,
-        # otherwise, append a new counter to self.events
-        if index < len(self.events):
-            self.events[index][subindex] += 1
-        else:
-            new_counter = self._new_counter(subindex)
-            self.events.append(new_counter)
-
-
-    def register_set_usage(self, set_index):
+    def register(self, set_index):
         if not self.enabled:
             return
-        self._fill_events_list(self.ic.val())
-        self._update_or_append_event(self.ic.val(), set_index)
+
+        # update existing counter, or add a new one.
+        event_idx = self.ic.val() # note that ic may skip values.
+        if event_idx < len(self.events):
+            # if the events[event_idx] exists, then just update it
+            self.events[event_idx][set_index] += 1
+        else:
+            # otherwise, pad events with zero counters so that
+            # events[event_idx] now exists.
+            self._pad_events_list(event_idx)
+            # deep copy the last real counter, and update the set's count
+            new_event = [x for x in self.last_counter]
+            new_event[set_index] += 1
+            self.events.append(new_event)
+            # update the last non-zero counter
+            self.last_counter = new_event
+        return
+
+    def _log_mapping(self, x):
+        # Apply logarithmic mapping to input values
+        return math.log(1 + 9 * x) / math.log(10)
 
 
-    def _create_plotting_data(self):
-        print(f'        Creating Normalized Matrix.')
-        # self.events cannot be plot right away because of two reasons:
-        # 1. each item is a list of num_sets counters. we need values from
+    def _create_plotting_data(self, kind='linear'):
+        # self.events cannot be plot right away because of three reasons:
+        # 1. There are most likely more time points than alias counters. We
+        #    need to pad the list of counters so that it nicely matches the
+        #    timeline array.
+        # 2. each item is a list of num_sets counters. we need values from
         #    0 to 1 that represents the proportion of usage:
         #      - 0=perfect,
         #      - 1=all fetches in the same set.
-        # 2. self.events is a list of columns. imshow() needs a list of rows,
+        #    This mapping can be 'linear' or 'log' (ln)
+        # 3. self.events is a list of columns. imshow() needs a list of rows,
         #    so we need to transpose it.
+
+        # pad self.events to match the length of self.X
+        while len(self.events) < len(self.X):
+            self.events.append(self.zero_counter)
 
         # create matrix filled with zeroes, of size transposed(self.events)
         self.Y = [[0] * len(self.events) # each row
@@ -101,31 +119,19 @@ class Alias(GenericInstrument):
             all_count = sum(counters_arr)
             if all_count == 0:
                 continue
-            for set_idx, raw_count in enumerate(counters_arr):
-                self.Y[set_idx][instr_idx] = \
-                    max(0,
-                        ((raw_count / all_count) - base_proportion) \
+            for set_idx, one_set_raw_count in enumerate(counters_arr):
+                linear_ratio = ((one_set_raw_count / all_count) - base_proportion) \
                         * normal_factor
-                        )
+                log_ratio = self._log_mapping(linear_ratio)
+                if kind=='log':
+                    val = log_ratio
+                else:
+                    val = linear_ratio
+                self.Y[set_idx][instr_idx] = max(0, val)
         self.events = None # hint GC
+        return
 
-    
-    def plot(self, axes, zorder=1, window=1):
-        # check if self.X has been filled
-        if self.X == None:
-            print('[!] Error: Please assign '
-                  f'{self.__class__.__name__ }.X before calling '
-                  'plot()')
-            sys.exit(1)
-
-        # create color shade
-        colors = [self.plot_color_bg, self.plot_color_fg1]
-        shade_cmap = mcolors.LinearSegmentedColormap.from_list(
-            'transparency_cmap', colors)
-
-        # transform list of events into list of plottable data in self.Y
-        self._create_plotting_data()
-
+    def get_extent(self):
         # fine tune margins to place each quadrilateral of the imshow()
         # right on the tick. So adding a 0.5 margin at each side.
         left_edge = self.X[0] - 0.5
@@ -133,19 +139,48 @@ class Alias(GenericInstrument):
         bottom_edge = 0 - 0.5
         top_edge = self.num_sets + 0.5
         extent = (left_edge, right_edge, bottom_edge, top_edge)
+        return extent
 
-        # create ticks for X and Y axis.
-        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=20)
-        axes.set_xticks(x_ticks)
+
+    def plot(self, axes, basename='alias', extent=None, kind='log'):
+        # check if self.X has been filled
+        if self.X == None:
+            print('[!] Error: Please assign '
+                  f'{self.__class__.__name__ }.X before calling plot()')
+            sys.exit(1)
+
+        # create color shade
+        colors = [self.plot_color_bg, self.plot_color_boxes]
+        shade_cmap = mcolors.LinearSegmentedColormap.from_list(
+            'transparency_cmap', colors)
+
+        # transform list of events into list of plotable data in self.Y
+        self._create_plotting_data(kind=kind)
+
+        # draw the image and invert Y axis (so lower value is on top)
+        extent = extent if extent != None else self.get_extent()
+        axes.imshow(self.Y, cmap=shade_cmap, origin='lower', interpolation=None,
+                    aspect='auto', extent=extent, zorder=1, vmin=0, vmax=1)
+        axes.invert_yaxis()
+
+        # setup title
+        axes.set_title(f'{self.plot_title}: {basename}\n'
+                       f'({self.plot_subtitle})')
+
+        # setup Y ticks
+        axes.tick_params(axis='y', which='both',
+                         left=True, right=False,
+                         labelleft=True, labelright=False)
         set_indices = list(range(self.num_sets))
-        y_ticks = self._create_up_to_n_ticks(set_indices, base=2, n=10)
+        y_ticks = self._create_up_to_n_ticks(set_indices, base=2, n=9)
         axes.set_yticks(y_ticks)
 
-        # plot the image.
-        axes.imshow(self.Y, cmap=shade_cmap, interpolation=None,
-                    aspect='auto', extent=extent, zorder=zorder,
-                    vmin=0, vmax=1)
+        # setup Y label
+        axes.yaxis.set_label_position('left')
+        axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
+                        labelpad=10)
 
-        axes.grid(axis='x', linestyle='-', alpha=0.7,
-                  linewidth=0.8, which='both', zorder=zorder+1)
-        return extent
+        # setup Y grid
+        axes.grid(axis='y', which='both', linestyle='-', alpha=0.2,
+                  color=self.plot_color_boxes, linewidth=0.8, zorder=2)
+        return

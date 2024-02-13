@@ -10,135 +10,88 @@ from matplotlib.colors import ListedColormap
 from instruction_counter import InstrCounter
 from instr_mapplotter import MapPlotter
 from instr_alias import Alias
-# from instr_miss import Miss
-# from instr_usage import Usage
+from instr_miss import Miss
+from instr_usage import UnusedBytes
 # from instr_siue import SIUEvict
 
 
 #-------------------------------------------
 class Instruments:
-    #def __init__(self, instr_counter, cache_specs, map_plotter=None, verb=False):
+    #def __init__(self, instr_counter, cache_specs, map=None, verb=False):
     def __init__(self, cache_specs, map_metadata, plot_width, plot_height,
                  resolution):
-        #self.ic = instr_counter
-        #self.num_sets = cache_specs['size']//(cache_specs['asso']*cache_specs['line'])
-        #self.line_size_bytes = cache_specs['line']
-        #self.verb = verb
-
         self.ic = InstrCounter()
         self.plot_width = plot_width
         self.plot_height = plot_height
 
-        # Create map plotter and alias, miss, usage, and SIU instruments.
-        # Make them share their X axis (for the plots)
-        self.map_plotter = MapPlotter(self.ic, map_metadata,
-                                      plot_width, plot_height, resolution)
+        # Create map plotter and other instruments: (alias, miss, usage,
+        # and SIU). Make them share their X axis (for the plots)
+        self.map = MapPlotter(self.ic, map_metadata, plot_width,
+                                      plot_height, resolution)
 
         num_sets = cache_specs['size']//(cache_specs['asso']*\
                                          cache_specs['line'])
+
         self.alias = Alias(self.ic, num_sets)
-        self.alias.X = self.map_plotter.X
+        self.alias.X = self.map.X
 
-        # self.miss = Miss(instr_counter)
-        # self.miss.X = self.map_plotter.instruction_ids
+        self.miss = Miss(self.ic)
+        self.miss.X = self.map.X
 
-        # self.usage = Usage(instr_counter, cache_specs['line'])
-        # self.usage.X = self.map_plotter.instruction_ids
+        self.usage = UnusedBytes(self.ic)
+        self.usage.X = self.map.X
 
         # self.siu = SIUEvict(instr_counter)
-        # self.siu.X = self.map_plotter.instruction_ids
+        # self.siu.X = self.map.instruction_ids
+        self.inst_list = [self.alias, self.miss, self.usage] #, self.siu]
 
 
     def enable_all(self):
-        self.map_plotter.enabled = True
-        self.alias.enabled = True
-        # self.missr.enabled = True
-        # self.usage.enabled = True
-        # self.siu.enabled = True
+        self.map.enabled = True
+        for i in self.inst_list:
+            i.enabled = True
 
 
     def disable_all(self):
-        self.map_plotter.enabled = False
-        self.alias.enabled = False
-        # self.miss.enabled = False
-        # self.usage.enabled = False
-        # self.siu.enabled = False
+        self.map.enabled = False
+        for i in self.inst_list:
+            i.enabled = False
 
 
     def prepare_for_second_pass(self):
-        self.map_plotter.enabled = False
-        self.alias.enabled = False
-        # self.miss.enabled = False
-        # self.usage.enabled = False
-        # self.siu.enabled = True
-        # self.siu.mode = 'evict'
+        self.disable_all()
+        #self.siu.enabled = True
+        #self.siu.mode = 'evict'
 
 
     def set_verbose(self, verb=False):
-        self.map_plotter.verbose = verb
-        self.alias.verbose = verb
-        # self.miss.verbose = verb
-        # self.usage.verbose = verb
-        # self.siu.verbose = verb
+        self.map.enabled = verb
+        for i in self.inst_list:
+            i.enabled = verb
 
 
-    def plot(self, window, base_name, out_format):
-        fig, instrument_axes = plt.subplots(
+    def plot(self, window, basename, out_format):
+        fig, map_axes = plt.subplots(
             figsize=(self.plot_width, self.plot_height))
+        instr_axes = map_axes.twinx()
 
-        map_axes = instrument_axes.twinx()
-        map_axes.tick_params(axis='y', which='both', left=False, right=False,
-                              labelleft=False, labelright=False)
+        for instr in self.inst_list:
+            print(f'    Plotting {instr.plot_title}.')
+            extent = instr.get_extent()
+            self.map.plot(map_axes, extent=extent)
+            instr.plot(instr_axes, basename=basename)
 
-        # plot alias
-        print(f'    Plotting {self.alias.plot_title}.')
-        extent = self.alias.plot(instrument_axes, zorder=1, window=window)
+            # save alias
+            filename=f'{basename}{instr.plot_name_sufix}.{out_format}'
+            print(f'        {filename}')
+            fig.savefig(filename, dpi=600, bbox_inches='tight')
+            instr_axes.cla()
 
-        # plot map
-        self.map_plotter.plot(map_axes, zorder=3, extent=extent)
-
-        # save figure
-        filename=f'{base_name}{self.alias.plot_filename_sufix}.{out_format}'
-        print(f'        {filename}')
-        fig.savefig(filename, dpi=600, bbox_inches='tight')
-        instrument_axes.cla()
-        print('DONE SO FAR :)')
         exit(0)
 
 
 '''
 COMMENT START
-    def build_log(self):
-        self.alias.build_log(self.instruction_ids)
-        self.miss.build_log(self.instruction_ids)
-        self.usage.build_log(self.instruction_ids)
-        self.siu.build_log(self.instruction_ids)
-
-
-    def filter_log(self, win):
-        default_win = 0.05 # window of 5% of the total number of points.
-        # sanity check for window size
-        ap_tot_events = self.access_pattern.event_count
-        auto_win = max(round(ap_tot_events * default_win), 1)
-        if win == None:
-            win = auto_win
-        elif win < 1 or ap_tot_events < win:
-            if ap_tot_events < win:
-                is_msg = f'larger than the number of events ({ap_tot_events})'
-            else:
-                is_msg = 'less than one'
-            print(f'[!] Warning: the given avg window ({win}) is '
-                  f'{is_msg}. Using default value ({auto_win}).')
-            win = auto_win
-
-        # filter instruments' logs
-        instruments = (self.alias, self.miss, self.usage, self.siu)
-        windows = [win, win, 1, win]
-        for i,w in zip(instruments,windows):
-            print(f'    Filtering {i.plot_details[1]} (w={w})')
-            i.filter_log(w)
-
-
     def plot_old(self, window, base_name, out_format):
         """Create all instrument plots with the access pattern in the
         background"""

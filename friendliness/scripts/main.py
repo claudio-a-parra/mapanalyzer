@@ -168,12 +168,12 @@ def command_line_args_parser():
         '-py', '--plot-y', dest='py', type=int, default=4,
         help="Height of the plots.")
     parser.add_argument(
-        '-f', '--format', dest='format', choices=['png', 'pdf'], default='pdf',
+        '-f', '--format', dest='format', choices=['png', 'pdf'], default='png',
         help='Choose the output format of the plots.')
     def check_res(val):
-        min_res = 10
-        max_res = 600
-        def_res = 150
+        min_res = 4
+        max_res = 1000
+        def_res = 600
         val = int(val)
         if min_res < val < max_res:
             return val
@@ -182,7 +182,7 @@ def command_line_args_parser():
                   f'{max_res}. Using default value {def_res}.')
             return def_res
     parser.add_argument(
-        '-r', '--resolution', dest='resolution', type=check_res, default=150,
+        '-r', '--resolution', dest='resolution', type=check_res, default=600,
         help=('Resolution of the Memory Access Pattern plot (value between '
               '10 and 600).'))
     parser.add_argument(
@@ -197,8 +197,6 @@ def command_line_args_parser():
 def main():
     global default_cache_specs
     cache_specs = default_cache_specs
-
-    # parse command line arguments
     args = command_line_args_parser()
 
     print(f'Reading Cache Parameters.')
@@ -211,36 +209,12 @@ def main():
                               args.px, args.py, args.resolution)
     cache_system = Cache(cache_specs, instr=instruments)
 
-
-    #map_plotter = MapPlotter(metadata, args.px, args.py, args.resolution)
-    #ic = InstrCounter()
-    #instruments = Instruments(ic, cache_specs,
-    #                          map_plotter=mat_plotter)
-
-
-
     print(f'Tracing Memory Access Pattern: {args.input_file}')
     run_simulation(map_reader, instruments, cache_system)
-    #instruments = run_simulation(cache_specs, map_reader, map_plotter, verb=args.verbosity)
-
-    # print('Building Instruments Log')
-    # instruments.build_log()
-
-    # print(f'Filtering Log')
-    # instruments.filter_log(win=args.window)
 
     print(f'Plotting Results ({args.format})')
     prefix = os.path.basename(os.path.splitext(args.input_file)[0])
     instruments.plot(args.window, prefix, args.format)
-
-    # print('Full (miss, hit):')
-    # for i,x in zip(instruments.instruction_ids,instruments.miss.full_events_log):
-    #     print(f'{i:3}: {x}')
-
-    # print('Filtered (avg on window):')
-    # for i,x in zip(instruments.instruction_ids,instruments.miss.filtered_avg_log):
-    #     print(f'{i:3}: {x}')
-
 
 
 

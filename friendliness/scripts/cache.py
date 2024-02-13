@@ -49,14 +49,13 @@ class Set:
                 break;
 
         # Handle a possible cache miss.
-        if line == None:
-            # cache miss
-            ###self.instr.miss.register_miss()
+        if line == None: # cache miss
+            self.instr.miss.register(delta_miss=1)
             line = self.lru_line()
             self.evict(line)
             self.fetch(line, tag)
         else: # cache hit
-            pass###self.instr.miss.register_hit()
+            self.instr.miss.register(delta_hit=1)
 
         # Now the cache line is valid. Access data, but pay attention to
         # how many bytes are freshly accessed, as these will count towards
@@ -66,7 +65,7 @@ class Set:
         after_access = line.count_accessed()
         if after_access > before_access:
             new_access = after_access - before_access
-            ###self.instr.usage.register_delta(new_access, 0)
+            self.instr.usage.register(delta_access=new_access)
 
     def lru_line(self):
         """return the least recently used line"""
@@ -81,8 +80,8 @@ class Set:
             return
         ###self.instr.siu.register_evict(self.set_index, line.tag)
         # these bytes are leaving the cache, so they are negative
-        ###self.instr.usage.register_delta(-line.count_accessed(),
-        ###                           -self.line_size_bytes)
+        self.instr.usage.register(delta_access=-line.count_accessed(),
+                                  delta_valid=-self.line_size_bytes)
         # imagine that here you write the block back to memory...
         # and now reset the line's access count and tag
         line.accessed_bytes = [False] * len(line.accessed_bytes)
@@ -92,8 +91,8 @@ class Set:
 
     def fetch(self, line, tag):
         ###self.instr.siu.register_fetch(self.set_index, tag)
-        self.instr.alias.register_set_usage(self.set_index)
-        ###self.instr.usage.register_delta(0, self.line_size_bytes)
+        self.instr.alias.register(self.set_index)
+        self.instr.usage.register(delta_valid=self.line_size_bytes)
         # imagine that here you bring the data... and now you mark the tag
         line.tag = tag
         return
@@ -145,7 +144,7 @@ class Cache:
         # - time: the timestamp of the instruction.
         addr = access.addr
         n_bytes = access.size
-        self.instr.map_plotter.register_access(access)
+        self.instr.map.register_access(access)
         # the potentially many lines are all accessed at the same time (cache.clock)
         self.clock += 1
         if addr.bit_length() > self.arch_size_bits:

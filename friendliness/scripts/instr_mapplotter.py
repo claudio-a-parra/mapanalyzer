@@ -6,7 +6,7 @@ from matplotlib.colors import ListedColormap
 from instr_generic import GenericInstrument
 
 class MapPlotter(GenericInstrument):
-    def __init__(self, instr_counter, mfmd, plot_w, plot_h, plot_res=150):
+    def __init__(self, instr_counter, mfmd, plot_w, plot_h, plot_max_res=600):
         super().__init__(instr_counter)
         # obtain mem_ap file metadata
         self.base_addr = mfmd[0]
@@ -18,30 +18,36 @@ class MapPlotter(GenericInstrument):
         self.plot_width = plot_w
         self.plow_height = plot_h
 
-        # adjust the matrix where the access pattern will be drawn to
-        # the smallest between its own value or plot*resolution. The
-        # idea is to not blow out the memory with a huge matrix.
+        # if block_size or time_size are larger than the max resolution, keep
+        # cutting them in half until they fit in a square of plot_max_res^2
         ap_matrix_height = self.block_size
-        if plot_res*plot_h < self.block_size:
-            ap_matrix_height = plot_res * plot_h
+        i=0
+        while ap_matrix_height > plot_max_res:
+            ap_matrix_height = self.block_size // (2**i)
+            i += 1
+
         ap_matrix_width = self.time_size
-        if plot_res*plot_w < self.time_size:
-            ap_matrix_width = plot_res * plot_w
+        i=0
+        while ap_matrix_width > plot_max_res:
+            ap_matrix_width = self.time_size // (2**i)
+            i += 1
+
         # cols: whole memory snapshot at a given instruction
         # rows: byte state across all instructions
-        self.access_matrix = \
-            [[0] * ap_matrix_width for _ in range(ap_matrix_height)]
+        self.access_matrix = [[0] * ap_matrix_width
+                              for _ in range(ap_matrix_height)]
 
         self.plot_filename_sufix = '_plot-00-map'
         self.plot_title = 'Memory Access Pattern'
         self.plot_subtitle = None
-        self.plot_y_label = 'Memory Addresses (space)'
-        self.plot_x_label = 'Instruction (time)'
+        self.plot_y_label = 'Memory Space'
+        self.plot_x_label = 'Time'
         self.plot_min = None
         self.plot_max = None
-        self.plot_color_fg1 = '#db000088' # dark red
-        self.plot_color_fg2 = None
-        self.plot_color_bg =  '#FFFFFF44' # pretty transparent white
+        self.plot_color_text =   '#888888'
+        self.plot_color_first =  '#CCCCCC' # opaque gray. '#DB000044'
+        self.plot_color_second = '#EEEEEE'
+        self.plot_color_bg =     '#FFFFFF00' # transparent
 
 
     def register_access(self, access):
@@ -49,31 +55,37 @@ class MapPlotter(GenericInstrument):
         map it to (y,x) in self.access_matrix."""
         if not self.enabled:
             return
+        if len(self.X) == 0:
+            for i in range(access.time):
+                self.X.append(i)
         self.X.append(access.time) # save instruction id
         for i in range(access.size):
             # obtain the original coordinates
             addr = access.addr - self.base_addr + i
             time = access.time
-            # transform to a percentage form [0-1)
-            addr = addr / self.block_size
-            time = time / self.time_size
-            # obtain the size of the access matrix
-            acc_addr_size = len(self.access_matrix)
-            acc_time_size = len(self.access_matrix[0])
-            # now map the coordinate to the access_matrix. -1 so we
-            # don't overflow
-            addr_acc = round(addr * (acc_addr_size-1))
-            time_acc = round(time * (acc_time_size-1))
-            # store the value in the matrix. The stored value is
-            # the thread number + 1 so empty cells remain 0 and used cells
-            # become 1, 2, 3, ...
-            self.access_matrix[addr_acc][time_acc] = access.thread + 1
+
+            # get percentage (from first to last possible address or time)
+            max_real_addr = self.block_size - 1
+            max_real_time = self.time_size - 1
+            propor_addr = addr / max_real_addr
+            propor_time = time / max_real_time
+
+            # get maximum value for the mapped address and time
+            max_mapped_addr = len(self.access_matrix) - 1
+            max_mapped_time = len(self.access_matrix[0]) - 1
+
+            # now map addr x time to the access_matrix
+            mapped_addr = round(propor_addr * max_mapped_addr)
+            mapped_time = round(propor_time * max_mapped_time)
+
+            # store the access. add 1 so zero values are interpreted as 'empty'
+            self.access_matrix[mapped_addr][mapped_time] = access.thread + 1
 
 
     def plot(self, axes, zorder=1, extent=[0,10,0,10]):
         # Memory Access Pattern color-map creation
-        threads_palette = ['#db000088'] # dark red
-        threads_bg = '#FFFFFF44' # last two digits is transparency
+        threads_palette = [self.plot_color_first]
+        threads_bg = self.plot_color_bg
         colors_needed = self.thread_count # one color per thread
         if colors_needed > len(threads_palette):
             print(f'[!] Warning: The Access Pattern has more threads '
@@ -82,5 +94,23 @@ class MapPlotter(GenericInstrument):
         cmap = ListedColormap([threads_bg] +
                               [threads_palette[i%len(threads_palette)]
                                for i in range(colors_needed)])
-        axes.imshow(self.access_matrix, cmap=cmap, aspect='auto', extent=extent,
+        # no Y axis for this plot
+        axes.tick_params(axis='y', which='both', left=False, right=True,
+                         labelleft=False, labelright=True)
+        # plot the trace
+        axes.imshow(self.access_matrix, cmap=cmap, origin='lower', aspect='auto',
                     zorder=zorder)
+
+        # setup X axis
+        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=20)
+        axes.set_xticks(x_ticks)
+        axes.set_xlabel(self.plot_x_label)
+
+        # setup right Y axis
+        axes.tick_params(axis='y', which='both', left=False, right=True,
+                         labelleft=False, labelright=True)
+        axes.yaxis.set_label_position('right')
+        axes.set_ylabel(self.plot_y_label, color=self.plot_color_text, labelpad=-18)
+        y_ticks = [0, self.block_size]
+        axes.set_yticks(y_ticks)
+        axes.invert_yaxis()

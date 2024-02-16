@@ -241,11 +241,11 @@ VOID merge_traces(void){
 /* ======== Analysis Routines ======== */
  /* This routine is called every time a thread is created */
 VOID thread_start(THREADID threadid, CONTEXT* ctxt, INT32 flags, VOID* v){
-    log_event(threadid, Tc, 0, 0);
+    //log_event(threadid, Tc, 0, 0);
 }
 /* This routine is called every time a thread is destroyed. */
 VOID thread_end(THREADID threadid, const CONTEXT* ctxt, INT32 code, VOID* v){
-    log_event(threadid, Td, 0, 0);
+    //log_event(threadid, Td, 0, 0);
 }
 /* Sets flag such that the next time the pintool calls malloc_before(),
 the size given to malloc is recorded */

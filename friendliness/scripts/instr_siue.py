@@ -1,139 +1,183 @@
 #!/usr/bin/env python3
 import sys
-import random # DEBUG
-from collections import deque
-import matplotlib as mpl
-# increase memory for big plots. Bruh...
-mpl.rcParams['agg.path.chunksize'] = 10000000000000
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-import matplotlib.colors as mcolors # to create shades of colors from list
-
 from instr_generic import GenericInstrument
 
 #-------------------------------------------
-class SIURatio(GenericInstrument):
+class SIUEvict(GenericInstrument):
     """
-    - Definition: Ratio between number of evictions on blocks that will later
-                  be fetched again, vs the total number of evictions done.
-    - Range     : 0: every block eviction is final.
-                  1: every block evicted by this instruction (or slice) is
-                     later fetched back to memory.
-    - Event     : tuple with two counters (siu_evictions, total_evictions)
-    - Trigger   : In the first pass, only fetches trigger the instrument; but
-                  the actual SIU counting happens in the second pass with
-                  every eviction.
+    Definition:
+        The proportion of SIU evictions with respect to the total number of
+        evictions. A SIU (still-in-use) eviction is the eviction of a cache
+        block that later will be fetched to the cache again.
 
-    This is an special counter, because it needs to pass through the memory
-    access pattern two times in order to be computed.
-      - First pass: Fetch mode: We count all the times each block was fetched.
-        Each fetch is a +1 to the counter of that particular block.
-      - Second pass: Evict mode: With each eviction of a given block, we
-        decrement its fetch counter. If after decrementing, the counter is NOT
-        zero, then we know that the same block will be brought back to cache
-        later, so this is a 'still-in-use' eviction.
+    Fetch and Evict Counters:
+        This instrument works in two passes. In the first pass a dictionary
+        of (tag,index) -> (counter) is populated, so that every time a cache
+        block is fetched, the counter increments.
+        On the second pass, and using the already populated dictionary, every
+        block eviction triggers a decrement in its corresponding counter.
+        If after the decrement, the counter is still greater than 0, this means
+        the block is later brought back to cache again. It is, then, said that
+        the current is an eviction of a "still-in-use" block.
+
+    Captured Events:
+        Each event is a tuple of two counters: (siu_evicts, tot_evicts). Note
+        that tot_evicts includes all siu_evicts. These counters are cumulative.
+
+    Plot interpretation:
+        The plot is a line that ranges from 0% to 100% showing the proportion
+        of evictions that are SIU.
     """
-    def __init__(self, instr_counter):
-        super().__init__(instr_counter)
-        self.default_event = (0,0)
-        # to register the fetches number of fetches performed on each block.
+
+    def __init__(self, instr_counter, verb=False):
+        super().__init__(instr_counter, verb=verb)
+
         self.fetch_counters = {}
-        # We run the first pass in fetch mode to fill the block's fetch counter.
-        # The second pass runs in evict mode to use the previous counters to
-        # check for 'still-in-use evictions'
-        self.mode = 'fetch'
-        self.plot_details = ('_plot-04-siu-eviction-ratio', # file sufix
-                             'Still-in-Use Block Eviction', # plot title
-                             'less is better', # subtitle
-                             '"I\'ll be back" Ratio', # Y axis name
-                             0, 1) # min-max
+        self.mode = 'fetch' # ['fetch', 'evict']
+        #
+        self.siu_evict_count = 0
+        self.tot_evict_count = 0
+        self.zero_counter = (0,0)
 
-    def register_fetch(self, index, tag):
-        if not self.enabled or self.mode != 'fetch':
-            return
-        block_id = (index, tag)
-        if block_id in self.fetch_counters:
-            self.fetch_counters[block_id] += 1
-        else:
-            self.fetch_counters[block_id] = 1
-        if self.verbose:
-            t = hex(tag)[2:]
-            i = hex(index)[2:]
-            print(f"[!] {self.__class__.__name__}: "
-                  f"fetch(s:{i},tag:{t})={self.fetch_counters[block_id]}")
-        return 0
+        self.plot_name_sufix = '_plot-04-siu'
+        self.plot_title      = 'Still-in-Use Block Evictions'
+        self.plot_subtitle   = 'lower is better'
+        self.plot_y_label    = 'SIU Eviction ratio [%]'
+        self.plot_color_text = '#990099'   # dark magenta
+        self.plot_color_line = '#AA00AACC' # magenta almost opaque
+        self.plot_color_fill = '#AA00AA44' # magenta semi-transparent
 
-    def register_evict(self, index: int, tag: int):
-        """
-        Given the first pass, we already know how many times we ever fetch
-        each block. Now, in this eviction, check whether the current block
-        is later fetched again. If that is the case, add a 'still-in-use'
-        eviction to the log.
-        """
-        if not self.enabled or self.mode != 'evict':
-            return
-        # for every earlier fetch of a block, there should be an eviction,
-        # then, this eviction decrements the fetch counter of this block.
-        block_id = (index, tag)
-        if block_id in self.fetch_counters:
-           self.fetch_counters[block_id] -= 1
-        else:
-            raise Exception("Trying to register eviction without a previous "
-                            "fetch")
-        # detect still-in-use eviction: if after the above decrementing the
-        # counter is still greater than 0, then we are evicting an
-        # 'still-in-use' block.
-        resulting_fetches = self.fetch_counters[block_id]
-        if resulting_fetches > 0: # the block is later fetched again.
-            new_event = (1, 1)
-            if self.verbose:
-                print(f"[!] {self.__class__.__name__}: "
-                      "still-in-use eviction!")
-        elif resulting_fetches == 0:
-            new_event = (0, 1)
-            if self.verbose:
-                print(f"[!] {self.__class__.__name__}: "
-                      "last eviction")
-        else:
-            raise Exception(f"There are more evictions than fetches for "
-                            f"tag:{hex(tag)}, index:{hex(index)}")
 
-        self.queue_event(new_event)
+    def _pad_events_list(self, new_index):
+        while len(self.events) < new_index:
+            self.events.append(self.zero_counter)
         return
 
-    def mix_events(self, base, new):
-        curr_siu,curr_tot = base
-        new_siu,new_tot = new
-        return (curr_siu+new_siu, curr_tot+new_tot)
+    
+    def register(self, mode, tag, index):
+        if not self.enabled:
+            return
 
-    def avg_events(self, left, right):
-        # If there was no previous summary, construct it.
-        if self.last_window_summary == None or left == 0:
-            self.last_window_summary = [0,0] # [siu_evic, tot_evic]
-            counters = self.last_window_summary
-            for siu,tot in self.full_events_log[left:right+1]:
-                counters[0] += siu
-                counters[1] += tot
-
-        else: # if there was a summary, just update the counters
-            counters = self.last_window_summary
-            retiring_siu, retiring_tot = self.full_events_log[left-1]
-            incoming_siu, incoming_tot = self.full_events_log[right]
-            counters[0] += incoming_siu - retiring_siu
-            counters[1] += incoming_tot - retiring_tot
-
-        # Now, having the counters of this window, construct the average
-        # of the window.
-        window_siu,window_tot = self.last_window_summary
-        if window_tot == 0:
-            if window_siu > 0:
-                print(f"Error: {self.__class__.__name__}: Total evictions is 0 "
-                      f"for the given slice, but {window_siu} evictions are "
-                      "reported to be SIU")
-                sys.exit(1)
+        block_id = (tag,index)
+        if self.mode == 'fetch' and mode == 'fetch':
+            if block_id in self.fetch_counters:
+                self.fetch_counters[block_id] += 1
             else:
-                # no siu or other evictions means we are just reading from
-                # valid caches. That is good -> return 0
-                return 0
-        return window_siu / window_tot
+                self.fetch_counters[block_id] = 1
+            if self.verb:
+                fetch_count = self.fetch_counters[block_id]
+                print(f'SIU: fetch t:{tag}, i:{index}. cnt: {fetch_count}')
 
+        elif self.mode == 'evict' and mode == 'evict':
+            if block_id in self.fetch_counters:
+                self.fetch_counters[block_id] -= 1
+            else:
+                print(f'[!] Error: {self.__class__.__name__}.register() Trying '
+                      'to register an eviction without a previous fetch. This '
+                      'is an impossible situation.')
+                sys.exit(1)
+
+            # register events
+            # if the counter is greater than one, then this was a SIU eviction
+            delta_siu = 1 if self.fetch_counters[block_id] > 0 else 0
+            if self.verb:
+                t = '. SIU!' if delta_siu > 0 else ''
+                t = t if self.mode == 'evict' else ''
+                fetch_count = self.fetch_counters[block_id]
+                print(f'SIU: evict t:{tag}, i:{index}{t}. cnt:{fetch_count}')
+            event_idx = self.ic.val() # note that ic may skip values.
+            if event_idx < len(self.events):
+                # if the events[event_idx] exists, then just update it
+                siu,tot = self.events[event_idx]
+                self.events[event_idx] = (siu+delta_siu, tot+1)
+                if event_idx+1 == len(self.events):
+                    # if we happen to have just edited the last event,
+                    # then update the last counters
+                    self.siu_evict_count += delta_siu
+                    self.tot_evict_count += 1
+            else:
+                # otherwise, pad events with zero counters so that
+                # the index of a new append() is event_idx
+                self._pad_events_list(event_idx)
+                # update counters
+                self.siu_evict_count += delta_siu
+                self.tot_evict_count += 1
+                self.events.append((self.siu_evict_count, self.tot_evict_count))
+        return
+
+
+    def _create_plotting_data(self):
+        # create the list of percentages based on the counts in self.events.
+        # This is straight forward:
+        #    percentage = 100 * (siu_evicts)/(total_evicts)
+        # However, if there are no evictions (those zero fills, and at the
+        # beginning), just copy the previous value, as the ratio has not
+        # changed.
+        previous_percentage = 0
+        self._pad_events_list(self.X[-1]+1)
+
+        for siu,tot in self.events:
+            if tot == 0:
+                percentage = previous_percentage
+            else:
+                percentage = 100 * (siu)/(tot)
+            self.Y.append(percentage)
+        self.events = None # hint GC
+        return
+
+
+    def get_extent(self):
+        # fine tune margins to place each quadrilateral of the imshow()
+        # right on the tick. So adding a 0.5 margin at each side.
+        left_edge = self.X[0] - 0.5
+        right_edge = self.X[-1] + 0.5
+        bottom_edge = 0 - 0.5
+        top_edge = 100 + 0.5 # 100% + a little margin
+        extent = (left_edge, right_edge, bottom_edge, top_edge)
+        return extent
+
+
+    def  plot(self, axes, basename='siu', extent=None):
+        # check if self.X has been filled
+        if self.X == None:
+            print('[!] Error: Please assign '
+                  f'{self.__class__.__name__}.X before calling plot()')
+            sys.exit(1)
+
+        # transform list of events into list of plotable data in self.Y
+        self._create_plotting_data()
+
+        # set plot limits
+        extent = extent if extent != None else self.get_extent()
+        axes.set_xlim(extent[0], extent[1])
+        axes.set_ylim(extent[2], extent[3])
+
+        # draw the curve and area below it
+        axes.step(self.X, self.Y, color=self.plot_color_line,
+                          linewidth=1.2, where='mid', zorder=2)
+        axes.fill_between(self.X, -1, self.Y, color='none',
+                          facecolor=self.plot_color_fill,
+                          linewidth=1.2, step='mid', zorder=1)
+
+        # setup title
+        axes.set_title(f'{self.plot_title}: {basename}\n'
+                       f'({self.plot_subtitle})')
+
+        # setup Y ticks
+        axes.tick_params(axis='y', which='both',
+                         left=True, right=False,
+                         labelleft=True, labelright=False)
+        percentages = list(range(100 + 1)) # from 0 to 100
+        y_ticks = self._create_up_to_n_ticks(percentages, base=10, n=5)
+        axes.set_yticks(y_ticks)
+
+        # setup Y label
+        axes.yaxis.set_label_position('left')
+        axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
+                        labelpad=3.5)
+
+        # setup Y grid
+        axes.grid(axis='y', which='both', linestyle='-', alpha=0.2,
+                  color=self.plot_color_line, linewidth=0.8, zorder=3)
+
+        return

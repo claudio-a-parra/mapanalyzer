@@ -21,8 +21,9 @@ class UnusedBytes(GenericInstrument):
         The plot is a line that ranges from 0% to 100% showing the proportion
         of bytes that are in cache but HAVE NOT BEEN ACCESSED to that point.
     """
-    def __init__(self, instr_counter):
-        super().__init__(instr_counter)
+
+    def __init__(self, instr_counter, verb=False):
+        super().__init__(instr_counter, verb=verb)
 
         self.access_count = 0
         self.valid_count = 0
@@ -33,7 +34,7 @@ class UnusedBytes(GenericInstrument):
         self.plot_subtitle   = 'lower is better'
         self.plot_y_label    = 'Unused valid bytes [%]'
         self.plot_color_text = '#006600'   # dark green
-        self.plot_color_line = '#00AA00'   # green
+        self.plot_color_line = '#00AA00CC' # green almost opaque
         self.plot_color_fill = '#00AA0044' # green semi-transparent
         return
 
@@ -78,8 +79,13 @@ class UnusedBytes(GenericInstrument):
         # create the list of percentages based on the counts in self.events.
         # This is straight forward:
         #    percentage = 100 * (valid-access)/(valid)
+
+        self._pad_events_list(self.X[-1]+1)
         for access,valid in self.events:
-            percentage = 100 * (valid-access)/(valid)
+            if valid == 0:
+                percentage = 0
+            else:
+                percentage = 100 * (valid-access)/(valid)
             self.Y.append(percentage)
         self.events = None # hint GC
         return
@@ -100,7 +106,7 @@ class UnusedBytes(GenericInstrument):
         # check if self.X has been filled
         if self.X == None:
             print('[!] Error: Please assign '
-                  f'{self.__class__.__name__ }.X before calling plot()')
+                  f'{self.__class__.__name__}.X before calling plot()')
             sys.exit(1)
 
         # transform list of events into list of plotable data in self.Y

@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 import sys
-from collections import deque
-import matplotlib as mpl
-# increase memory for big plots. Bruh...
-mpl.rcParams['agg.path.chunksize'] = 10000000000000
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
+
+# from collections import deque
+# import matplotlib as mpl
+# # increase memory for big plots. Bruh...
+# mpl.rcParams['agg.path.chunksize'] = 10000000000000
+# from matplotlib.colors import ListedColormap
 
 from instruction_counter import InstrCounter
 from instr_mapplotter import MapPlotter
 from instr_alias import Alias
 from instr_miss import Miss
 from instr_usage import UnusedBytes
-# from instr_siue import SIUEvict
+from instr_siue import SIUEvict
 
 
 #-------------------------------------------
 class Instruments:
     #def __init__(self, instr_counter, cache_specs, map=None, verb=False):
     def __init__(self, cache_specs, map_metadata, plot_width, plot_height,
-                 resolution):
+                 resolution, verb=False):
         self.ic = InstrCounter()
         self.plot_width = plot_width
         self.plot_height = plot_height
@@ -27,23 +28,25 @@ class Instruments:
         # Create map plotter and other instruments: (alias, miss, usage,
         # and SIU). Make them share their X axis (for the plots)
         self.map = MapPlotter(self.ic, map_metadata, plot_width,
-                                      plot_height, resolution)
+                                      plot_height, resolution, verb=verb)
 
         num_sets = cache_specs['size']//(cache_specs['asso']*\
                                          cache_specs['line'])
 
-        self.alias = Alias(self.ic, num_sets)
+        self.alias = Alias(self.ic, num_sets, verb=verb)
         self.alias.X = self.map.X
 
-        self.miss = Miss(self.ic)
+        self.miss = Miss(self.ic, verb=verb)
         self.miss.X = self.map.X
 
-        self.usage = UnusedBytes(self.ic)
+        self.usage = UnusedBytes(self.ic, verb=verb)
         self.usage.X = self.map.X
 
-        # self.siu = SIUEvict(instr_counter)
-        # self.siu.X = self.map.instruction_ids
-        self.inst_list = [self.alias, self.miss, self.usage] #, self.siu]
+        self.siu = SIUEvict(self.ic, verb=verb)
+        self.siu.X = self.map.X
+
+        self.inst_list = [self.alias, self.miss, self.usage, self.siu]
+
 
 
     def enable_all(self):
@@ -60,14 +63,14 @@ class Instruments:
 
     def prepare_for_second_pass(self):
         self.disable_all()
-        #self.siu.enabled = True
-        #self.siu.mode = 'evict'
+        self.siu.enabled = True
+        self.siu.mode = 'evict'
 
 
     def set_verbose(self, verb=False):
-        self.map.enabled = verb
+        self.map.verb = verb
         for i in self.inst_list:
-            i.enabled = verb
+            i.verb = verb
 
 
     def plot(self, window, basename, out_format):
@@ -77,17 +80,17 @@ class Instruments:
 
         for instr in self.inst_list:
             print(f'    Plotting {instr.plot_title}.')
-            extent = instr.get_extent()
-            self.map.plot(map_axes, extent=extent)
+            self.map.plot(map_axes)
             instr.plot(instr_axes, basename=basename)
 
             # save alias
             filename=f'{basename}{instr.plot_name_sufix}.{out_format}'
             print(f'        {filename}')
             fig.savefig(filename, dpi=600, bbox_inches='tight')
+            map_axes.cla()
             instr_axes.cla()
 
-        exit(0)
+        return
 
 
 '''

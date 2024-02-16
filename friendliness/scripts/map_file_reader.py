@@ -19,7 +19,8 @@ class MemAccess:
 
 class MapFileReader:
     """iterates over the map file, reading one register at the time."""
-    def __init__(self, file_path):
+    def __init__(self, file_path, verb=False):
+        self.verb = verb
         self.file_path = file_path
         self.base_addr = -1
         self.block_size = -1
@@ -127,11 +128,25 @@ class MapFileReader:
         return self
 
     def __next__(self):
-        line = self.file.readline()
-        if line == '': #EOF
-            self.file.close()
-            raise StopIteration
+        line = ''
+        # ignore empty lines or comment lines
+        while True:
+            line = self.file.readline()
+            if line == '': #EOF
+                self.file.close()
+                raise StopIteration
+            line = line.strip()
+            if line == '':
+                continue
+            if line[0] == '#':
+                continue
+            if '#' in line:
+                line = line.split('#')[0].strip()
+            break
+
         line = line.strip()
+        if self.verb:
+            print(f'line: {line}')
         try:
             time,thr,ev,size,off = line.split(',')
         except ValueError:

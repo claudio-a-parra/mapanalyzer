@@ -19,8 +19,8 @@ class Miss(GenericInstrument):
         The plot is a line that ranges from 0% to 100% showing the proportion
         of cache misses at that point.
     """
-    def __init__(self, instr_counter):
-        super().__init__(instr_counter)
+    def __init__(self, instr_counter, verb=False):
+        super().__init__(instr_counter, verb=verb)
 
         self.miss_count = 0
         self.hit_count = 0
@@ -31,7 +31,7 @@ class Miss(GenericInstrument):
         self.plot_subtitle   = 'lower is better'
         self.plot_y_label    = 'Cache Misses [%]'
         self.plot_color_text = '#0000AA'   # dark blue
-        self.plot_color_line = '#0000FF'   # blue
+        self.plot_color_line = '#0000FFCC' # blue almost opaque
         self.plot_color_fill = '#0000FF44' # blue semi-transparent
         return
 

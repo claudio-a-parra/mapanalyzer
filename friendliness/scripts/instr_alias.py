@@ -35,8 +35,8 @@ class Alias(GenericInstrument):
                  sharing 1/S of the total number of fetches.
             - 1: this set has attended all the fetches.
     """
-    def __init__(self, instr_counter, num_sets):
-        super().__init__(instr_counter)
+    def __init__(self, instr_counter, num_sets, verb=False):
+        super().__init__(instr_counter, verb=verb)
 
         self.num_sets = num_sets
         self.last_counter = [0] * num_sets
@@ -46,8 +46,8 @@ class Alias(GenericInstrument):
         self.plot_title       = 'Aliasing'
         self.plot_subtitle    = 'transparent is better'
         self.plot_y_label     = 'Set Index'
-        self.plot_color_text  = '#E09200'   # dark orange
-        self.plot_color_boxes = '#ffa500'   # orange
+        self.plot_color_text  = '#E09200FF' # dark orange
+        self.plot_color_boxes = '#ffa500FF' # orange opaque
         self.plot_color_bg    = '#FFFFFF00' # transparent
         return
 
@@ -63,10 +63,11 @@ class Alias(GenericInstrument):
         return
 
 
-    def register(self, set_index):
+    def register(self, tag, set_index):
         if not self.enabled:
             return
-
+        if self.verb:
+            print(f'ALI: fetch t:{tag}, i:{set_index}')
         # update existing counter, or add a new one.
         event_idx = self.ic.val() # note that ic may skip values.
         if event_idx < len(self.events):
@@ -113,21 +114,25 @@ class Alias(GenericInstrument):
         # place the normalized proportions of self.events[x][y] in
         # self.Y[y][x]
         base_proportion = 1/self.num_sets
-        normal_factor = 1 - base_proportion
+        if self.num_sets == 1:
+            normal_factor = 1
+        else:
+            normal_factor = (self.num_sets) / (self.num_sets - 1)
         for instr_idx,counters_arr in enumerate(self.events):
             # if there is nothing to count, keep the zeroes in Y
             all_count = sum(counters_arr)
             if all_count == 0:
                 continue
             for set_idx, one_set_raw_count in enumerate(counters_arr):
-                linear_ratio = ((one_set_raw_count / all_count) - base_proportion) \
-                        * normal_factor
+                linear_ratio = \
+                    ((one_set_raw_count / all_count) - base_proportion) \
+                    * normal_factor
+                # if the raw counter is zero, then the linear_ratio should
+                # be zero, not a negative value.
+                linear_ratio = max(0,linear_ratio)
                 log_ratio = self._log_mapping(linear_ratio)
-                if kind=='log':
-                    val = log_ratio
-                else:
-                    val = linear_ratio
-                self.Y[set_idx][instr_idx] = max(0, val)
+                val = log_ratio if kind=='log' else linear_ratio
+                self.Y[set_idx][instr_idx] = val
         self.events = None # hint GC
         return
 
@@ -137,7 +142,7 @@ class Alias(GenericInstrument):
         left_edge = self.X[0] - 0.5
         right_edge = self.X[-1] + 0.5
         bottom_edge = 0 - 0.5
-        top_edge = self.num_sets + 0.5
+        top_edge = (self.num_sets-1) + 0.5 # I want the max index + margin
         extent = (left_edge, right_edge, bottom_edge, top_edge)
         return extent
 
@@ -177,8 +182,12 @@ class Alias(GenericInstrument):
 
         # setup Y label
         axes.yaxis.set_label_position('left')
+        if y_ticks[-1] < 100:
+            pad = 10
+        if y_ticks[-1] < 10:
+            pad = 16
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
-                        labelpad=10)
+                        labelpad=pad)
 
         # setup Y grid
         axes.grid(axis='y', which='both', linestyle='-', alpha=0.2,

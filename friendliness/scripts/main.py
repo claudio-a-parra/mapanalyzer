@@ -3,7 +3,6 @@ import sys # for command line arguments
 import os # for file extension removal
 import argparse # to get command line arguments
 
-
 from address_formatter import log2, AddressFormatter
 from instruction_counter import InstrCounter
 from instruments import Instruments
@@ -31,10 +30,6 @@ def get_cache_specs(specs, cache_filename=None):
         for key in specs:
             if not type(specs[key]) == int:
                 specs[key] = specs[key][1]
-        print(f'    line size     : {specs["line"]}\n'
-              f'    associativity : {specs["asso"]}\n'
-              f'    cache size    : {specs["size"]}\n'
-              f'    architecture  : {specs["arch"]}')
 
     # if no file was given
     if cache_filename == None:
@@ -59,7 +54,7 @@ def get_cache_specs(specs, cache_filename=None):
 
                 # ignore weird names
                 if name not in file_to_spec_key_map:
-                    print(f"File {cache_filename}: Unknown parameter name:\n"
+                    print(f"[!] File {cache_filename}: Unknown parameter name:\n"
                           f">>>>{line}\n"
                           "Ignoring.")
                     continue
@@ -70,14 +65,14 @@ def get_cache_specs(specs, cache_filename=None):
                 try:
                     specs[key] = int(val)
                 except ValueError:
-                    print(f"Incorrect value in redirected input file:\n"
+                    print(f"[!] Incorrect value in redirected input file:\n"
                           f">>>>{file_user_input}\n"
                           f"Using default value ({default_val}).")
                     specs[key] = int(default_val)
     except FileNotFoundError:
-        print(f"[!]    File {cache_filename} does not exist. Using default "
+        print(f"[!] File {cache_filename} does not exist. Using default "
               "configuration.")
-    complete_cache_config(specs)
+    _complete_cache_specs(specs)
 
 
 #def run_simulation(cache_specs, map_reader, map_plotter, verb=False):
@@ -95,12 +90,11 @@ def run_simulation(map_reader, instruments, cache_system, verb=False):
               f'offset {byte}.')
 
     # First Pass
+    if verb:
+        print('\nFIRST PASS')
     for access in map_reader:
         ic.counter = access.time
         cache_system.access(access)
-        if verb:
-            cache_system.dump()
-            print()
 
     # Prepare for second pass
     instruments.disable_all()
@@ -111,6 +105,8 @@ def run_simulation(map_reader, instruments, cache_system, verb=False):
     cache_system.reset_clock()
 
     # Second Pass
+    if verb:
+        print('\nSECOND PASS')
     for access in map_reader:
         ic.counter = access.time
         cache_system.access(access)
@@ -203,19 +199,24 @@ def main():
     get_cache_specs(cache_specs, cache_filename=args.cache)
 
     print(f'Creating MAP Reader, Instruments, and Cache System.')
-    map_reader = MapFileReader(args.input_file)
+    map_reader = MapFileReader(args.input_file, verb=args.verbosity)
     map_metadata = map_reader.get_metadata()
     instruments = Instruments(cache_specs, map_metadata,
-                              args.px, args.py, args.resolution)
+                              args.px, args.py, args.resolution,
+                              verb=args.verbosity)
+    # Debug: set individual instruments verbosity
+    # instruments.siu.verb = True
+    # instruments.alias.verb = True
     cache_system = Cache(cache_specs, instr=instruments)
-
+    cache_system.describe_cache()
     print(f'Tracing Memory Access Pattern: {args.input_file}')
-    run_simulation(map_reader, instruments, cache_system)
+    run_simulation(map_reader, instruments, cache_system, verb=args.verbosity)
 
     print(f'Plotting Results ({args.format})')
     prefix = os.path.basename(os.path.splitext(args.input_file)[0])
     instruments.plot(args.window, prefix, args.format)
 
+    print('Done')
 
 
 

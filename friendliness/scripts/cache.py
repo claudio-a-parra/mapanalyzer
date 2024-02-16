@@ -78,7 +78,7 @@ class Set:
     def evict(self, line):
         if line.tag == None:
             return
-        ###self.instr.siu.register_evict(self.set_index, line.tag)
+        self.instr.siu.register('evict', line.tag, self.set_index)
         # these bytes are leaving the cache, so they are negative
         self.instr.usage.register(delta_access=-line.count_accessed(),
                                   delta_valid=-self.line_size_bytes)
@@ -90,8 +90,8 @@ class Set:
         return
 
     def fetch(self, line, tag):
-        ###self.instr.siu.register_fetch(self.set_index, tag)
-        self.instr.alias.register(self.set_index)
+        self.instr.siu.register('fetch', tag, self.set_index)
+        self.instr.alias.register(tag, self.set_index)
         self.instr.usage.register(delta_valid=self.line_size_bytes)
         # imagine that here you bring the data... and now you mark the tag
         line.tag = tag
@@ -177,13 +177,12 @@ class Cache:
         self.clock = 0
 
     def describe_cache(self):
-        print("\n── Cache Configuration ─────────────────")
-        print(f"Address size  : {self.arch_size_bits} bits")
-        print(f"Cache size    : {self.cache_size_bytes} bytes")
-        print(f"Number of sets: {self.num_sets}")
-        print(f"Associativity : {self.associativity} lines")
-        print(f"Line size     : {self.line_size_bytes} bytes")
-        print(f"Tag size      : {self.tag_bits} bits")
+        print(f"    Address size  : {self.arch_size_bits} bits")
+        print(f"    Cache size    : {self.cache_size_bytes} bytes")
+        print(f"    Number of sets: {self.num_sets}")
+        print(f"    Associativity : {self.associativity} lines")
+        print(f"    Line size     : {self.line_size_bytes} bytes")
+        print(f"    Tag size      : {self.tag_bits} bits")
 
 
     def dump(self, show_last=True):

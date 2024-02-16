@@ -3,8 +3,9 @@ import sys
 #from collections import deque
 
 class GenericInstrument:
-    def __init__(self, instr_counter):
+    def __init__(self, instr_counter, verb=False):
         self.enabled = True
+        self.verb = verb
         self.ic = instr_counter
         self.events = []
         self.X = []
@@ -42,4 +43,7 @@ class GenericInstrument:
                     break
             if found:
                 break
-        return full_list[::tick_step]
+        tick_list = full_list[::tick_step]
+        # print(f'full_list: {full_list}')
+        # print(f'ticks    : {tick_list}')
+        return tick_list

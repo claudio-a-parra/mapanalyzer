@@ -168,8 +168,8 @@ def command_line_args_parser():
         help='Choose the output format of the plots.')
     def check_res(val):
         min_res = 4
-        max_res = 1000
-        def_res = 600
+        max_res = 2048
+        def_res = 512
         val = int(val)
         if min_res < val < max_res:
             return val
@@ -178,9 +178,9 @@ def command_line_args_parser():
                   f'{max_res}. Using default value {def_res}.')
             return def_res
     parser.add_argument(
-        '-r', '--resolution', dest='resolution', type=check_res, default=600,
+        '-r', '--resolution', dest='resolution', type=check_res, default=512,
         help=('Resolution of the Memory Access Pattern plot (value between '
-              '10 and 600).'))
+              '4 and 2048).'))
     parser.add_argument(
         '-v', '--verbose', dest='verbosity', action="store_true",
         help="Print all the fun stuff.")

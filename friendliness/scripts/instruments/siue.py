@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import sys
-from instr_generic import GenericInstrument
+from .generic import GenericInstrument
 
 #-------------------------------------------
 class SIUEvict(GenericInstrument):
@@ -39,7 +39,7 @@ class SIUEvict(GenericInstrument):
         self.tot_evict_count = 0
         self.zero_counter = (0,0)
 
-        self.plot_name_sufix = '_plot-04-siu'
+        self.plot_name_sufix = '_plot-05-siu'
         self.plot_title      = 'Still-in-Use Block Evictions'
         self.plot_subtitle   = 'lower is better'
         self.plot_y_label    = 'SIU Eviction ratio [%]'

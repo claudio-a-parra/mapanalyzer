@@ -138,13 +138,14 @@ class Cache:
 
         # TODO: Do something with the other members of the access object:
         # - (USED) addr: address of access
-        # - (USED)size: the number of bytes accessed
-        # - event: read or write event {'R', 'W'}
+        # - (USED) size: the number of bytes accessed
+        # - (USED) event: read or write event {'R', 'W'}
         # - thread: the thread accessing data
         # - time: the timestamp of the instruction.
         addr = access.addr
         n_bytes = access.size
         self.instr.map.register_access(access)
+        self.instr.locality.register_access(access)
         # the potentially many lines are all accessed at the same time (cache.clock)
         self.clock += 1
         if addr.bit_length() > self.arch_size_bits:

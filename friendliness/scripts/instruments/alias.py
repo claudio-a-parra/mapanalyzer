@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.colors as mcolors # to create shades of colors from list
 
-from instr_generic import GenericInstrument
+from .generic import GenericInstrument
 
 #-------------------------------------------
 class Alias(GenericInstrument):
@@ -42,7 +42,7 @@ class Alias(GenericInstrument):
         self.last_counter = [0] * num_sets
         self.zero_counter = [0] * num_sets
 
-        self.plot_name_sufix  = '_plot-01-alias'
+        self.plot_name_sufix  = '_plot-02-alias'
         self.plot_title       = 'Aliasing'
         self.plot_subtitle    = 'transparent is better'
         self.plot_y_label     = 'Set Index'

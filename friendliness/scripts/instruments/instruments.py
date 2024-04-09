@@ -1,19 +1,13 @@
-#!/usr/bin/env python3
 import sys
 import matplotlib.pyplot as plt
 
-# from collections import deque
-# import matplotlib as mpl
-# # increase memory for big plots. Bruh...
-# mpl.rcParams['agg.path.chunksize'] = 10000000000000
-# from matplotlib.colors import ListedColormap
-
-from instruction_counter import InstrCounter
-from instr_mapplotter import MapPlotter
-from instr_alias import Alias
-from instr_miss import Miss
-from instr_usage import UnusedBytes
-from instr_siue import SIUEvict
+from .ic import InstrCounter
+from .mapplotter import Map
+from .locality import Locality
+from .alias import Alias
+from .miss import Miss
+from .usage import UnusedBytes
+from .siue import SIUEvict
 
 
 #-------------------------------------------
@@ -25,13 +19,16 @@ class Instruments:
         self.plot_height = plot_height
 
         # Create map plotter
-        self.map = MapPlotter(self.ic, map_metadata, plot_width,
-                                      plot_height, resolution, verb=verb)
+        self.map = Map(self.ic, map_metadata, plot_width, plot_height,
+                       resolution, verb=verb)
 
-        num_sets = cache_specs['size']//(cache_specs['asso']*\
-                                         cache_specs['line'])
         # Create other instruments: (alias, miss, usage, and SIU) and
         # make them share their X axis (for the plots)
+        self.locality = Locality(self.ic, cache_specs['size'],
+                                 cache_specs['line'])
+        self.locality.X = self.map.X
+        num_sets = cache_specs['size']//(cache_specs['asso']*\
+                                         cache_specs['line'])
         self.alias = Alias(self.ic, num_sets, verb=verb)
         self.alias.X = self.map.X
 
@@ -45,8 +42,8 @@ class Instruments:
         self.siu.X = self.map.X
 
         # list of all instruments for easy access.
-        self.inst_list = [self.alias, self.miss, self.usage, self.siu]
-
+        self.inst_list = [self.locality, self.alias, self.miss, self.usage,
+                          self.siu]
 
 
     def enable_all(self):

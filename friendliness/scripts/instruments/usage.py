@@ -1,48 +1,58 @@
 #!/usr/bin/env python3
 import sys
-import matplotlib.pyplot as plt
-from instr_generic import GenericInstrument
+from .generic import GenericInstrument
 
 #-------------------------------------------
-class Miss(GenericInstrument):
+class UnusedBytes(GenericInstrument):
     """
     Definition:
-        The proportion of cache misses with respect to all cache requests.
-        (misses + hits).
+        The proportion of valid UNUSED bytes in cache with respect to all the
+        valid bytes in cache.
 
     Captured Events:
-        Every time there is a hit or a miss (this is, any cache access) a
-        tuple with two counters is created: (miss, hit). Each of these two
-        counters has the total cumulative count of all misses and hits.
+        Each event is a tuple with two counters: (accessed, valid). Note that
+        all accessed bytes are also be valid. These counters are cumulative
+        and represent the total count in the whole execution so far.
+        Every cache access may contribute bytes "accessed for the first time",
+        every fetch brings new valid bytes, and every eviction removes valid
+        bytes.
 
     Plot interpretation:
         The plot is a line that ranges from 0% to 100% showing the proportion
-        of cache misses at that point.
+        of bytes that are in cache but HAVE NOT BEEN ACCESSED to that point.
     """
+
     def __init__(self, instr_counter, verb=False):
         super().__init__(instr_counter, verb=verb)
 
-        self.miss_count = 0
-        self.hit_count = 0
+        self.access_count = 0
+        self.valid_count = 0
         self.zero_counter = (0,0)
 
-        self.plot_name_sufix = '_plot-02-miss'
-        self.plot_title      = 'Miss Ratio'
+        self.plot_name_sufix = '_plot-04-unused'
+        self.plot_title      = 'Unused Bytes Ratio'
         self.plot_subtitle   = 'lower is better'
-        self.plot_y_label    = 'Cache Misses [%]'
-        self.plot_color_text = '#0000AA'   # dark blue
-        self.plot_color_line = '#0000FFCC' # blue almost opaque
-        self.plot_color_fill = '#0000FF44' # blue semi-transparent
+        self.plot_y_label    = 'Unused valid bytes [%]'
+        self.plot_color_text = '#00CCBA'   # dark turquoise
+        self.plot_color_line = '#00CCBACC' # turquoise almost opaque
+        self.plot_color_fill = '#00CCBA44' # turquoise semi-transparent
         return
 
 
     def _pad_events_list(self, new_index):
-        while len(self.events) < new_index:
+        if len(self.events) == 0:
             self.events.append(self.zero_counter)
+        else:
+            while len(self.events) < new_index:
+                self.events.append(self.events[-1])
         return
 
 
-    def register(self, delta_miss=0, delta_hit=0):
+    def register(self, delta_access=0, delta_valid=0):
+        # positive delta_access: newly accessed bytes.
+        # negative delta_access: bytes that have been accessed are now evicted.
+        # positive delta_valid: fetching block.
+        # negative delta_valid: evicting block.
         if not self.enabled:
             return
 
@@ -50,30 +60,35 @@ class Miss(GenericInstrument):
         event_idx = self.ic.val() # note that ic may skip values.
         if event_idx < len(self.events):
             # if the events[event_idx] exists, then just update it
-            m,h = self.events[event_idx]
-            self.events[event_idx] = (m+delta_miss, h+delta_hit)
+            access,valid = self.events[event_idx]
+            self.events[event_idx] = (access+delta_access, valid+delta_valid)
             if event_idx+1 == len(self.events):
                 # if we happen to have just edited the last event,
                 # then the miss/hit counters need to be updated
-                self.miss_count += delta_miss
-                self.hit_count += delta_hit
+                self.access_count += delta_access
+                self.valid_count += delta_valid
         else:
-            # otherwise, pad events with zero counters so that
+            # otherwise, pad events with the last counter so that
             # the index of a new append() is event_idx
             self._pad_events_list(event_idx)
             # update counters
-            self.miss_count += delta_miss
-            self.hit_count += delta_hit
-            self.events.append((self.miss_count, self.hit_count))
+            self.access_count += delta_access
+            self.valid_count += delta_valid
+            self.events.append((self.access_count, self.valid_count))
         return
 
 
     def _create_plotting_data(self):
         # create the list of percentages based on the counts in self.events.
         # This is straight forward:
-        #    percentage = 100 * misses/(misses+hits)
-        for misses,hits in self.events:
-            percentage = 100 * misses/(misses+hits)
+        #    percentage = 100 * (valid-access)/(valid)
+
+        self._pad_events_list(self.X[-1]+1)
+        for access,valid in self.events:
+            if valid == 0:
+                percentage = 0
+            else:
+                percentage = 100 * (valid-access)/(valid)
             self.Y.append(percentage)
         self.events = None # hint GC
         return
@@ -94,7 +109,7 @@ class Miss(GenericInstrument):
         # check if self.X has been filled
         if self.X == None:
             print('[!] Error: Please assign '
-                  f'{self.__class__.__name__ }.X before calling plot()')
+                  f'{self.__class__.__name__}.X before calling plot()')
             sys.exit(1)
 
         # transform list of events into list of plotable data in self.Y

@@ -3,9 +3,9 @@ import sys
 from collections import deque
 from matplotlib.colors import ListedColormap
 
-from instr_generic import GenericInstrument
+from .generic import GenericInstrument
 
-class MapPlotter(GenericInstrument):
+class Map(GenericInstrument):
     def __init__(self, instr_counter, mfmd, plot_w, plot_h, plot_max_res=2048,
                  verb=False):
         super().__init__(instr_counter, verb=verb)
@@ -126,7 +126,7 @@ class MapPlotter(GenericInstrument):
         cmap = ListedColormap(list(reversed(read_palette)) + [thr_bg] + write_palette)
 
         # plot the trace
-        extent = (self.X[0]-0.5, self.X[-1]+0.5, 0, self.block_size)
+        extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, self.block_size-0.5)
         axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
                     aspect='auto', zorder=zorder, extent=extent,
                     vmin=-thr_count, vmax=thr_count)
@@ -155,6 +155,6 @@ class MapPlotter(GenericInstrument):
         axes.yaxis.set_label_position('right')
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
                         labelpad=-14)
-        y_ticks = [0, self.block_size]
+        y_ticks = [0, self.block_size-1]
         axes.set_yticks(y_ticks)
         axes.invert_yaxis()

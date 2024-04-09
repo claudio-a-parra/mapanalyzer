@@ -4,11 +4,21 @@ import sys
 class MemAccess:
     """One register from the map file."""
     def __init__(self, time, thread, event, size, addr):
-        self.time = time
-        self.thread = thread
-        self.event = event
-        self.size = size
-        self.addr = addr
+        # all members are integers.
+        try:
+            self.time = int(time)
+            self.thread = int(thread)
+            self.event = event
+            self.size = int(size)
+            self.addr = int(addr)
+        except:
+            print('Incorrect values to create MemAccess:\n'
+                  f'    time  : {time}\n'
+                  f'    thread: {thread}\n'
+                  f'    event : {event}\n'
+                  f'    size  : {size}\n'
+                  f'    addr  : {addr}')
+            sys.exit(1)
         return
 
     def __str__(self):
@@ -150,18 +160,15 @@ class MapFileReader:
         try:
             time,thr,ev,size,off = line.split(',')
         except ValueError:
-            print('The input line does not have all the fields:\n'
+            print('The input line does not have all the correct number of '
+                  'fields:\n'
                   f'    {line}')
             sys.exit(1)
         try:
-            time = int(time)
-            thr = int(thr)
-            size = int(size)
-            addr = self.base_addr + int(off)
+            off = int(off)
         except:
-            print('Error while parsing input line:\n'
-                  f'    {line}')
+            print('Incorrect value for offset:\n'
+                  f'    {off}')
             sys.exit(1)
-        if ev in ('Tc','Td'):
-            addr = 0
+        addr = 0 if ev in ('Tc','Td') else self.base_addr + off
         return MemAccess(time, thr, ev, size, addr)

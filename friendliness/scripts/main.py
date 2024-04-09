@@ -3,11 +3,11 @@ import sys # for command line arguments
 import os # for file extension removal
 import argparse # to get command line arguments
 
-from address_formatter import log2, AddressFormatter
-from instruction_counter import InstrCounter
-from instruments import Instruments
-from cache import Cache
 from map_file_reader import MapFileReader
+from address_formatter import log2, AddressFormatter
+from cache import Cache
+#from instruments import Instruments
+from instruments import Instruments
 
 
 # Default cache configuration. typical Intel i7 L1d
@@ -75,15 +75,8 @@ def get_cache_specs(specs, cache_filename=None):
     _complete_cache_specs(specs)
 
 
-#def run_simulation(cache_specs, map_reader, map_plotter, verb=False):
 def run_simulation(map_reader, instruments, cache_system, verb=False):
     ic = instruments.ic
-
-    #instruments = Instruments(ic, cache_specs, map_plotter=mat_plotter,
-    #                          verb=verb)
-    #af = cache_system.af
-    #cache = Cache(cache_specs, instr=instruments)
-
     _,_,byte = cache_system.af.split(map_reader.base_addr)
     if byte != 0:
         print(f'[!] Warning: Memory block is not cache aligned. First byte at '
@@ -111,7 +104,11 @@ def run_simulation(map_reader, instruments, cache_system, verb=False):
         ic.counter = access.time
         cache_system.access(access)
         if verb:
+            addr_bin,addr_hex = cache_system.af.format_addr(access.addr)
+            print(addr_bin)
+            print(addr_hex)
             cache_system.dump()
+            input('cont?')
             print()
     instruments.disable_all()
     ic.step()
@@ -195,7 +192,7 @@ def main():
     cache_specs = default_cache_specs
     args = command_line_args_parser()
 
-    print(f'Reading Cache Parameters.')
+    print(f'Reading cache parameters: {args.cache}')
     get_cache_specs(cache_specs, cache_filename=args.cache)
 
     print(f'Creating MAP Reader, Instruments, and Cache System.')

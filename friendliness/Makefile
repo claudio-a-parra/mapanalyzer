@@ -1,6 +1,6 @@
 
 OPTS = -w 100
-MAPS = $(wildcard *.map)
+MAPS = $(wildcard map-samples/*.map)
 
 .PHONY: all clean
 

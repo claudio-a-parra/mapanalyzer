@@ -149,7 +149,8 @@ class Cache:
         # the potentially many lines are all accessed at the same time (cache.clock)
         self.clock += 1
         if addr.bit_length() > self.arch_size_bits:
-            raise ValueError("Access issued to address beyond architecture word size")
+            raise ValueError("Error: Access issued to address larger than"
+                             " the one defined for this cache.")
             exit(1)
         while n_bytes > 0:
             v_tag, index, offset = self.af.split(addr)

@@ -33,16 +33,14 @@ class UnusedBytes(GenericInstrument):
         self.plot_title      = 'Unused Bytes Ratio'
         self.plot_subtitle   = 'lower is better'
         self.plot_y_label    = 'Unused valid bytes [%]'
-        self.plot_color_text = '#00CCBA'   # dark turquoise
-        self.plot_color_line = '#00CCBACC' # turquoise almost opaque
-        self.plot_color_fill = '#00CCBA44' # turquoise semi-transparent
+        self.plot_color_text = '#00CCBAFF'   # dark turquoise
+        self.plot_color_line = '#00CCBAAA' # turquoise almost opaque
+        self.plot_color_fill = '#00CCBA22' # turquoise semi-transparent
         return
 
 
     def _pad_events_list(self, new_index):
-        if len(self.events) == 0:
-            self.events.append(self.zero_counter)
-        else:
+        if len(self.events) != 0:
             while len(self.events) < new_index:
                 self.events.append(self.events[-1])
         return
@@ -64,7 +62,7 @@ class UnusedBytes(GenericInstrument):
             self.events[event_idx] = (access+delta_access, valid+delta_valid)
             if event_idx+1 == len(self.events):
                 # if we happen to have just edited the last event,
-                # then the miss/hit counters need to be updated
+                # then the access/valid counters need to be updated
                 self.access_count += delta_access
                 self.valid_count += delta_valid
         else:

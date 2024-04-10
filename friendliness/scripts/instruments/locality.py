@@ -28,8 +28,7 @@ class AccessTrace:
             # trim buffer from the left until it fits in the cache
             oldest_access = self.buffer.popleft()
             self.buffer_bytes -= oldest_access.size
-            self.locality.append(self._win_dist_loc())
-            #self.access_windows.append(self._new_window())
+        self.locality.append(self._win_dist_loc())
 
     def _win_dist_loc(self):
         """Compute the locality value for a window of memory accesses.
@@ -77,9 +76,9 @@ class Locality(GenericInstrument):
         self.plot_title       = 'Locality'
         self.plot_subtitle    = 'Higher is better'
         self.plot_y_label     = 'Degree of locality [%]'
-        self.plot_color_text  = '#606060FF' # dark gray
-        self.plot_color_line  = '#A0A0A0FF' # gray
-        self.plot_color_fill  = '#A0A0A044' # gray semi-transparent
+        self.plot_color_text  = '#8B0E57FF' # fuchsia dark
+        self.plot_color_line  = '#A21065AA' # fuchsia
+        self.plot_color_fill  = '#A2106522' # fuchsia semi transparent
         self.plot_color_bg    = '#FFFFFF00' # transparent
 
 

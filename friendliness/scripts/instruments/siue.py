@@ -43,9 +43,9 @@ class SIUEvict(GenericInstrument):
         self.plot_title      = 'Still-in-Use Block Evictions'
         self.plot_subtitle   = 'lower is better'
         self.plot_y_label    = 'SIU Eviction ratio [%]'
-        self.plot_color_text = '#990099'   # dark magenta
-        self.plot_color_line = '#AA00AACC' # magenta almost opaque
-        self.plot_color_fill = '#AA00AA44' # magenta semi-transparent
+        self.plot_color_text = '#6122AA'   #'#990099'   # dark magenta
+        self.plot_color_line = '#7A2AD5AA' #'#AA00AACC' # magenta almost opaque
+        self.plot_color_fill = '#7A2AD522' #'#AA00AA44' # magenta semi-transparent
 
 
     def _pad_events_list(self, new_index):

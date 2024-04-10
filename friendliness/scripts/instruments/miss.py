@@ -30,9 +30,9 @@ class Miss(GenericInstrument):
         self.plot_title      = 'Miss Ratio'
         self.plot_subtitle   = 'lower is better'
         self.plot_y_label    = 'Cache Misses [%]'
-        self.plot_color_text = '#0000AA'   # dark blue
-        self.plot_color_line = '#0000FFCC' # blue almost opaque
-        self.plot_color_fill = '#0000FF44' # blue semi-transparent
+        self.plot_color_text = '#18419A'   # dark blue
+        self.plot_color_line = '#18419AAA' # blue almost opaque
+        self.plot_color_fill = '#18419A22' # blue semi-transparent
         return
 
 

@@ -23,16 +23,18 @@ class Map(GenericInstrument):
         # if block_size or time_size are larger than the max resolution, keep
         # diving them until they fit in a square of plot_max_res^2
         ap_matrix_height = self.block_size
-        i=1
-        while ap_matrix_height > plot_max_res:
-            ap_matrix_height = self.block_size // i
-            i += 1
+        ap_matrix_height = self.block_size if self.block_size <= plot_max_res else plot_max_res
+        ap_matrix_width = self.time_size if self.time_size <= plot_max_res else plot_max_res
+        # i=1
+        # while ap_matrix_height > plot_max_res:
+        #     ap_matrix_height = self.block_size // i
+        #     i += 1
 
-        ap_matrix_width = self.time_size
-        i=1
-        while ap_matrix_width > plot_max_res * aspect_ratio:
-            ap_matrix_width = self.time_size // i
-            i += 1
+        # ap_matrix_width = self.time_size
+        # i=1
+        # while ap_matrix_width > plot_max_res * aspect_ratio:
+        #     ap_matrix_width = self.time_size // i
+        #     i += 1
 
         # cols: whole memory snapshot at a given instruction
         # rows: byte state across all instructions

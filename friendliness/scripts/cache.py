@@ -37,7 +37,7 @@ class Set:
         self.lines = [Line(line_size_bytes) for i in range(associativity)]
         self.instr=instr # instruments
 
-    def access(self, tag, offset, n_bytes, clock):
+    def access(self, thr, instr_id, tag, offset, n_bytes, clock):
         """Find the Line in this Set that contains a given tag, and access
         n bytes from it. Handle cache misses. Error if trying to access
         bytes outside of the selected line"""
@@ -50,12 +50,12 @@ class Set:
 
         # Handle a possible cache miss.
         if line == None: # cache miss
-            self.instr.miss.register(delta_miss=1)
+            self.instr.miss.register(thr, delta_miss=1)
             line = self.lru_line()
             self.evict(line)
             self.fetch(line, tag)
         else: # cache hit
-            self.instr.miss.register(delta_hit=1)
+            self.instr.miss.register(thr, delta_hit=1)
 
         # Now the cache line is valid. Access data, but pay attention to
         # how many bytes are freshly accessed, as these will count towards
@@ -112,7 +112,7 @@ class Cache:
         self.line_size_bytes = int(specs['line'])
         self.associativity = int(specs['asso'])
 
-        self.clock = 0
+        self.clock = 0 # used for last recently used policy
         self.instr = instr # instruments
         self.af = AddressFormatter(specs)
         # compute the number of bits needed for byte addressing in the line,
@@ -146,6 +146,7 @@ class Cache:
         n_bytes = access.size
         self.instr.map.register_access(access)
         self.instr.locality.register_access(access)
+
         # the potentially many lines are all accessed at the same time (cache.clock)
         self.clock += 1
         if addr.bit_length() > self.arch_size_bits:
@@ -164,7 +165,8 @@ class Cache:
                 this_line_n_bytes = n_bytes
 
             # access this single line
-            self.sets[index].access(p_tag, offset, this_line_n_bytes, self.clock)
+            self.sets[index].access(access.thread, access.time,
+                                    p_tag, offset, this_line_n_bytes, self.clock)
 
             # update address and reminding bytes to read for a potential new loop
             addr += this_line_n_bytes

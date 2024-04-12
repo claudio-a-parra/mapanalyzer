@@ -9,6 +9,17 @@ from .miss import Miss
 from .usage import UnusedBytes
 from .siue import SIUEvict
 
+# class Alias:
+#     def __init__(self, ic, num_sets, verb=False):
+#         self.enabled = False
+#         self.plot_title = 'Nada'
+#         self.plot_name_sufix = '_99-nada'
+#         pass
+#     def register(self, tag, set_index):
+#         pass
+
+#     def plot(self, axes, basename='nada'):
+#         pass
 
 #-------------------------------------------
 class Instruments:
@@ -32,7 +43,7 @@ class Instruments:
         self.alias = Alias(self.ic, num_sets, verb=verb)
         self.alias.X = self.map.X
 
-        self.miss = Miss(self.ic, verb=verb)
+        self.miss = Miss(self.ic, cache_specs['size'], verb=verb)
         self.miss.X = self.map.X
 
         self.usage = UnusedBytes(self.ic, verb=verb)

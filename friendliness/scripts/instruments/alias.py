@@ -2,19 +2,62 @@
 import sys
 import math # log function
 from collections import deque
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
+#import matplotlib.pyplot as plt
+#import matplotlib.ticker as ticker
 import matplotlib.colors as mcolors # to create shades of colors from list
 
 from .generic import GenericInstrument
+
+class BufferedTrace:
+    win_size = 64*8 # number of sets
+    def __init__(self):
+        # buffer with incoming elements
+        self.buffer = deque()
+        # value that represents the logical size of the buffer
+        self.buffer_lsize = 0
+        # resulting values obtained from each window extracted from the buffer
+        self.window_values = []
+
+
+    def add_to_buffer(self, instr_id, set_index):
+        """Add an element to the buffer. If its logical size is big enough,
+        create a window, compute its value, and append it to the window_values
+        list."""
+        self.buffer.append(set_index)
+        self.buffer_lsize += 1
+        # While there are enough elements in the buffer
+        while self.buffer_lsize > BufferedTrace.win_size:
+            # trim buffer from the left until it fits in the window
+            self.buffer.popleft()
+            self.buffer_lsize -= 1
+        # Create window with the buffer
+        self.window_values.append((instr_id,self._buffer_to_window_value()))
+
+
+    def _buffer_to_window_value(self):
+        """create a window value from the buffer"""
+        # the win_size is the number of sets in the cache.
+        win = [0] * BufferedTrace.win_size
+        for set_idx in self.buffer:
+            win[set_idx] += 1
+        return win
+
+
+    def create_plotable_data(self, X, Y):
+        # fill potential gaps while creating the Y array.
+        # The Y array ranges from 0 to 100.
+        Y = [[0] * BufferedTrace.win_size ] * len(X)
+        for instr_id,val in self.window_values:
+            self.Y[instr_id] = val
 
 #-------------------------------------------
 class Alias(GenericInstrument):
     """
     Definition:
         The distribution of sets usage. Y-axis is the list of all sets, and for
-        each instruction, every set shows the proportion of fetches they have
-        effected.
+        each instruction that triggers a fetch, every set shows the proportion
+        of fetches they have effected in the window of last BufferedTrace.win_size
+        fetches.
 
     Captured Events:
         An event is captured at every cache block fetching.
@@ -37,10 +80,18 @@ class Alias(GenericInstrument):
     """
     def __init__(self, instr_counter, num_sets, verb=False):
         super().__init__(instr_counter, verb=verb)
+        BufferedTrace.win_size = num_sets
 
+        # there is one alias trace for the whole cache, not
+        # one per thread.
+        self.buffer_trace = BufferedTrace()
+
+
+        # old
         self.num_sets = num_sets
         self.last_counter = [0] * num_sets
         self.zero_counter = [0] * num_sets
+        # end_old
 
         self.plot_name_sufix  = '_plot-02-alias'
         self.plot_title       = 'Aliasing'
@@ -52,46 +103,61 @@ class Alias(GenericInstrument):
         return
 
 
-    def _pad_events_list(self, new_index):
-        # Always true: new_index >= len(self.events)
-        if len(self.events) != 0:
-            # save last real counter
-            self.last_counter = self.events[-1]
-        while len(self.events) < new_index:
-            # and pad with zeroes
-            self.events.append(self.zero_counter)
-        return
-
-
     def register(self, tag, set_index):
         if not self.enabled:
             return
         if self.verb:
             print(f'ALI: fetch t:{tag}, i:{set_index}')
-        # update existing counter, or add a new one.
-        event_idx = self.ic.val() # note that ic may skip values.
-        if event_idx < len(self.events):
-            # if the events[event_idx] exists, then just update it
-            self.events[event_idx][set_index] += 1
-        else:
-            # otherwise, pad events with zero counters so that
-            # events[event_idx] now exists.
-            self._pad_events_list(event_idx)
-            # deep copy the last real counter, and update the set's count
-            new_event = [x for x in self.last_counter]
-            new_event[set_index] += 1
-            self.events.append(new_event)
-            # update the last non-zero counter
-            self.last_counter = new_event
+
+        self.buffer_trace.add_to_buffer(self.ic.val(), set_index)
+
+
+
+
+        # # update existing counter, or add a new one.
+        # event_idx = self.ic.val() # note that ic may skip values.
+        # if event_idx < len(self.events):
+        #     # if the events[event_idx] exists, then just update it
+        #     self.events[event_idx][set_index] += 1
+        # else:
+        #     # otherwise, pad events with zero counters so that
+        #     # events[event_idx] now exists.
+        #     self._pad_events_list(event_idx)
+        #     # deep copy the last real counter, and update the set's count
+        #     new_event = [x for x in self.last_counter]
+        #     new_event[set_index] += 1
+        #     self.events.append(new_event)
+        #     # update the last non-zero counter
+        #     self.last_counter = new_event
         return
+
+
+    # def _pad_events_list(self, new_index):
+    #     # Always true: new_index >= len(self.events)
+    #     if len(self.events) != 0:
+    #         # save last real counter
+    #         self.last_counter = self.events[-1]
+    #     while len(self.events) < new_index:
+    #         # and pad with zeroes
+    #         self.events.append(self.zero_counter)
+    #     return
 
     def _log_mapping(self, x):
         # Apply logarithmic mapping to input values
         return math.log(1 + 9 * x) / math.log(10)
 
 
+    # def create_plotable_data(self, X, Y):
+    #     # fill potential gaps while creating the Y array.
+    #     # The Y array ranges from 0 to 100.
+    #     Y = [[0] * BufferedTrace.win_size ] * len(X)
+    #     for instr_id,val in self.window_values:
+    #         self.Y[instr_id] = val
+
+
     def _create_plotting_data(self, kind='linear'):
-        # self.events cannot be plot right away because of three reasons:
+        # self.buffer_trace.window_values cannot be plot right away because
+        # of three reasons:
         # 1. There are most likely more time points than alias counters. We
         #    need to pad the list of counters so that it nicely matches the
         #    timeline array.
@@ -100,25 +166,27 @@ class Alias(GenericInstrument):
         #      - 0=perfect,
         #      - 1=all fetches in the same set.
         #    This mapping can be 'linear' or 'log' (ln)
-        # 3. self.events is a list of columns. imshow() needs a list of rows,
-        #    so we need to transpose it.
+        # 3. The matrix self.buffer_trace.window_values is a list of columns.
+        #    But imshow() needs a list of rows, so we need to transpose it.
 
-        # pad self.events to match the length of self.X
-        while len(self.events) < len(self.X):
-            self.events.append(self.zero_counter)
 
-        # create matrix filled with zeroes, of size transposed(self.events)
-        self.Y = [[0] * len(self.events) # each row
-                  for _ in range(len(self.events[0]))]
+        # fill gaps to match the instructions in self.X
+        transp_Y = [[0] * self.num_sets] * len(self.X)
+        for instr_id,val in self.buffer_trace.window_values:
+            transp_Y[instr_id] = val
 
-        # place the normalized proportions of self.events[x][y] in
+        # create matrix filled with zeroes, of size transposed(transp_Y)
+        self.Y = [[0] * len(transp_Y) # each row
+                  for _ in range(len(transp_Y[0]))]
+
+        # place the normalized proportions of transp_Y[x][y] in
         # self.Y[y][x]
         base_proportion = 1/self.num_sets
         if self.num_sets == 1:
             normal_factor = 1
         else:
             normal_factor = (self.num_sets) / (self.num_sets - 1)
-        for instr_idx,counters_arr in enumerate(self.events):
+        for instr_idx,counters_arr in enumerate(transp_Y):
             # if there is nothing to count, keep the zeroes in Y
             all_count = sum(counters_arr)
             if all_count == 0:
@@ -133,8 +201,55 @@ class Alias(GenericInstrument):
                 log_ratio = self._log_mapping(linear_ratio)
                 val = log_ratio if kind=='log' else linear_ratio
                 self.Y[set_idx][instr_idx] = val
-        self.events = None # hint GC
+        transp_Y = None # hint GC
         return
+
+
+    # def _create_plotting_data(self, kind='linear'):
+    #     # self.events cannot be plot right away because of three reasons:
+    #     # 1. There are most likely more time points than alias counters. We
+    #     #    need to pad the list of counters so that it nicely matches the
+    #     #    timeline array.
+    #     # 2. each item is a list of num_sets counters. we need values from
+    #     #    0 to 1 that represents the proportion of usage:
+    #     #      - 0=perfect,
+    #     #      - 1=all fetches in the same set.
+    #     #    This mapping can be 'linear' or 'log' (ln)
+    #     # 3. self.events is a list of columns. imshow() needs a list of rows,
+    #     #    so we need to transpose it.
+
+    #     # pad self.events to match the length of self.X
+    #     while len(self.events) < len(self.X):
+    #         self.events.append(self.zero_counter)
+
+    #     # create matrix filled with zeroes, of size transposed(self.events)
+    #     self.Y = [[0] * len(self.events) # each row
+    #               for _ in range(len(self.events[0]))]
+
+    #     # place the normalized proportions of self.events[x][y] in
+    #     # self.Y[y][x]
+    #     base_proportion = 1/self.num_sets
+    #     if self.num_sets == 1:
+    #         normal_factor = 1
+    #     else:
+    #         normal_factor = (self.num_sets) / (self.num_sets - 1)
+    #     for instr_idx,counters_arr in enumerate(self.events):
+    #         # if there is nothing to count, keep the zeroes in Y
+    #         all_count = sum(counters_arr)
+    #         if all_count == 0:
+    #             continue
+    #         for set_idx, one_set_raw_count in enumerate(counters_arr):
+    #             linear_ratio = \
+    #                 ((one_set_raw_count / all_count) - base_proportion) \
+    #                 * normal_factor
+    #             # if the raw counter is zero, then the linear_ratio should
+    #             # be zero, not a negative value.
+    #             linear_ratio = max(0,linear_ratio)
+    #             log_ratio = self._log_mapping(linear_ratio)
+    #             val = log_ratio if kind=='log' else linear_ratio
+    #             self.Y[set_idx][instr_idx] = val
+    #     self.events = None # hint GC
+    #     return
 
     def get_extent(self):
         # fine tune margins to place each quadrilateral of the imshow()

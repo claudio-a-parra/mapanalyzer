@@ -25,16 +25,6 @@ class Map(GenericInstrument):
         ap_matrix_height = self.block_size
         ap_matrix_height = self.block_size if self.block_size <= plot_max_res else plot_max_res
         ap_matrix_width = self.time_size if self.time_size <= plot_max_res else plot_max_res
-        # i=1
-        # while ap_matrix_height > plot_max_res:
-        #     ap_matrix_height = self.block_size // i
-        #     i += 1
-
-        # ap_matrix_width = self.time_size
-        # i=1
-        # while ap_matrix_width > plot_max_res * aspect_ratio:
-        #     ap_matrix_width = self.time_size // i
-        #     i += 1
 
         # cols: whole memory snapshot at a given instruction
         # rows: byte state across all instructions
@@ -48,7 +38,7 @@ class Map(GenericInstrument):
         self.plot_x_label = 'Time'
         self.plot_min = None
         self.plot_max = None
-        self.plot_color_text =  '#000000'
+        self.plot_color_text =  '#009900'
         self.plot_color_palette = [ #    read , write
             #('#4CB24C', '#B24C4C'), #t0: dusty green and red
             ('#00BB00', '#BB0000'), #t1: green, red
@@ -148,15 +138,15 @@ class Map(GenericInstrument):
         axes.tick_params(axis='x', rotation=90)
 
         # setup X grid
-        axes.grid(axis='x', which='both', linestyle='-', alpha=0.2,
-                  color='k', linewidth=0.8, zorder=zorder+1)
+        axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
+                  color='k', linewidth=0.5, zorder=zorder+1)
 
         # setup right Y axis
         axes.tick_params(axis='y', which='both', left=False, right=True,
-                         labelleft=False, labelright=True)
+                         labelleft=False, labelright=True, colors=self.plot_color_text)
         axes.yaxis.set_label_position('right')
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
-                        labelpad=-14)
+                        labelpad=-15)
         y_ticks = [0, self.block_size-1]
         axes.set_yticks(y_ticks)
         axes.invert_yaxis()

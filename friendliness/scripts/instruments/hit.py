@@ -50,7 +50,7 @@ class BufferedTrace:
         for _,mh in self.buffer:
             misses += mh[0]
             hits += mh[1]
-        return (misses)/(misses+hits)
+        return (hits)/(misses+hits)
 
 
     def create_plotable_data(self, X):
@@ -64,20 +64,7 @@ class BufferedTrace:
 #-------------------------------------------
 class Miss(GenericInstrument):
     """
-    Definition:
-        The proportion of cache misses with respect to all cache requests in
-        the last window of BufferedTrace.win_size accessed bytes.
-
-    Captured Events:
-        Every time there is a hit or a miss (this is, any cache access) a
-        tuple with them (miss, hit) is appended to a buffer of up to
-        BufferedTrace.win_size elements. After every appendage, compute the
-        proportion on the buffer. If the buffer becomes greater than the
-        window size, then trim it from the oldest side (FIFO).
-
-    Plot interpretation:
-        The plot is a line that ranges from 0% to 100% showing the proportion
-        of cache misses in the last win_size memory accesses.
+        Alternate version of miss.py. This one actually registers the hits
     """
     def __init__(self, instr_counter, cache_size, verb=False):
         super().__init__(instr_counter, verb=verb)
@@ -86,10 +73,10 @@ class Miss(GenericInstrument):
         # each thread has its own miss trace.
         self.buffer_traces = {}
 
-        self.plot_name_sufix = '_plot-02-miss'
-        self.plot_title      = 'Miss Ratio'
-        self.plot_subtitle   = 'lower is better'
-        self.plot_y_label    = 'Cache Misses [%]'
+        self.plot_name_sufix = '_plot-02-hit'
+        self.plot_title      = 'Hit Ratio'
+        self.plot_subtitle   = 'higher is better'
+        self.plot_y_label    = 'Cache Hits [%]'
         self.plot_color_text = '#18419AFF' # darker blue
         self.plot_color_line = '#18419A88' # blue almost opaque
         self.plot_color_fill = '#18419A11' # blue semi-transparent

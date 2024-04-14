@@ -75,8 +75,8 @@ class Locality(GenericInstrument):
         self.plot_subtitle    = 'Higher is better'
         self.plot_y_label     = 'Degree of locality [%]'
         self.plot_color_text  = '#8B0E57FF' # fuchsia dark
-        self.plot_color_line  = '#A21065AA' # fuchsia
-        self.plot_color_fill  = '#A2106522' # Fuchsia semi transparent
+        self.plot_color_line  = '#A2106588' # fuchsia
+        self.plot_color_fill  = '#A2106511' # Fuchsia semi transparent
         self.plot_color_bg    = '#FFFFFF00' # transparent
 
 
@@ -121,11 +121,11 @@ class Locality(GenericInstrument):
                        f'({self.plot_subtitle})')
 
         # setup Y ticks
-        axes.tick_params(axis='y', which='both',
-                         left=True, right=False,
-                         labelleft=True, labelright=False)
+        axes.tick_params(axis='y', which='both', left=True, right=False,
+                         labelleft=True, labelright=False,
+                         colors=self.plot_color_text)
         percentages = list(range(100 + 1)) # from 0 to 100
-        y_ticks = self._create_up_to_n_ticks(percentages, base=10, n=5)
+        y_ticks = self._create_up_to_n_ticks(percentages, base=10, n=11)
         axes.set_yticks(y_ticks)
 
         # setup Y label
@@ -134,7 +134,7 @@ class Locality(GenericInstrument):
                         labelpad=3.5)
 
         # setup Y grid
-        axes.grid(axis='y', which='both', linestyle='-', alpha=0.2,
-                  color=self.plot_color_line, linewidth=0.8, zorder=3)
+        axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
+                  color=self.plot_color_line, linewidth=0.5, zorder=3)
 
         return

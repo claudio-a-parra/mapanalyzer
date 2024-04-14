@@ -4,22 +4,10 @@ import matplotlib.pyplot as plt
 from .ic import InstrCounter
 from .mapplotter import Map
 from .locality import Locality
-from .alias import Alias
 from .miss import Miss
 from .usage import UnusedBytes
+from .alias import Alias
 from .siue import SIUEvict
-
-# class Alias:
-#     def __init__(self, ic, num_sets, verb=False):
-#         self.enabled = False
-#         self.plot_title = 'Nada'
-#         self.plot_name_sufix = '_99-nada'
-#         pass
-#     def register(self, tag, set_index):
-#         pass
-
-#     def plot(self, axes, basename='nada'):
-#         pass
 
 #-------------------------------------------
 class Instruments:
@@ -38,10 +26,6 @@ class Instruments:
         self.locality = Locality(self.ic, cache_specs['size'],
                                  cache_specs['line'])
         self.locality.X = self.map.X
-        num_sets = cache_specs['size']//(cache_specs['asso']*\
-                                         cache_specs['line'])
-        self.alias = Alias(self.ic, num_sets, verb=verb)
-        self.alias.X = self.map.X
 
         self.miss = Miss(self.ic, cache_specs['size'], verb=verb)
         self.miss.X = self.map.X
@@ -49,39 +33,26 @@ class Instruments:
         self.usage = UnusedBytes(self.ic, verb=verb)
         self.usage.X = self.map.X
 
-        self.siu = SIUEvict(self.ic, verb=verb)
+
+        num_sets = cache_specs['size']//(cache_specs['asso']*\
+                                         cache_specs['line'])
+
+        self.alias = Alias(self.ic, num_sets, verb=verb)
+        self.alias.X = self.map.X
+
+        self.siu = SIUEvict(self.ic, num_sets, verb=verb)
         self.siu.X = self.map.X
 
         # list of all instruments for easy access.
-        self.inst_list = [self.locality, self.alias, self.miss, self.usage,
+        self.inst_list = [self.locality, self.miss, self.usage, self.alias,
                           self.siu]
 
-
-    def enable_all(self):
-        self.map.enabled = True
-        for i in self.inst_list:
-            i.enabled = True
-
-
     def disable_all(self):
-        self.map.enabled = False
-        for i in self.inst_list:
-            i.enabled = False
+        for tool in self.inst_list:
+            tool.enabled = False
 
 
-    def prepare_for_second_pass(self):
-        self.disable_all()
-        self.siu.enabled = True
-        self.siu.mode = 'evict'
-
-
-    def set_verbose(self, verb=False):
-        self.map.verb = verb
-        for i in self.inst_list:
-            i.verb = verb
-
-
-    def plot(self, window, basename, out_format, dpi=600):
+    def plot(self, window, basename, out_format, dpi=800):
         fig, map_axes = plt.subplots(
             figsize=(self.plot_width, self.plot_height))
         instr_axes = map_axes.twinx()

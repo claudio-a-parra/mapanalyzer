@@ -79,37 +79,19 @@ def run_simulation(map_reader, instruments, cache_system, verb=False):
     ic = instruments.ic
     _,_,byte = cache_system.af.split(map_reader.base_addr)
     if byte != 0:
-        print(f'[!] Warning: Memory block is not cache aligned. First byte at '
-              f'offset {byte}.')
+        print(f'[!] Warning: Memory block is not cache aligned. '
+              f'First byte is {byte} bytes into the cache line.')
 
-    # First Pass
-    if verb:
-        print('\nFIRST PASS')
+    tot_instr = map_reader.time_size-1
     for access in map_reader:
         ic.counter = access.time
+        print('\033[2K\r    '
+              f'{(100*access.time/tot_instr):5.1f}% '
+              f'{access.time:8d}/{tot_instr}'
+              ,end='')
+        sys.stdout.flush()
         cache_system.access(access)
-
-    # Prepare for second pass
-    instruments.disable_all()
-    ic.step()
-    cache_system.flush()
-    ic.reset()
-    instruments.prepare_for_second_pass()
-    cache_system.reset_clock()
-
-    # Second Pass
-    if verb:
-        print('\nSECOND PASS')
-    for access in map_reader:
-        ic.counter = access.time
-        cache_system.access(access)
-        if verb:
-            addr_bin,addr_hex = cache_system.af.format_addr(access.addr)
-            print(addr_bin)
-            print(addr_hex)
-            cache_system.dump()
-            input('cont?')
-            print()
+    print()
     instruments.disable_all()
     ic.step()
     cache_system.flush()

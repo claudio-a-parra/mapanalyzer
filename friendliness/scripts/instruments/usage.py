@@ -29,13 +29,13 @@ class UnusedBytes(GenericInstrument):
         self.valid_count = 0
         self.zero_counter = (0,0)
 
-        self.plot_name_sufix = '_plot-04-unused'
+        self.plot_name_sufix = '_plot-03-unused'
         self.plot_title      = 'Unused Bytes Ratio'
         self.plot_subtitle   = 'lower is better'
         self.plot_y_label    = 'Unused valid bytes [%]'
-        self.plot_color_text = '#00CCBAFF'   # dark turquoise
-        self.plot_color_line = '#00CCBAAA' # turquoise almost opaque
-        self.plot_color_fill = '#00CCBA22' # turquoise semi-transparent
+        self.plot_color_text = '#006B62FF'   # dark turquoise
+        self.plot_color_line = '#00CCBA88' # turquoise almost opaque
+        self.plot_color_fill = '#00CCBA11' # turquoise semi-transparent
         return
 
 
@@ -130,11 +130,11 @@ class UnusedBytes(GenericInstrument):
                        f'({self.plot_subtitle})')
 
         # setup Y ticks
-        axes.tick_params(axis='y', which='both',
-                         left=True, right=False,
-                         labelleft=True, labelright=False)
+        axes.tick_params(axis='y', which='both', left=True, right=False,
+                         labelleft=True, labelright=False,
+                         colors=self.plot_color_text)
         percentages = list(range(100 + 1)) # from 0 to 100
-        y_ticks = self._create_up_to_n_ticks(percentages, base=10, n=5)
+        y_ticks = self._create_up_to_n_ticks(percentages, base=10, n=11)
         axes.set_yticks(y_ticks)
 
         # setup Y label
@@ -143,7 +143,7 @@ class UnusedBytes(GenericInstrument):
                         labelpad=3.5)
 
         # setup Y grid
-        axes.grid(axis='y', which='both', linestyle='-', alpha=0.2,
-                  color=self.plot_color_line, linewidth=0.8, zorder=3)
+        axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
+                  color=self.plot_color_line, linewidth=0.5, zorder=3)
 
         return

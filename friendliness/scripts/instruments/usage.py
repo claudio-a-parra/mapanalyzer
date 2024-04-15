@@ -29,10 +29,10 @@ class UnusedBytes(GenericInstrument):
         self.valid_count = 0
         self.zero_counter = (0,0)
 
-        self.plot_name_sufix = '_plot-03-unused'
-        self.plot_title      = 'Unused Bytes Ratio'
-        self.plot_subtitle   = 'lower is better'
-        self.plot_y_label    = 'Unused valid bytes [%]'
+        self.plot_name_sufix = '_plot-03-usage'
+        self.plot_title      = 'Cache Utilization Ratio'
+        self.plot_subtitle   = 'higher is better'
+        self.plot_y_label    = 'Used bytes [%]'
         self.plot_color_text = '#006B62FF'   # dark turquoise
         self.plot_color_line = '#00CCBA88' # turquoise almost opaque
         self.plot_color_fill = '#00CCBA11' # turquoise semi-transparent
@@ -86,7 +86,7 @@ class UnusedBytes(GenericInstrument):
             if valid == 0:
                 percentage = 0
             else:
-                percentage = 100 * (valid-access)/(valid)
+                percentage = 100 * (access)/(valid)
             self.Y.append(percentage)
         self.events = None # hint GC
         return

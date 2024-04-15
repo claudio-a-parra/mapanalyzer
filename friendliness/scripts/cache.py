@@ -50,12 +50,12 @@ class Set:
 
         # Handle a possible cache miss.
         if line == None: # cache miss
-            self.instr.miss.register(thr, delta_miss=1)
+            self.instr.hit.register(thr, delta_miss=1)
             line = self.lru_line()
             self.evict(line)
             self.fetch(line, tag)
         else: # cache hit
-            self.instr.miss.register(thr, delta_hit=1)
+            self.instr.hit.register(thr, delta_hit=1)
 
         # Now the cache line is valid. Access data, but pay attention to
         # how many bytes are freshly accessed, as these will count towards

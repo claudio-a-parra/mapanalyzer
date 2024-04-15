@@ -62,15 +62,28 @@ class BufferedTrace:
 
 
 #-------------------------------------------
-class Miss(GenericInstrument):
+class Hit(GenericInstrument):
     """
-        Alternate version of miss.py. This one actually registers the hits
+    Definition:
+        The proportion of cache hits with respect to all cache requests in
+        the last window of BufferedTrace.win_size accessed bytes.
+
+    Captured Events:
+        Every time there is a hit or a miss (this is, any cache access) a
+        tuple with them (miss, hit) is appended to a buffer of up to
+        BufferedTrace.win_size elements. After every appendage, compute the
+        proportion on the buffer. If the buffer becomes greater than the
+        window size, then trim it from the oldest side (FIFO).
+
+    Plot interpretation:
+        The plot is a line that ranges from 0% to 100% showing the proportion
+        of cache hits in the last win_size memory accesses.
     """
     def __init__(self, instr_counter, cache_size, verb=False):
         super().__init__(instr_counter, verb=verb)
         BufferedTrace.win_size = cache_size
 
-        # each thread has its own miss trace.
+        # each thread has its own hit trace.
         self.buffer_traces = {}
 
         self.plot_name_sufix = '_plot-02-hit'
@@ -103,7 +116,7 @@ class Miss(GenericInstrument):
         return extent
 
 
-    def plot(self, axes, basename='miss', extent=None):
+    def plot(self, axes, basename='hit', extent=None):
         for thread in self.buffer_traces:
             self.buffer_traces[thread].create_plotable_data(self.X)
 

@@ -83,10 +83,10 @@ class Alias(GenericInstrument):
 
         self.plot_name_sufix  = '_plot-04-alias'
         self.plot_title       = 'Aliasing'
-        self.plot_subtitle    = 'transparent is better'
+        self.plot_subtitle    = 'homogeneous is better'
         self.plot_y_label     = 'Set Index'
         self.plot_color_text  = '#B87800FF' # dark orange
-        self.plot_color_boxes = '#ffa500FF' # orange opaque
+        self.plot_color_boxes = '#ffa500F8' # almost opaque orange
         self.plot_color_bg    = '#FFFFFF00' # transparent
         return
 
@@ -123,29 +123,21 @@ class Alias(GenericInstrument):
         transp_Y = [[0] * self.num_sets] * len(self.X)
         for instr_id,val in self.buffer_trace.window_values:
             transp_Y[instr_id] = val
+        self.buffer_trace = None # hint GC
 
         # create matrix filled with zeroes, of size transposed(transp_Y)
         self.Y = [[0] * len(transp_Y) # each row
                   for _ in range(len(transp_Y[0]))]
 
         # place the normalized proportions of transp_Y[x][y] in self.Y[y][x]
-        base_proportion = 1/self.num_sets
-        if self.num_sets == 1:
-            normal_factor = 1
-        else:
-            normal_factor = (self.num_sets) / (self.num_sets - 1)
         for instr_idx,counters_arr in enumerate(transp_Y):
             # if there is nothing to count, keep the zeroes in Y
             all_count = sum(counters_arr)
             if all_count == 0:
                 continue
+
             for set_idx, one_set_raw_count in enumerate(counters_arr):
-                linear_ratio = \
-                    ((one_set_raw_count / all_count) - base_proportion) \
-                    * normal_factor
-                # if the raw counter is zero, then the linear_ratio should
-                # be zero, not a negative value.
-                linear_ratio = max(0,linear_ratio)
+                linear_ratio = one_set_raw_count / all_count
                 log_ratio = self._log_mapping(linear_ratio)
                 val = log_ratio if kind=='log' else linear_ratio
                 self.Y[set_idx][instr_idx] = val
@@ -164,7 +156,7 @@ class Alias(GenericInstrument):
         return extent
 
 
-    def plot(self, axes, basename='alias', extent=None, kind='log'):
+    def plot(self, axes, basename='alias', extent=None, kind='linear'):
         # create color shade
         colors = [self.plot_color_bg, self.plot_color_boxes]
         shade_cmap = mcolors.LinearSegmentedColormap.from_list(

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from .ic import InstrCounter
 from .mapplotter import Map
 from .locality import Locality
-from .miss import Miss
+from .hit import Hit
 from .usage import UnusedBytes
 from .alias import Alias
 from .siue import SIUEvict
@@ -21,14 +21,14 @@ class Instruments:
         self.map = Map(self.ic, map_metadata, plot_width, plot_height,
                        resolution, verb=verb)
 
-        # Create other instruments: (alias, miss, usage, and SIU) and
-        # make them share their X axis (for the plots)
+        # Create other instruments and make them share their
+        # X axis (for the plots)
         self.locality = Locality(self.ic, cache_specs['size'],
                                  cache_specs['line'])
         self.locality.X = self.map.X
 
-        self.miss = Miss(self.ic, cache_specs['size'], verb=verb)
-        self.miss.X = self.map.X
+        self.hit = Hit(self.ic, cache_specs['size'], verb=verb)
+        self.hit.X = self.map.X
 
         self.usage = UnusedBytes(self.ic, verb=verb)
         self.usage.X = self.map.X
@@ -44,7 +44,7 @@ class Instruments:
         self.siu.X = self.map.X
 
         # list of all instruments for easy access.
-        self.inst_list = [self.locality, self.miss, self.usage, self.alias,
+        self.inst_list = [self.locality, self.hit, self.usage, self.alias,
                           self.siu]
 
     def disable_all(self):

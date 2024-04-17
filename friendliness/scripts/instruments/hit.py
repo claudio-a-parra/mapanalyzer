@@ -90,6 +90,7 @@ class Hit(GenericInstrument):
         self.plot_title      = 'Hit Ratio'
         self.plot_subtitle   = 'higher is better'
         self.plot_y_label    = 'Cache Hits [%]'
+        self.plot_x_label    = 'Instruction'
         self.plot_color_text = '#18419AFF' # darker blue
         self.plot_color_line = '#18419A88' # blue almost opaque
         self.plot_color_fill = '#18419A11' # blue semi-transparent
@@ -135,23 +136,28 @@ class Hit(GenericInstrument):
                               linewidth=1.2, step='mid', zorder=1)
 
         # setup title
-        axes.set_title(f'{self.plot_title}: {basename}\n'
-                       f'({self.plot_subtitle})')
+        axes.set_title(f'{self.plot_title}: {basename}. '
+                       f'({self.plot_subtitle})', fontsize=10)
 
-        # setup Y ticks
+        # setup X ticks, labels, and grid
+        axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
+                         rotation=90)
+        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=20)
+        axes.set_xticks(x_ticks)
+        axes.set_xlabel(self.plot_x_label)
+        axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
+                  color='k', linewidth=0.5, zorder=2)
+
+        # setup Y ticks, labels and grid
         axes.tick_params(axis='y', which='both', left=True, right=False,
                          labelleft=True, labelright=False,
                          colors=self.plot_color_text)
         percentages = list(range(100 + 1)) # from 0 to 100
         y_ticks = self._create_up_to_n_ticks(percentages, base=10, n=11)
         axes.set_yticks(y_ticks)
-
-        # setup Y label
         axes.yaxis.set_label_position('left')
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
                         labelpad=3.5)
-
-        # setup Y grid
         axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
                   color=self.plot_color_line, linewidth=0.5, zorder=3)
 

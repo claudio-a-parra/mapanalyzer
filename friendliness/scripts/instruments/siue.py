@@ -1,54 +1,9 @@
 #!/usr/bin/env python3
 import sys
+import matplotlib.colors as mcolors # to create shades of colors from list
 from collections import deque
 
 from .generic import GenericInstrument
-
-class BufferedTrace:
-    win_size = 64*8 # number of sets
-    def __init__(self):
-        # buffer with incoming elements
-        self.buffer = deque()
-        # value that represents the logical size of the buffer
-        self.buffer_lsize = 0
-        # resulting values obtained from each window extracted from the buffer
-        self.window_values = []
-
-
-    def add_to_buffer(self, instr_id, set_index):
-        """Add an element to the buffer. If its logical size is big enough,
-        create a window, compute its value, and append it to the window_values
-        list."""
-        self.buffer.append(set_index)
-        self.buffer_lsize += 1
-        # While there are enough elements in the buffer
-        while self.buffer_lsize > BufferedTrace.win_size:
-            # trim buffer from the left until it fits in the window
-            self.buffer.popleft()
-            self.buffer_lsize -= 1
-        # Create window with the buffer
-        self.window_values.append((instr_id,self._buffer_to_window_value()))
-
-    def search_buffer(self, key):
-        mode = 'fetch'
-        return mode
-
-    def _buffer_to_window_value(self):
-        """create a window value from the buffer"""
-        # the win_size is the number of sets in the cache.
-        win = [0] * BufferedTrace.win_size
-        for set_idx in self.buffer:
-            win[set_idx] += 1
-        return win
-
-
-    def create_plotable_data(self, X, Y):
-        # fill potential gaps while creating the Y array.
-        # The Y array ranges from 0 to 100.
-        Y = [[0] * BufferedTrace.win_size ] * len(X)
-        for instr_id,val in self.window_values:
-            self.Y[instr_id] = val
-
 
 #-------------------------------------------
 class SIUEvict(GenericInstrument):
@@ -77,19 +32,21 @@ class SIUEvict(GenericInstrument):
         of evictions that are SIU.
     """
 
-    def __init__(self, instr_counter, num_sets, verb=False):
+    def __init__(self, instr_counter, num_sets, asso, alias, verb=False):
         super().__init__(instr_counter, verb=verb)
-
         # last block operations (tag,index) -> queue<(instr_id,operation)>()
         self.blocks_ops = {}
         # queue of last block operations to preserve in/out order
         # of the dictionary above.
         self.buffer = deque()
+        self.buffer_fetches_count = 0
 
-        self.buffer_max_size = num_sets
+        self.buffer_max_size = num_sets * asso
         self.num_sets = num_sets
-        self.sparse_Y = []
+        self.SIUE = []
 
+        # this is the whole alias tool.
+        self.alias = alias
 
         # BEGIN_OLD
         self.fetch_counters = {}
@@ -101,12 +58,13 @@ class SIUEvict(GenericInstrument):
 
         self.plot_name_sufix = '_plot-05-siu'
         self.plot_title      = 'Still-in-Use Block Evictions'
-        self.plot_subtitle   = 'less points is better'
-        self.plot_y_label    = 'SIU Eviction ratio [%]'
+        self.plot_subtitle   = 'lower count is better'
+        self.plot_y_label    = 'Set Index'
+        self.plot_x_label    = 'Instruction'
         self.plot_color_text = '#6122AA'   # dark magenta
-        self.plot_color_dots = '#7A2AD5AA' # magenta almost opaque
-        #self.plot_color_fill = '#7A2AD522' # magenta semi-transparent
-
+        self.plot_color_dots = '#7A2AD5FF' # magenta opaque
+        self.plot_color_boxes = '#9A4AF5FF' # magenta opaque
+        self.plot_color_bg    = '#FFFFFF00' # transparent
 
     def register(self, op, tag, index):
         if not self.enabled:
@@ -114,21 +72,36 @@ class SIUEvict(GenericInstrument):
 
         block = (tag,index)
 
-        if block in self.blocks_ops:
-            if op == 'fetch':
-                last_instr_id,last_op = self.blocks_ops[block][-1]
-                if last_op == 'evict':
-                    self.Y.append((last_instr_id,index))
-        else:
-            self.blocks_ops[block] = deque()
-        self.blocks_ops[block].append((self.ic.val(),op))
-
+        # append block id to temporally sorted queue
         self.buffer.append(block)
-        if len(self.buffer) > self.buffer_max_size:
+        # print(f'b+ {block}: {op} ({self.ic.val()})')
+        if op == 'fetch':
+            self.buffer_fetches_count += 1
+
+        # trim back of the buffer and block search dictionary
+        # if the buffer is too long.
+        while self.buffer_fetches_count > self.buffer_max_size:
             old_block = self.buffer.popleft()
-            self.blocks_ops[old_block].popleft()
+            old_instr_id,old_op = self.blocks_ops[old_block].popleft()
+            # print(f'b- {old_block}: {old_op} ({old_instr_id})')
+            # print(f'        d- {old_block}: {old_op} ({old_instr_id})')
             if len(self.blocks_ops[old_block]) == 0:
                 del self.blocks_ops[old_block]
+            if old_op == 'fetch':
+                self.buffer_fetches_count -= 1
+
+        # if the current operation is fetch, then check if the same
+        # block was recently evicted. If so, annotate a SIU eviction.
+        if block in self.blocks_ops:
+            if op == 'fetch':
+                recent_instr_id,recent_op = self.blocks_ops[block][-1]
+                if recent_op == 'evict':
+                    self.SIUE.append((recent_instr_id,index))
+                    # print(f'SIU: ({recent_instr_id}) -> ({self.ic.val()})')
+        else:
+            self.blocks_ops[block] = deque()
+        # print(f'        d+ {block}: {op} ({self.ic.val()})')
+        self.blocks_ops[block].append((self.ic.val(),op))
         return
 
 
@@ -145,30 +118,53 @@ class SIUEvict(GenericInstrument):
 
     def plot(self, axes, basename='siue', extent=None):
         # draw the image and invert Y axis (so lower value is on top)
-        X = [coor[0] for coor in self.Y]
-        Y = [coor[1] for coor in self.Y]
-        axes.scatter(X, Y, marker='s', s=8,
-                     color=self.plot_color_dots, edgecolor='none',
-                     zorder=1)
-        # set plot limits
-        le,re,be,te = extent if extent != None else self.get_extent()
+
+        #self.alias.plot_color_boxes = '#7A2AD588' # magenta almost opaque
+        self.alias.plot(axes)
+
+        X = [coor[0] for coor in self.SIUE]
+        Y = [coor[1] for coor in self.SIUE]
+        # create plotable image with captured coordenates
+        plotable_img = [[0] * len(self.X) for _ in range(self.num_sets)]
+        for x,y in self.SIUE:
+            plotable_img[y][x] = 1
+
+        # create color shade
+        colors = [self.plot_color_bg, self.plot_color_boxes]
+        shade_cmap = mcolors.LinearSegmentedColormap.from_list(
+            'transparency_cmap', colors)
+
+        # draw the image and invert Y axis (so lower value is on top)
+        extent = extent if extent != None else self.get_extent()
+        axes.imshow(plotable_img, cmap=shade_cmap, origin='lower', interpolation=None,
+                    aspect='auto', extent=extent, zorder=1, vmin=0, vmax=1)
+        axes.scatter(X, Y, marker='|', s=512/self.num_sets,
+                     color=self.plot_color_boxes, zorder=1)
+        le,re,be,te = extent
         axes.set_xlim(le, re)
         axes.set_ylim(be, te)
         axes.invert_yaxis()
 
         # setup title
-        axes.set_title(f'{self.plot_title}: {basename}\n'
-                       f'({self.plot_subtitle})')
+        axes.set_title(f'{self.plot_title}: {basename}. '
+                       f'({self.plot_subtitle})', fontsize=10)
 
-        # setup Y ticks
+        # setup X ticks, labels, and grid
+        axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
+                         rotation=90)
+        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=20)
+        axes.set_xticks(x_ticks)
+        axes.set_xlabel(self.plot_x_label)
+        axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
+                  color='k', linewidth=0.5, zorder=2)
+
+        # setup Y ticks, labels, and grid
         axes.tick_params(axis='y', which='both', left=True, right=False,
                          labelleft=True, labelright=False,
                          colors=self.plot_color_text)
         set_indices = list(range(self.num_sets))
         y_ticks = self._create_up_to_n_ticks(set_indices, base=2, n=9)
         axes.set_yticks(y_ticks)
-
-        # setup Y label
         axes.yaxis.set_label_position('left')
         if y_ticks[-1] < 100:
             pad = 10
@@ -176,8 +172,6 @@ class SIUEvict(GenericInstrument):
             pad = 16
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
                         labelpad=pad)
-
-        # setup Y grid
         axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
                   color=self.plot_color_dots, linewidth=0.5, zorder=2)
         return

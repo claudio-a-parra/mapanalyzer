@@ -8,6 +8,7 @@ from .generic import GenericInstrument
 
 class BufferedTrace:
     win_size = 64*8 # number of sets
+    num_sets = 1
     def __init__(self):
         # buffer with incoming elements
         self.buffer = deque()
@@ -31,7 +32,7 @@ class BufferedTrace:
     def _buffer_to_window_value(self):
         """create a window value from the buffer"""
         # the win_size is the number of sets in the cache.
-        win = [0] * BufferedTrace.win_size
+        win = [0] * BufferedTrace.num_sets
         for set_idx in self.buffer:
             win[set_idx] += 1
         return win
@@ -40,7 +41,7 @@ class BufferedTrace:
     def create_plotable_data(self, X, Y):
         # fill potential gaps while creating the Y array.
         # The Y array ranges from 0 to 100.
-        Y = [[0] * BufferedTrace.win_size ] * len(X)
+        Y = [[0] * BufferedTrace.num_sets ] * len(X)
         for instr_id,val in self.window_values:
             self.Y[instr_id] = val
 
@@ -72,9 +73,10 @@ class Alias(GenericInstrument):
                  sharing 1/S of the total number of fetches.
             - 1: this set has attended all the fetches.
     """
-    def __init__(self, instr_counter, num_sets, verb=False):
+    def __init__(self, instr_counter, num_sets, asso, verb=False):
         super().__init__(instr_counter, verb=verb)
-        BufferedTrace.win_size = num_sets
+        BufferedTrace.win_size = num_sets * asso
+        BufferedTrace.num_sets = num_sets
         self.num_sets = num_sets
 
         # there is one alias trace for the whole cache, not
@@ -83,10 +85,11 @@ class Alias(GenericInstrument):
 
         self.plot_name_sufix  = '_plot-04-alias'
         self.plot_title       = 'Aliasing'
-        self.plot_subtitle    = 'homogeneous is better'
+        self.plot_subtitle    = 'uniform is better'
         self.plot_y_label     = 'Set Index'
+        self.plot_x_label     = 'Instruction'
         self.plot_color_text  = '#B87800FF' # dark orange
-        self.plot_color_boxes = '#ffa500F8' # almost opaque orange
+        self.plot_color_boxes = '#ef9500F8' # almost opaque orange
         self.plot_color_bg    = '#FFFFFF00' # transparent
         return
 
@@ -123,7 +126,7 @@ class Alias(GenericInstrument):
         transp_Y = [[0] * self.num_sets] * len(self.X)
         for instr_id,val in self.buffer_trace.window_values:
             transp_Y[instr_id] = val
-        self.buffer_trace = None # hint GC
+
 
         # create matrix filled with zeroes, of size transposed(transp_Y)
         self.Y = [[0] * len(transp_Y) # each row
@@ -172,27 +175,33 @@ class Alias(GenericInstrument):
         axes.invert_yaxis()
 
         # setup title
-        axes.set_title(f'{self.plot_title}: {basename}\n'
-                       f'({self.plot_subtitle})')
+        axes.set_title(f'{self.plot_title}: {basename}. '
+                       f'({self.plot_subtitle})', fontsize=10)
 
-        # setup Y ticks
+        # setup X ticks, labels, and grid
+        axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
+                         rotation=90)
+        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=20)
+        axes.set_xticks(x_ticks)
+        axes.set_xlabel(self.plot_x_label)
+        axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
+                  color='k', linewidth=0.5, zorder=2)
+
+        # setup Y ticks, labels, and grid
         axes.tick_params(axis='y', which='both', left=True, right=False,
                          labelleft=True, labelright=False,
                          colors=self.plot_color_text)
         set_indices = list(range(self.num_sets))
         y_ticks = self._create_up_to_n_ticks(set_indices, base=2, n=9)
         axes.set_yticks(y_ticks)
-
-        # setup Y label
         axes.yaxis.set_label_position('left')
+        # pad y axis so it aligns with the percentages of the other plots
         if y_ticks[-1] < 100:
             pad = 10
         if y_ticks[-1] < 10:
             pad = 16
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
                         labelpad=pad)
-
-        # setup Y grid
         axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
                   color=self.plot_color_boxes, linewidth=0.5, zorder=2)
         return

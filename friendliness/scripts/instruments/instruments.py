@@ -37,10 +37,11 @@ class Instruments:
         num_sets = cache_specs['size']//(cache_specs['asso']*\
                                          cache_specs['line'])
 
-        self.alias = Alias(self.ic, num_sets, verb=verb)
+        self.alias = Alias(self.ic, num_sets, cache_specs['asso'], verb=verb)
         self.alias.X = self.map.X
 
-        self.siu = SIUEvict(self.ic, num_sets, verb=verb)
+        self.siu = SIUEvict(self.ic, num_sets, cache_specs['asso'], self.alias,
+                            verb=verb)
         self.siu.X = self.map.X
 
         # list of all instruments for easy access.
@@ -52,31 +53,36 @@ class Instruments:
             tool.enabled = False
 
 
-    def plot(self, window, basename, out_format, dpi=800):
-        fig, map_axes = plt.subplots(
-            figsize=(self.plot_width, self.plot_height))
-        instr_axes = map_axes.twinx()
-        instr_axes.set_yticks([])
+    def plot(self, window, basename, out_format, dpi=300):
+
+
         # plot MAP only.
+        fig,map_axes = plt.subplots(
+            figsize=(self.plot_width, self.plot_height))
         print(f'    Plotting {self.map.plot_title}.')
         self.map.plot(map_axes, basename=basename, title=True)
         filename=f'{basename}{self.map.plot_name_sufix}.{out_format}'
         print(f'        {filename}')
-        fig.savefig(filename, dpi=dpi, bbox_inches='tight')
-        map_axes.cla()
+        fig.savefig(filename, dpi=dpi, bbox_inches='tight', pad_inches=0)
+
 
         # plot superposition of MAP and instrument.
+        fig, instr_axes = plt.subplots(
+            figsize=(self.plot_width, self.plot_height))
+        map_axes = instr_axes.twinx()
+        instr_axes.set_yticks([])
         for instr in self.inst_list:
             print(f'    Plotting {instr.plot_title}.')
-            # plot map
-            self.map.plot(map_axes)
+
             # plot instrument
             instr.plot(instr_axes, basename=basename)
+            # plot map
+            self.map.plot(map_axes)
 
             # save figure
             filename=f'{basename}{instr.plot_name_sufix}.{out_format}'
             print(f'        {filename}')
-            fig.savefig(filename, dpi=dpi, bbox_inches='tight')
+            fig.savefig(filename, dpi=dpi, bbox_inches='tight', pad_inches=0)
             map_axes.cla()
             instr_axes.cla()
 

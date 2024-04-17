@@ -34,8 +34,8 @@ class Map(GenericInstrument):
         self.plot_name_sufix = '_plot-00-map'
         self.plot_title = 'Memory Access Pattern'
         self.plot_subtitle = None
-        self.plot_y_label = 'Memory Space'
-        self.plot_x_label = 'Time'
+        self.plot_y_label = 'Memory Space [bytes]'
+        self.plot_x_label = 'Instruction'
         self.plot_min = None
         self.plot_max = None
         self.plot_color_text =  '#009900'
@@ -91,7 +91,7 @@ class Map(GenericInstrument):
             self.access_matrix[mapped_addr][mapped_time] = access_code
 
 
-    def plot(self, axes, zorder=1, basename='map', extent=(0,10,0,10), title=False):
+    def plot(self, axes, basename='map', extent=(0,10,0,10), title=False):
 
         # Memory Access Pattern color-map creation
         # threads_palette = [self.plot_color_read, self.plot_color_write]
@@ -120,7 +120,7 @@ class Map(GenericInstrument):
         # plot the trace
         extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, self.block_size-0.5)
         axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
-                    aspect='auto', zorder=zorder, extent=extent,
+                    aspect='auto', zorder=1, extent=extent,
                     vmin=-thr_count, vmax=thr_count)
 
         # setup title
@@ -128,18 +128,17 @@ class Map(GenericInstrument):
             title_string = f'{self.plot_title}: {basename}'
             if self.plot_subtitle != None:
                 title_string += f'\n({self.plot_subtitle})'
-            axes.set_title(title_string)
+            axes.set_title(title_string, fontsize=10)
 
 
-        # setup X axis
+        # setup X ticks, labels, and grid
+        axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
+                         rotation=90)
         x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=20)
         axes.set_xticks(x_ticks)
         axes.set_xlabel(self.plot_x_label)
-        axes.tick_params(axis='x', rotation=90)
-
-        # setup X grid
         axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
-                  color='k', linewidth=0.5, zorder=zorder+1)
+                  color='k', linewidth=0.5, zorder=2)
 
         # setup right Y axis
         axes.tick_params(axis='y', which='both', left=False, right=True,

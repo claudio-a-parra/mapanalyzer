@@ -57,8 +57,8 @@ class SIUEvict(GenericInstrument):
         # END_OLD
 
         self.plot_name_sufix = '_plot-05-siu'
-        self.plot_title      = 'Still-in-Use Block Evictions'
-        self.plot_subtitle   = 'lower count is better'
+        self.plot_title      = 'SIU Evictions'
+        self.plot_subtitle   = 'fewer is better'
         self.plot_y_label    = 'Set Index'
         self.plot_x_label    = 'Instruction'
         self.plot_color_text = '#6122AA'   # dark magenta

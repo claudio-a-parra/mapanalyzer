@@ -72,7 +72,7 @@ class Locality(GenericInstrument):
 
         self.plot_name_sufix  = '_plot-01-locality'
         self.plot_title       = 'Locality'
-        self.plot_subtitle    = 'Higher is better'
+        self.plot_subtitle    = 'higher is better'
         self.plot_y_label     = 'Degree of locality [%]'
         self.plot_x_label     = 'Instruction'
         self.plot_color_text  = '#8B0E57FF' # fuchsia dark

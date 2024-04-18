@@ -159,7 +159,7 @@ class Alias(GenericInstrument):
         return extent
 
 
-    def plot(self, axes, basename='alias', extent=None, kind='linear'):
+    def plot(self, axes, basename='alias', extent=None, kind='log'):
         # create color shade
         colors = [self.plot_color_bg, self.plot_color_boxes]
         shade_cmap = mcolors.LinearSegmentedColormap.from_list(

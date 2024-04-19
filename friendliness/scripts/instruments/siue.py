@@ -124,7 +124,7 @@ class SIUEvict(GenericInstrument):
 
         X = [coor[0] for coor in self.SIUE]
         Y = [coor[1] for coor in self.SIUE]
-        # create plotable image with captured coordenates
+        # create plotable image with captured coordinates
         plotable_img = [[0] * len(self.X) for _ in range(self.num_sets)]
         for x,y in self.SIUE:
             plotable_img[y][x] = 1

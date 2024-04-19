@@ -2,6 +2,8 @@
 import sys
 from collections import deque
 from matplotlib.colors import ListedColormap
+from matplotlib.ticker import FuncFormatter #to make a custom tick formatter
+import humanize # to convert raw byte count to KiB, MiB...
 
 from .generic import GenericInstrument
 

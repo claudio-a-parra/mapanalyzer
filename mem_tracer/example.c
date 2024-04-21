@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "instr.h"
+#include "mem_trace.h"
 
 int N=512;
 int shared=0;
@@ -31,14 +31,14 @@ void *thread_work(void* tid){
 int main(void){
     pthread_mutex_init(&m,NULL);
 
-    instr_select_next_block();
+    mt_select_next_block();
     chunk = malloc(N * sizeof(double));
     if(!chunk){
         printf("allocation failed\n");
         return 1;
     }
 
-    instr_start_tracing();
+    mt_start_tracing();
 
     int id0=0, id1=1;
     pthread_t t0, t1;
@@ -48,7 +48,7 @@ int main(void){
     pthread_join(t0,NULL);
     pthread_join(t1,NULL);
 
-    instr_stop_tracing();
+    mt_stop_tracing();
 
     free((double *)chunk);
 

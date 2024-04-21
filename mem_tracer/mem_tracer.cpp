@@ -322,7 +322,7 @@ VOID action_start_tracing(THREADID threadid){
         error << "Block start: " << tracked_block.start << std::endl
                   << "Block size : " << tracked_block.size << std::endl;
         error << "ERROR: Cannot start tracing without having allocated "
-                  << "a block of memory. Did you call instr_select_next_block() "
+                  << "a block of memory. Did you call mt_select_next_block() "
                   << "before the malloc() that reserves the block that you want "
                   << "to trace?" << std::endl;
         PIN_ExitApplication(1);
@@ -389,13 +389,13 @@ VOID image_load(IMG img, VOID* v) {
     // after it.
 
     // Instrument the flag-functions present in the patient code.
-    // - inst_select_next_block
-    // - instr_start_tracing
-    // - instr_stop_tracing
+    // - mt_select_next_block
+    // - mt_start_tracing
+    // - mt_stop_tracing
     //
-    // Just before the function patient calls instr_select_next_block(),
+    // Just before the function patient calls mt_select_next_block(),
     // the pintool will call action_select_next_block().
-    RTN select_routine = RTN_FindByName(img, "instr_select_next_block");
+    RTN select_routine = RTN_FindByName(img, "mt_select_next_block");
     if (RTN_Valid(select_routine)) {
         RTN_Open(select_routine);
         RTN_InsertCall(select_routine,
@@ -404,9 +404,9 @@ VOID image_load(IMG img, VOID* v) {
                        IARG_END);
         RTN_Close(select_routine);
     }
-    // The same idea applies for patient's functions instr_start_tracing()
-    // and instr_stop_tracing().
-    RTN start_routine = RTN_FindByName(img, "instr_start_tracing");
+    // The same idea applies for patient's functions mt_start_tracing()
+    // and mt_stop_tracing().
+    RTN start_routine = RTN_FindByName(img, "mt_start_tracing");
     if (RTN_Valid(start_routine)) {
         RTN_Open(start_routine);
         RTN_InsertCall(start_routine,
@@ -417,7 +417,7 @@ VOID image_load(IMG img, VOID* v) {
                        IARG_END);
         RTN_Close(start_routine);
     }
-    RTN stop_routine = RTN_FindByName(img, "instr_stop_tracing");
+    RTN stop_routine = RTN_FindByName(img, "mt_stop_tracing");
     if (RTN_Valid(stop_routine)) {
         RTN_Open(stop_routine);
         RTN_InsertCall(stop_routine,
@@ -431,7 +431,7 @@ VOID image_load(IMG img, VOID* v) {
     // Note that this instrumentation happens for any malloc in the
     // patient code, but given the definitions of "malloc_before" and
     // "malloc_after", stuff only happens when the patient has
-    // previously called "instr_select_next_block".
+    // previously called "mt_select_next_block".
     RTN malloc_routine = RTN_FindByName(img, "malloc");
     if (RTN_Valid(malloc_routine)) {
         RTN_Open(malloc_routine);
@@ -454,7 +454,7 @@ VOID image_load(IMG img, VOID* v) {
         RTN_Close(malloc_routine);
     }
 
-    // In case the patient has not called "instr_stop_tracing", anyway
+    // In case the patient has not called "mt_stop_tracing", anyway
     // stop the tracing if patient code calls "free".
     RTN free_routine = RTN_FindByName(img, "free");
     if (RTN_Valid(free_routine)) {

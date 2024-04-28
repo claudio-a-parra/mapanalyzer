@@ -11,12 +11,13 @@ class Map(GenericInstrument):
     def __init__(self, instr_counter, mfmd, plot_w, plot_h, plot_max_res=2048,
                  verb=False):
         super().__init__(instr_counter, verb=verb)
-        # obtain mem_ap file metadata
+        # obtain map file metadata
         self.base_addr = mfmd[0]
         self.block_size = mfmd[1]
         self.thread_count = mfmd[2]
         self.event_count = mfmd[3]
         self.time_size = mfmd[4]
+        self.X = [i for i in range(self.time_size)] #new
 
         self.plot_width = plot_w
         self.plow_height = plot_h
@@ -56,10 +57,10 @@ class Map(GenericInstrument):
             return
 
         # add instruction to the correct spot in the timeline
-        if len(self.X) == 0:
-            for i in range(access.time):
-                self.X.append(i)
-        self.X.append(access.time)
+        # if len(self.X) == 0:
+        #     for i in range(access.time):
+        #         self.X.append(i)
+        # self.X.append(access.time)
 
         # negative: read access, positive: write access
         # abs value: thread ID + 1 (to leave 0 for no-op)

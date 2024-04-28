@@ -87,7 +87,7 @@ class MapFileReader:
                     self.thread_count = int(value, 10)
                 elif name == 'event-count':
                     self.event_count = int(value, 10)
-                elif name == 'max-qtime':
+                elif name == 'max-time':
                     self.time_size = int(value, 10) + 1
             except ValueError:
                 print(f"Invalid value for '{name}' in "

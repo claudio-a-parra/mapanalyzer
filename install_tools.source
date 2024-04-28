@@ -32,7 +32,7 @@ create_link(){
 
     # if there is no file called as the link to be created,
     # then just create it.
-    if [[ ! -f $lnk ]]; then
+    if [[ ! -f $lnk && ! -L $lnk && ! -d $lnk ]]; then
         ln -s $tool $lnk
         echo "$lnk -> $tool"
 
@@ -54,5 +54,4 @@ create_link(){
 create_var  PIN_ROOT        "$SCRIPT_DIR/pin"
 create_var  MEM_TRACER      "$SCRIPT_DIR/mem_tracer/obj-intel64/mem_tracer.so"
 create_link ~/bin/pin       "$SCRIPT_DIR/pin/pin"
-create_link ~/bin/traceplot "$SCRIPT_DIR/traceplot/traceplot.py"
 create_link ~/bin/friendliness "$SCRIPT_DIR/friendliness/scripts/main.py"

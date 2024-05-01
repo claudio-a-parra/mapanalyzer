@@ -15,12 +15,12 @@ create_var(){
     # print its previous value before exporting.
     local varname="$1"
     local varvalue="$2"
+    echo "$varname=$varvalue"
 
     if [[ "${!varname}" != $varvalue ]]; then
         if [[ -n "${!varname}" ]]; then
-            echo "[!] Overwriting current variable: $varname=${!varname}"
+            echo "[!] Overwriting current variable ($varname=${!varname})"
         fi
-        echo "$varname=$varvalue"
         eval "export $varname=$varvalue"
     fi
 }
@@ -29,22 +29,22 @@ create_link(){
     # create a link to a given binary.
     local lnk="$1"
     local tool="$2"
-
+    echo "$lnk -> $tool"
+	
     # if there is no file called as the link to be created,
     # then just create it.
     if [[ ! -f $lnk && ! -L $lnk && ! -d $lnk ]]; then
+		mkdir -p "$(dirname "$lnk")"
         ln -s $tool $lnk
-        echo "$lnk -> $tool"
 
     # if there is a file with that path, and it happens to
     # be a link, then check its target
     elif [[ -L $lnk ]]; then
         local rlk="$(readlink $lnk)"
         if [[ "$rlk" != "$tool" ]]; then
-            echo "[!] Overwriting current link: $lnk -> $rlk"
+            echo "[!] Overwriting current link ($lnk -> $rlk)"
             rm $lnk
             ln -s $tool $lnk
-            echo "$lnk -> $tool"
         fi
     else
         echo "[!]File $lnk exists, but it is NOT a link. Nothing done with it."
@@ -54,4 +54,7 @@ create_link(){
 create_var  PIN_ROOT        "$SCRIPT_DIR/pin"
 create_var  MEM_TRACER      "$SCRIPT_DIR/mem_tracer/obj-intel64/mem_tracer.so"
 create_link ~/bin/pin       "$SCRIPT_DIR/pin/pin"
-create_link ~/bin/friendliness "$SCRIPT_DIR/friendliness/scripts/main.py"
+create_link ~/bin/mapalyzer "$SCRIPT_DIR/mapalyzer/main.py"
+
+unset -f create_var
+unset -f create_link

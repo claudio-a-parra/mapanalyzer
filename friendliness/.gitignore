@@ -1,7 +1,0 @@
-**/__pycache__/*
-*.pyc
-*.png
-# teporary exclussions
-*.map
-*.conf
-.gitignore

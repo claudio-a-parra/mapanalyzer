@@ -54,8 +54,6 @@ class Instruments:
 
 
     def plot(self, basename, out_format, dpi=300):
-
-
         # plot MAP only.
         fig,map_axes = plt.subplots(
             figsize=(self.plot_width, self.plot_height))

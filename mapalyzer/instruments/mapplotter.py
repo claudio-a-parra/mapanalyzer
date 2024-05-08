@@ -37,7 +37,7 @@ class Map(GenericInstrument):
         self.plot_name_sufix = '_plot-00-map'
         self.plot_title = 'Memory Access Pattern'
         self.plot_subtitle = None
-        self.plot_y_label = 'Memory Space [bytes]'
+        self.plot_y_label = 'Space [bytes]'
         self.plot_x_label = 'Instruction'
         self.plot_min = None
         self.plot_max = None
@@ -148,7 +148,7 @@ class Map(GenericInstrument):
                          labelleft=False, labelright=True, colors=self.plot_color_text)
         axes.yaxis.set_label_position('right')
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
-                        labelpad=-15)
+                        labelpad=-10)
         y_ticks = [0, self.block_size-1]
         axes.set_yticks(y_ticks)
         axes.invert_yaxis()

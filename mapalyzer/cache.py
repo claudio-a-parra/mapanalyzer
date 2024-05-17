@@ -112,7 +112,7 @@ class Cache:
         self.line_size_bytes = int(specs['line'])
         self.associativity = int(specs['asso'])
 
-        self.clock = 0 # used for last recently used policy
+        self.clock = 0 # used for least recently used policy
         self.instr = instr # instruments
         self.af = AddressFormatter(specs)
         # compute the number of bits needed for byte addressing in the line,
@@ -129,19 +129,19 @@ class Cache:
 
     def access(self, access):
         """
-        Access 'n bytes' starting from address 'addr'. If this requires to access
-        multiple cache lines, then generate multiple accesses.
+        Access 'n bytes' starting from address 'addr'. If this requires to
+        access multiple cache lines, then generate multiple accesses.
         """
         # ignore Thread creation and destroying
         if access.event in ('Tc', 'Td'):
             return
 
-        # TODO: Do something with the other members of the access object:
-        # - (USED) addr: address of access
-        # - (USED) size: the number of bytes accessed
-        # - (USED) event: read or write event {'R', 'W'}
+        # Access object:
+        # - addr  : address of access
+        # - size  : the number of bytes accessed
+        # - event : read or write event {'R', 'W'}
         # - thread: the thread accessing data
-        # - time: the timestamp of the instruction.
+        # - time  : the timestamp of the instruction.
         addr = access.addr
         n_bytes = access.size
         self.instr.map.register_access(access)

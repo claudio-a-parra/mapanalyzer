@@ -108,11 +108,8 @@ class MapFileReader:
         return
 
     def get_metadata(self):
-        return (self.base_addr,
-                self.block_size,
-                self.thread_count,
-                self.event_count,
-                self.time_size)
+        return MapMetadata(self.base_addr, self.block_size, self.thread_count,
+                           self.event_count, self.time_size)
 
     def rewind(self):
         if self.file.closed:
@@ -172,3 +169,13 @@ class MapFileReader:
             sys.exit(1)
         addr = 0 if ev in ('Tc','Td') else self.base_addr + off
         return MemAccess(time, thr, ev, size, addr)
+
+class MapMetadata:
+    def __init__(self, base, mem, thrs, events, time):
+        self.base_addr = base
+        self.mem_size = mem
+        self.thread_count = thrs
+        self.event_count = events
+        self.time_size = time
+        return
+        

@@ -24,7 +24,8 @@ class Instruments:
         # Create other instruments and make them share their
         # X axis (for the plots)
         self.locality = Locality(self.ic, cache_specs['size'],
-                                 cache_specs['line'])
+                                 cache_specs['line'],
+                                 map_metadata)
         self.locality.X = self.map.X
 
         self.hit = Hit(self.ic, cache_specs['size'], verb=verb)

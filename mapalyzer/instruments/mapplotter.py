@@ -12,21 +12,21 @@ class Map(GenericInstrument):
                  verb=False):
         super().__init__(instr_counter, verb=verb)
         # obtain map file metadata
-        self.base_addr = mfmd[0]
-        self.block_size = mfmd[1]
-        self.thread_count = mfmd[2]
-        self.event_count = mfmd[3]
-        self.time_size = mfmd[4]
+        self.base_addr = mfmd.base_addr
+        self.mem_size = mfmd.mem_size
+        self.thread_count = mfmd.thread_count
+        self.event_count = mfmd.event_count
+        self.time_size = mfmd.time_size
         self.X = [i for i in range(self.time_size)] #new
 
         self.plot_width = plot_w
         self.plow_height = plot_h
         aspect_ratio = plot_w/plot_h
 
-        # if block_size or time_size are larger than the max resolution, keep
+        # if mem_size or time_size are larger than the max resolution, keep
         # diving them until they fit in a square of plot_max_res^2
-        ap_matrix_height = self.block_size
-        ap_matrix_height = self.block_size if self.block_size <= plot_max_res else plot_max_res
+        ap_matrix_height = self.mem_size
+        ap_matrix_height = self.mem_size if self.mem_size <= plot_max_res else plot_max_res
         ap_matrix_width = self.time_size if self.time_size <= plot_max_res else plot_max_res
 
         # cols: whole memory snapshot at a given instruction
@@ -75,7 +75,7 @@ class Map(GenericInstrument):
             time = access.time
 
             # get percentage (from first to last possible address or time)
-            max_real_addr = self.block_size - 1
+            max_real_addr = self.mem_size - 1
             max_real_time = self.time_size - 1
             propor_addr = addr / max_real_addr
             propor_time = time / max_real_time
@@ -118,10 +118,11 @@ class Map(GenericInstrument):
                          for i in range(thr_count)]
         write_palette = [ thr_palette[i%len(thr_palette)][1]
                           for i in range(thr_count)]
-        cmap = ListedColormap(list(reversed(read_palette)) + [thr_bg] + write_palette)
+        cmap = ListedColormap(list(reversed(read_palette)) + [thr_bg] +
+                              write_palette)
 
         # plot the trace
-        extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, self.block_size-0.5)
+        extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, self.mem_size-0.5)
         axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
                     aspect='auto', zorder=1, extent=extent,
                     vmin=-thr_count, vmax=thr_count)
@@ -137,7 +138,8 @@ class Map(GenericInstrument):
         # setup X ticks, labels, and grid
         axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
                          rotation=90)
-        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=20)
+        num_ticks = 61 #20 # DEBUG
+        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=num_ticks)
         axes.set_xticks(x_ticks)
         axes.set_xlabel(self.plot_x_label)
         axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
@@ -148,7 +150,13 @@ class Map(GenericInstrument):
                          labelleft=False, labelright=True, colors=self.plot_color_text)
         axes.yaxis.set_label_position('right')
         axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
-                        labelpad=-10)
-        y_ticks = [0, self.block_size-1]
+                        # labelpad=-10)
+                        ) # DEBUG
+        #y_ticks = [0, self.mem_size-1]
+        y_ticks = self._create_up_to_n_ticks(range(self.mem_size),
+                                             base=10, n=num_ticks) # DEBUG
         axes.set_yticks(y_ticks)
+        axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
+                  color='k', linewidth=0.5, zorder=2) # DEBUG
+
         axes.invert_yaxis()

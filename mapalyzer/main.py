@@ -4,37 +4,83 @@ import os # for file extension removal
 import argparse # to get command line arguments
 
 from map_file_reader import MapFileReader
-from address_formatter import log2, AddressFormatter
+from address_formatter import log2, AddrFmt
 from cache import Cache
-#from instruments import Instruments
-from instruments import Instruments
+from tools import Tools
 
 
-# Default cache configuration. typical Intel i7 L1d
-default_cache_specs = {
-    'line': ("Line size [bytes]", 64),
-    'asso': ("Associativity [lines]", 8),
-    'size': ("Total Cache size [bytes]" , 32768),
-    'arch': ("Architecture word size [bits]", 64)}
+class MemSpecs:
+    def __init__(self, arch=64, cache_size=32768, line_size=64, asso=8,
+                 fetch=1, write=2):
+        # Default typical Intel i7 L1d
+        self.arch = arch
+        self.cache_size = cache_size
+        self.line_size = line_size
+        self.asso = asso
+        self.fetch_cost = fetch
+        self.write_cost = write
+        self.set_derived_values()    
+        return
 
+    def set_derived_values(self):
+        self.num_sets = self.cache_size // (self.asso * self.line_size)
+        self.bits_set = log2(self.num_sets)
+        self.bits_off = log2(self.line_size)
+        self.bits_tag = self.arch - self.bits_set - self.bits_off
+        return
+    
+    def set_value(self, name, val):
+        key_map = {
+            'arch_size_bits'  : 'arch',
+            'cache_size_bytes': 'cache_size',
+            'line_size_bytes' : 'line_size',
+            'associativity'   : 'asso',
+            'fetch_cost'      : 'fetch_cost',
+            'writeback_cost'  : 'write_cost',
+        }
+        if name not in key_map:
+            print(f'[!] Invalid name {name}. Ignoring line.')
+            return
+        try:
+            int_val = int(val)
+        except ValueError as e:
+            print(f'[!] Invalid value ({val}) given to name "{name}". '
+                  'It must be integer. Ignoring.')
+            return
+        setattr(self, key_map[name], int_val)
+        self.set_derived_values()
+        return
 
-def get_cache_specs(specs, cache_filename=None):
-    file_to_spec_key_map = {
-        'line_size_bytes': 'line',
-        'associativity': 'asso',
-        'cache_size_bytes': 'size',
-        'arch_size_bits': 'arch'
-    }
-    def _complete_cache_specs(specs):
-        # missing parameters filled from default specs config
-        for key in specs:
-            if not type(specs[key]) == int:
-                specs[key] = specs[key][1]
+    def describe(self, ind=''):
+        print(f'{ind}Address size         : {self.arch} bits ('
+              f'tag:{self.bits_tag} | '
+              f'idx:{self.bits_set} | '
+              f'off:{self.bits_off})\n'
+              f'{ind}Cache size           : {self.cache_size} bytes\n'
+              f'{ind}Number of sets       : {self.num_sets}\n'
+              f'{ind}Line size            : {self.line_size} bytes\n'
+              f'{ind}Associativity        : {self.asso}-way\n'
+              f'{ind}Main Mem. Fetch cost : {self.fetch_cost} units\n'
+              f'{ind}Main Mem. Write cost : {self.write_cost} units'
+              )
+        return
 
+class PlotMetadata:
+    def __init__(self, width, height, resolution, dpi, format, prefix):
+        self.width = width
+        self.height = height
+        self.res = resolution
+        self.dpi = dpi
+        self.format = format
+        self.prefix = prefix
+        return
+
+def get_cache_specs(cache_filename=None):
+    specs = MemSpecs()
+    
     # if no file was given
     if cache_filename == None:
-        _complete_cache_specs(specs)
-        return
+        return specs
 
     try:
         with open(cache_filename, 'r') as cache_config_file:
@@ -42,42 +88,29 @@ def get_cache_specs(specs, cache_filename=None):
                 # skip empty or comment
                 if line == '' or line[0] == '#':
                     continue
+                # get rid of trailing comments
+                content_comment = line.split('#')
+                line = content_comment[0]
+
+                # parse <name>:<value>
                 key_val_arr = line.split(':')
 
                 # ignore lines not like <name>:<value>
                 if len(key_val_arr) != 2:
-                    print(f"File {cache_filename}: Invalid line:\n"
-                          ">>>>{line}\n"
-                          "Ignoring.")
+                    print(f'[!] File {cache_filename}: Invalid line, ignoring:\n'
+                          '    >>>>{line}')
                     continue
                 name,val = key_val_arr[0].strip(), key_val_arr[1].strip()
-
-                # ignore weird names
-                if name not in file_to_spec_key_map:
-                    print(f"[!] File {cache_filename}: Unknown parameter name:\n"
-                          f">>>>{line}\n"
-                          "Ignoring.")
-                    continue
-
-                # potential good 'name:value' found
-                key = file_to_spec_key_map[name]
-                default_val = specs[key][1]
-                try:
-                    specs[key] = int(val)
-                except ValueError:
-                    print(f"[!] Incorrect value in redirected input file:\n"
-                          f">>>>{file_user_input}\n"
-                          f"Using default value ({default_val}).")
-                    specs[key] = int(default_val)
+                specs.set_value(name, val)
     except FileNotFoundError:
         print(f"[!] File {cache_filename} does not exist. Using default "
               "configuration.")
-    _complete_cache_specs(specs)
+    return specs
 
 
-def run_simulation(map_reader, instruments, cache_system, verb=False):
-    ic = instruments.ic
-    _,_,byte = cache_system.af.split(map_reader.base_addr)
+def run_simulation(map_reader, cache, tools):
+    ic = tools.ic
+    _,_,byte = AddrFmt.split(map_reader.base_addr)
     if byte != 0:
         print(f'[!] Warning: Memory block is not cache aligned. '
               f'First byte is {byte} bytes into the cache line.')
@@ -85,61 +118,75 @@ def run_simulation(map_reader, instruments, cache_system, verb=False):
     tot_instr = map_reader.time_size-1
     for access in map_reader:
         ic.counter = access.time
+        # print progress
         print('\033[2K\r    '
               f'{(100*access.time/tot_instr):5.1f}% '
               f'{access.time:8d}/{tot_instr}'
               ,end='')
         sys.stdout.flush()
-        cache_system.access(access)
+        # perform memory access
+        cache.access(access)
     print()
-    instruments.disable_all()
+    tools.disable_all()
     ic.step()
-    cache_system.flush()
-
+    cache.flush()
     return
 
 
 def command_line_args_parser():
-    synopsis = ("MAPalyzer, a tool to study the cache friendliness of "
-                "memory access patterns.")
-    cache_conf = ("cache.conf:\n"
-                  "  The cache file file must have this format:\n"
-                  "\n"
-                  "      # Comments start with pound sign\n"
-                  "      line_size_bytes  : <value> # default: 16\n"
-                  "      associativity    : <value> # default: 2\n"
-                  "      cache_size_bytes : <value> # default: 256\n"
-                  "      arch_size_bits   : <value> # default: 16")
-    note = ("note:\n"
-            "  If running with verbose mode on, all addresses, set indices,\n"
-            "  line offsets, and tags are in hexadecimal unless explicitly\n"
-            "  indicated otherwise. Clocks and other numbers are decimal.")
-    signature = ("By Claudio A. Parra. 2024.\n"
-                 "parraca@uci.edu")
+    ms = MemSpecs()
+    synopsis = ('MAPalyzer, a tool to study the cache friendliness of '
+                'memory access patterns.')
+    cache_conf = ('cache.conf:\n'
+                  '  The cache file file must have this format:\n'
+                  '\n'
+                  '    # Comments start with pound sign\n'
+                  f'   line_size_bytes     : <value> # default: {ms.line_size}\n'
+                  f'   associativity       : <value> # default: {ms.asso}\n'
+                  f'   cache_size_bytes    : <value> # default: {ms.cache_size}\n'
+                  f'   arch_size_bits      : <value> # default: {ms.arch}\n'
+                  f'   fetch_time_cost     : <value> # default: {ms.fetch_cost}\n'
+                  f'   writeback_time_cost : <value> # default: {ms.write_cost}\n')
+    signature = ('By Claudio A. Parra. 2024.\n'
+                 'parraca@uci.edu')
 
     parser = argparse.ArgumentParser(
         description=synopsis+'\n\n',
-        epilog=cache_conf+'\n\n'+note+'\n\n'+signature,
+        epilog=cache_conf+'\n\n'+signature,
         formatter_class=argparse.RawTextHelpFormatter)
-    #parser = argparse.ArgumentParser(description=__doc__
+    
     # Adding arguments
     parser.add_argument(
         'input_file', metavar='input_file.map', type=str,
-        help='Path of the input Memory Access Pattern file.')
+        help='Path of the input Memory Access Pattern file.'
+    )
+    
     parser.add_argument(
         '-c', '--cache', metavar='cache.conf', dest='cache', type=str,
         default=None,
-        help=("File describing the shape of the cache. See "
-              "'cache.conf' section."))
+        help='File describing the cache. See "cache.conf" section.'
+    )
+    
     parser.add_argument(
-        '-px', '--plot-x', dest='px', type=int, default=8,
-        help="Width of the plots.")
+        '-px', '--plot-x', dest='px', type=float, default=8,
+        help="Width of the plots."
+    )
+    
     parser.add_argument(
-        '-py', '--plot-y', dest='py', type=int, default=4,
-        help="Height of the plots.")
+        '-py', '--plot-y', dest='py', type=float, default=4,
+        help="Height of the plots."
+    )
+    
+    parser.add_argument(
+        '-dpi', '--dpi', dest='dpi', type=int, default=300,
+        help='Choose the DPI of the resulting plots.'
+    )
+    
     parser.add_argument(
         '-f', '--format', dest='format', choices=['png', 'pdf'], default='png',
-        help='Choose the output format of the plots.')
+        help='Choose the output format of the plots.'
+    )
+    
     def check_res(val):
         min_res = 4
         max_res = 2048
@@ -153,11 +200,9 @@ def command_line_args_parser():
             return def_res
     parser.add_argument(
         '-r', '--resolution', dest='resolution', type=check_res, default=512,
-        help=('Resolution of the Memory Access Pattern plot (value between '
-              '4 and 2048).'))
-    parser.add_argument(
-        '-v', '--verbose', dest='verbosity', action="store_true",
-        help="Print all the fun stuff.")
+        help=('Maximum resolution of the Memory Access Pattern grid (value '
+              'between 4 and 2048).')
+    )
 
     args = parser.parse_args()
     return args
@@ -165,30 +210,29 @@ def command_line_args_parser():
     
 
 def main():
-    global default_cache_specs
-    cache_specs = default_cache_specs
     args = command_line_args_parser()
 
     print(f'Reading cache parameters: {args.cache}')
-    get_cache_specs(cache_specs, cache_filename=args.cache)
-
-    print(f'Creating MAP Reader, Instruments, and Cache System.')
-    map_reader = MapFileReader(args.input_file, verb=args.verbosity)
+    cache_specs = get_cache_specs(cache_filename=args.cache)
+    AddrFmt.init(cache_specs)
+    
+    plot_metadata = PlotMetadata(
+        args.px, args.py, args.resolution, args.dpi, args.format,
+        os.path.basename(os.path.splitext(args.input_file)[0])
+    )
+    
+    print(f'Creating MAP Reader, Memory System, and Tools.')
+    map_reader = MapFileReader(args.input_file)
     map_metadata = map_reader.get_metadata()
-    instruments = Instruments(cache_specs, map_metadata,
-                              args.px, args.py, args.resolution,
-                              verb=args.verbosity)
-    # Debug: set individual instruments verbosity
-    # instruments.siu.verb = True
-    # instruments.alias.verb = True
-    cache_system = Cache(cache_specs, instr=instruments)
-    cache_system.describe_cache()
+    tools = Tools(cache_specs, map_metadata, plot_metadata)
+    cache = Cache(cache_specs, tools=tools)
+    cache.describe_cache()
+    
     print(f'Tracing Memory Access Pattern: {args.input_file}')
-    run_simulation(map_reader, instruments, cache_system, verb=args.verbosity)
+    run_simulation(map_reader, cache, tools)
 
-    print(f'Plotting Results ({args.format})')
-    prefix = os.path.basename(os.path.splitext(args.input_file)[0])
-    instruments.plot(prefix, args.format)
+    print(f'Plotting Results ({plot_metadata.format})')
+    tools.plot()
 
     print('Done')
 

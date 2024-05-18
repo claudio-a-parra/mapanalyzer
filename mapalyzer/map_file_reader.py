@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sys
 
 class MemAccess:
@@ -27,10 +26,19 @@ class MemAccess:
                 f'siz:{self.size}')
 
 
+class MapMetadata:
+    def __init__(self, base, mem, thrs, events, time):
+        self.base_addr = base
+        self.mem_size = mem
+        self.thread_count = thrs
+        self.event_count = events
+        self.time_size = time
+        return
+        
+
 class MapFileReader:
     """iterates over the map file, reading one register at the time."""
-    def __init__(self, file_path, verb=False):
-        self.verb = verb
+    def __init__(self, file_path):
         self.file_path = file_path
         self.base_addr = -1
         self.block_size = -1
@@ -152,8 +160,6 @@ class MapFileReader:
             break
 
         line = line.strip()
-        if self.verb:
-            print(f'line: {line}')
         try:
             time,thr,ev,size,off = line.split(',')
         except ValueError:
@@ -169,13 +175,3 @@ class MapFileReader:
             sys.exit(1)
         addr = 0 if ev in ('Tc','Td') else self.base_addr + off
         return MemAccess(time, thr, ev, size, addr)
-
-class MapMetadata:
-    def __init__(self, base, mem, thrs, events, time):
-        self.base_addr = base
-        self.mem_size = mem
-        self.thread_count = thrs
-        self.event_count = events
-        self.time_size = time
-        return
-        

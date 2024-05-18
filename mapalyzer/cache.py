@@ -1,141 +1,70 @@
 #!/usr/bin/env python3
-from address_formatter import log2, AddressFormatter
+from collections import deque
+from address_formatter import log2, AddrFmt
 
-class Line:
-    def __init__(self, line_size_bytes, tag=None, last_time_used=0):
-        self.tag = tag # line tag
-        self.accessed_bytes = [False] * line_size_bytes # accessed bytes
-        self.last_time_used = last_time_used # last time the line was used
-        # the last (offset,n_bytes) of accessed bytes. Used to highlight
-        # the last access.
-        self.last_accessed_bytes = (0, 0)
-    def access(self, offset, n_bytes, clock):
-        """access n bytes in this line starting from offset."""
+class Block:
+    def __init__(self, block_size, tag=None, dirty=False):
+        self.tag = tag
+        self.dirty = dirty
+        self.bytes = [False] * block_size # accessed bytes
+        
+    def access(self, offset, n_bytes, write=False):
+        """access n bytes in this bloc starting from offset."""
         # Raise an exception if attempting to access bytes passed the end
-        # of the cache line
-        if offset + n_bytes > len(self.accessed_bytes):
+        # of the block
+        if offset + n_bytes > len(self.bytes):
             raise ValueError("trying to access more bytes than the ones "
-                             "contained in a cache line")
+                             "contained in a cache block")
             exit(1)
-        # Mark bytes as accessed and timestamp
+        # Mark bytes as accessed
         if n_bytes > 0:
-            self.last_accessed_bytes = (offset, n_bytes)
-            self.accessed_bytes[offset:offset+n_bytes] = [True] * n_bytes
-            self.last_time_used = clock
+            self.bytes[offset:offset+n_bytes] = [True] * n_bytes
+            if write:
+                self.dirty = True
 
     def count_accessed(self):
-        return self.accessed_bytes.count(True)
-
-
+        return self.bytes.count(True)
 
 
 class Set:
-    def __init__(self, associativity, line_size_bytes, set_index, instr=None):
+    def __init__(self, associativity):
         self.associativity = int(associativity)
-        self.line_size_bytes = int(line_size_bytes)
-        self.set_index = int(set_index)
-        self.lines = [Line(line_size_bytes) for i in range(associativity)]
-        self.instr=instr # instruments
+        self.lines = deque()
 
-    def access(self, thr, instr_id, tag, offset, n_bytes, clock):
-        """Find the Line in this Set that contains a given tag, and access
-        n bytes from it. Handle cache misses. Error if trying to access
-        bytes outside of the selected line"""
-        # find line
-        index, line = None, None
-        for i,l in enumerate(self.lines):
-            if l.tag == tag:
-                index,line = i,l
-                break;
+    def push_block(self, block) -> Block:
+        """push a block to this set. If the set is full, return the evicting
+        block, otherwise return None"""
+        self.lines.appendleft(block)
+        if len(self.lines) < self.associativity:
+            return None
+        return self.lines.pop()
 
-        # Handle a possible cache miss.
-        if line == None: # cache miss
-            self.instr.hit.register(thr, delta_miss=1)
-            line = self.lru_line()
-            self.evict(line)
-            self.fetch(line, tag)
-        else: # cache hit
-            self.instr.hit.register(thr, delta_hit=1)
-
-        # Now the cache line is valid. Access data, but pay attention to
-        # how many bytes are freshly accessed, as these will count towards
-        # byte usage.
-        before_access = line.count_accessed()
-        line.access(offset, n_bytes, clock)
-        after_access = line.count_accessed()
-        if after_access > before_access:
-            new_access = after_access - before_access
-            self.instr.usage.register(delta_access=new_access)
-
-    def lru_line(self):
-        """return the least recently used line"""
-        oldest_line = self.lines[0]
-        for l in self.lines[1:]:
-            if l.last_time_used < oldest_line.last_time_used:
-               oldest_line = l
-        return oldest_line
-
-    def evict(self, line):
-        if line.tag == None:
-            return
-        self.instr.siu.register('evict', line.tag, self.set_index)
-        # these bytes are leaving the cache, so they are negative
-        self.instr.usage.register(delta_access=-line.count_accessed(),
-                                  delta_valid=-self.line_size_bytes)
-        # imagine that here you write the block back to memory...
-        # and now reset the line's access count and tag
-        line.accessed_bytes = [False] * len(line.accessed_bytes)
-        line.tag = None
-        line.last_time_used = 0
+    def touch_block(self, block):
+        """bring some block in the set to the beginning of the queue,
+        making it the "most recently used" one."""
+        self.lines.remove(block)
+        self.lines.appendleft(block)
         return
 
-    def fetch(self, line, tag):
-        self.instr.siu.register('fetch', tag, self.set_index)
-        self.instr.alias.register(tag, self.set_index)
-        self.instr.usage.register(delta_valid=self.line_size_bytes)
-        # imagine that here you bring the data... and now you mark the tag
-        line.tag = tag
-        return
-
-    def flush(self):
-        for l in self.lines:
-            self.evict(l)
-
-
-
+    def pop_lru_block(self):
+        """remove the least recently used block, or None if set is empty"""
+        if len(self.lines) == 0:
+            return None
+        return self.lines.pop()
+    
 
 class Cache:
-    def __init__(self, specs, instr=None):
-        # arch_size_bits, cache_size_bytes,line_size_bytes, associativity
-        self.arch_size_bits = int(specs['arch'])
-        self.cache_size_bytes = int(specs['size'])
-        self.line_size_bytes = int(specs['line'])
-        self.associativity = int(specs['asso'])
-
-        self.clock = 0 # used for least recently used policy
-        self.instr = instr # instruments
-        self.af = AddressFormatter(specs)
-        # compute the number of bits needed for byte addressing in the line,
-        # set selection, and line-tag
-        self.offset_bits = log2(self.line_size_bytes)
-        self.num_sets = self.cache_size_bytes// \
-            (self.associativity*self.line_size_bytes)
-        self.index_bits = log2(self.num_sets)
-        self.tag_bits = self.arch_size_bits - self.index_bits - self.offset_bits
-
-        self.sets = [Set(self.associativity, self.line_size_bytes,
-                         set_index=i, instr=self.instr)
-                     for i in range(self.num_sets)] # the array of sets
+    def __init__(self, specs, tools=None):
+        # .arch .cache_size .line_size .asso
+        self.sp = specs
+        self.tools = tools
+        
+        self.blocks_in_cache = {}
+        self.sets = [Set(self.sp.asso) for _ in range(self.sp.num_sets)]
 
     def access(self, access):
-        """
-        Access 'n bytes' starting from address 'addr'. If this requires to
-        access multiple cache lines, then generate multiple accesses.
-        """
-        # ignore Thread creation and destroying
-        if access.event in ('Tc', 'Td'):
-            return
-
+        """ Access 'n bytes' starting from address 'addr'. If this requires to
+        access multiple cache lines, then generate multiple accesses."""
         # Access object:
         # - addr  : address of access
         # - size  : the number of bytes accessed
@@ -144,94 +73,191 @@ class Cache:
         # - time  : the timestamp of the instruction.
         addr = access.addr
         n_bytes = access.size
-        self.instr.map.register_access(access)
-        self.instr.locality.register_access(access)
+        self.tools.map.access(access)
+        self.tools.locality.access(access)
 
-        # the potentially many lines are all accessed at the same time (cache.clock)
-        self.clock += 1
-        if addr.bit_length() > self.arch_size_bits:
+        # check correct bit_length
+        if addr.bit_length() > self.sp.arch:
             raise ValueError("Error: Access issued to address larger than"
                              " the one defined for this cache.")
             exit(1)
+
+        # access the potentially many lines
         while n_bytes > 0:
-            v_tag, index, offset = self.af.split(addr)
+            v_tag, set_index, offset = AddrFmt.split(addr)
             # TODO: implement TLB and physical addresses
             p_tag = v_tag
 
             # handle multi-line accesses
-            if n_bytes > (self.line_size_bytes - offset):
-                this_line_n_bytes = self.line_size_bytes - offset
+            if n_bytes > (self.sp.line_size - offset):
+                this_block_n_bytes = self.sp.line_size - offset
             else:
-                this_line_n_bytes = n_bytes
+                this_block_n_bytes = n_bytes
 
-            # access this single line
-            self.sets[index].access(access.thread, access.time,
-                                    p_tag, offset, this_line_n_bytes, self.clock)
+            # access this_block
+            writing = (access.event == 'W')
+            if (p_tag,set_index) not in self.blocks_in_cache:
+                fetched_block = Block(self.sp.line_size, tag=p_tag,
+                                      dirty=writing)
+                self.blocks_in_cache[(p_tag,set_index)] = fetched_block
+                evicted_block = self.sets[set_index].push_block(fetched_block)
+                #self.tools.hitmiss.miss()
+                #self.tools.ram.read()
+                #self.tools.alias.fetch()
+                #self.tools.siue.fetch()
+                #self.tools.usage.update()
+                if evicted_block != None:
+                    pass
+                    #self.tools.usage.update()
+                    if evicted_block.dirty:
+                        pass
+                        #self.tools.ram.write()
+            else:
+                resident_block = self.blocks_in_cache[(p_tag,set_index)]
+                resident_block.access(offset, this_block_n_bytes, write=writing)
+                self.sets[set_index].touch_block(resident_block)
+                #self.tools.hitmiss.hit()
+                #self.tools.usage.update()
 
             # update address and reminding bytes to read for a potential new loop
-            addr += this_line_n_bytes
-            n_bytes -= this_line_n_bytes
+            addr += this_block_n_bytes
+            n_bytes -= this_block_n_bytes
 
     def flush(self):
         """evict all cache lines"""
         for s in self.sets:
-            s.flush()
-
-    def reset_clock(self):
-        self.clock = 0
+            evicted_block = s.pop_lru_block()
+            while evicted_block != None:
+                pass
+                #self.tools.usage.update()
+                if evicted_block.dirty:
+                    pass
+                    #self.tools.ram.write()
+                evicted_block = s.pop_lru_block()
+        return
 
     def describe_cache(self):
-        print(f"    Address size  : {self.arch_size_bits} bits")
-        print(f"    Cache size    : {self.cache_size_bytes} bytes")
-        print(f"    Number of sets: {self.num_sets}")
-        print(f"    Associativity : {self.associativity} lines")
-        print(f"    Line size     : {self.line_size_bytes} bytes")
-        print(f"    Tag size      : {self.tag_bits} bits")
+        self.sp.describe(ind='    ')
 
 
-    def dump(self, show_last=True):
-        """print a representation of all cache sets and their content"""
+    # def dump(self, show_last=True):
+    #     """print a representation of all cache sets and their content"""
 
-        # invalid, valid, accessed, and 'right-now-accessing' bytes
-        # For copy/paste: ░ ▒ ▓ █ ← ⇐ ─
-        inv_b, val_b, acc_b, now_b = ' ', '░', '▒', '█'
+    #     # invalid, valid, accessed, and 'right-now-accessing' bytes
+    #     # For copy/paste: ░ ▒ ▓ █ ← ⇐ ─
+    #     inv_b, val_b, acc_b, now_b = ' ', '░', '▒', '█'
 
-        set_label_width = len(hex(self.num_sets)[2:])
-        line_label_width = len(hex(self.associativity)[2:])
-        padding = (self.tag_bits + 3) // 4
+    #     set_label_width = len(hex(self.sp.num_sets)[2:])
+    #     line_label_width = len(hex(self.sp.asso)[2:])
+    #     padding = (self.tag_bits + 3) // 4
 
-        # for each set in the cache
-        for i,s in enumerate(self.sets):
-            i_hex = hex(i)[2:]
-            set_label = f"s{i_hex.zfill(set_label_width)} "
-            no_set_label = ' ' * len(set_label)
-            # for each line in the set
-            for j,l in enumerate(s.lines):
-                j_hex = hex(j)[2:]
-                last_access = l.last_time_used
+    #     # for each set in the cache
+    #     for i,s in enumerate(self.sets):
+    #         i_hex = hex(i)[2:]
+    #         set_label = f"s{i_hex.zfill(set_label_width)} "
+    #         no_set_label = ' ' * len(set_label)
+    #         # for each line in the set
+    #         for j,l in enumerate(s.lines):
+    #             j_hex = hex(j)[2:]
+    #             last_access = l.last_time_used
 
-                # create line label (lX)
-                line_label = f'l{j_hex.zfill(line_label_width)} '
+    #             # create line label (lX)
+    #             line_label = f'l{j_hex.zfill(line_label_width)} '
 
-                arrow = ''
-                if l.tag == None: # if it is an invalid line:
-                    tag_label = ' ' * padding
-                    data = inv_b * self.line_size_bytes
-                else: # if this is a valid line
-                    tag_label = hex(l.tag)[2:].zfill(padding)
-                    line = [acc_b if b else val_b
-                            for b in l.accessed_bytes]
-                    # if this line was just accessed, highlight it
-                    if last_access == self.clock and show_last:
-                        arrow = ' <───'
-                        lo,lb = l.last_accessed_bytes
-                        line[lo:lo+lb] = now_b * lb
-                    data = ''.join(line)
-                # print line
-                print(f"{set_label}{line_label}{data} "
-                      f"tag:{tag_label} acc:{last_access}{arrow}")
-                # invisible set label for next lines in the same set
-                set_label = no_set_label
-            # skip one line for the next set
-            if i+1 < self.num_sets:
-                print()
+    #             arrow = ''
+    #             if l.tag == None: # if it is an invalid line:
+    #                 tag_label = ' ' * padding
+    #                 data = inv_b * self.line_size_bytes
+    #             else: # if this is a valid line
+    #                 tag_label = hex(l.tag)[2:].zfill(padding)
+    #                 line = [acc_b if b else val_b
+    #                         for b in l.accessed_bytes]
+    #                 # if this line was just accessed, highlight it
+    #                 if last_access == self.clock and show_last:
+    #                     arrow = ' <───'
+    #                     lo,lb = l.last_access
+    #                     line[lo:lo+lb] = now_b * lb
+    #                 data = ''.join(line)
+    #             # print line
+    #             print(f"{set_label}{line_label}{data} "
+    #                   f"tag:{tag_label} acc:{last_access}{arrow}")
+    #             # invisible set label for next lines in the same set
+    #             set_label = no_set_label
+    #         # skip one line for the next set
+    #         if i+1 < self.sp.num_sets:
+    #             print()
+
+
+
+
+
+
+
+
+
+# class Line:   
+    # def access(self, thr, instr_id, tag, offset, n_bytes):
+    #     """Find the Line in this Set that contains a given tag, and access
+    #     n bytes from it. Handle cache misses. Error if trying to access
+    #     bytes outside of the selected line"""
+    #     # find line
+    #     index, line = None, None
+    #     for i,l in enumerate(self.lines):
+    #         if l.tag == tag:
+    #             index,line = i,l
+    #             break;
+
+    #     # Handle a possible cache miss.
+    #     if line == None: # cache miss
+    #         self.instr.hit.register(thr, delta_miss=1)
+    #         line = self.lru_line()
+    #         self.evict(line)
+    #         self.fetch(line, tag)
+    #     else: # cache hit
+    #         self.instr.hit.register(thr, delta_hit=1)
+
+    #     # Now the cache line is valid. Access data, but pay attention to
+    #     # how many bytes are freshly accessed, as these will count towards
+    #     # byte usage.
+    #     before_access = line.count_accessed()
+    #     line.access(offset, n_bytes, clock)
+    #     after_access = line.count_accessed()
+    #     if after_access > before_access:
+    #         new_access = after_access - before_access
+    #         self.instr.usage.register(delta_access=new_access)
+
+    # def lru_line(self):
+    #     """return the least recently used line"""
+    #     oldest_line = self.lines[0]
+    #     for l in self.lines[1:]:
+    #         if l.last_time_used < oldest_line.last_time_used:
+    #            oldest_line = l
+    #     return oldest_line
+
+    # def evict(self, line):
+    #     if line.tag == None:
+    #         return
+    #     self.instr.siu.register('evict', line.tag, self.set_index)
+    #     # these bytes are leaving the cache, so they are negative
+    #     self.instr.usage.register(delta_access=-line.count_accessed(),
+    #                               delta_valid=-self.line_size_bytes)
+    #     # imagine that here you write the block back to memory...
+    #     # and now reset the line's access count and tag
+    #     line.accessed_bytes = [False] * len(line.accessed_bytes)
+    #     line.tag = None
+    #     line.last_time_used = 0
+    #     return
+
+    # def fetch(self, line, tag):
+    #     self.instr.siu.register('fetch', tag, self.set_index)
+    #     self.instr.alias.register(tag, self.set_index)
+    #     self.instr.usage.register(delta_valid=self.line_size_bytes)
+    #     # imagine that here you bring the data... and now you mark the tag
+    #     line.tag = tag
+    #     return
+
+    # def flush(self):
+    #     for l in self.lines:
+    #         self.evict(l)
+
+

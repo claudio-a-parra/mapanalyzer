@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 class InstrCounter:
     """Instruction Counter"""
     def __init__(self):

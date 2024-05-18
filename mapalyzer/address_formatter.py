@@ -3,48 +3,47 @@
 def log2(x):
     return x.bit_length() - 1
 
-class AddressFormatter:
-    def __init__(self, specs):
-        self.arch_size_bits = int(specs['arch'])
-        line_size_bytes = int(specs['line'])
-        cache_size_bytes = int(specs['size'])
-        associativity = int(specs['asso'])
+class AddrFmt:
+    sp = None
+    max_tag = None
+    max_index = None
+    max_offset = None
 
-        self.offset_bits = int(log2(line_size_bytes))
-        self.index_bits = int(log2(
-            cache_size_bytes//(associativity*line_size_bytes)))
-        self.tag_bits = int(
-            self.arch_size_bits - self.index_bits - self.offset_bits)
+    @classmethod
+    def init(cls, specs):
+        AddrFmt.sp = specs
+        AddrFmt.max_tag = 2**cls.sp.bits_tag - 1
+        AddrFmt.max_index = 2**cls.sp.bits_set - 1
+        AddrFmt.max_offset = 2**cls.sp.bits_off - 1
 
-        self.max_tag = 2**self.tag_bits - 1
-        self.max_index = 2**self.index_bits - 1
-        self.max_offset = 2**self.offset_bits - 1
-
-    def format_addr(self, address):
-        tag, index, offset = self.split(address)
+    @classmethod
+    def format_addr(cls, address):
+        tag, index, offset = cls.split(address)
         padded_bin = \
-            "|T:"  + self.pad(tag,    2, self.max_tag)  +\
-            "| I:" + self.pad(index,  2, self.max_index) +\
-            "| O:" + self.pad(offset, 2, self.max_offset)+\
+            "|T:"  + cls.pad(tag,    2, cls.max_tag)  +\
+            "| I:" + cls.pad(index,  2, cls.max_index) +\
+            "| O:" + cls.pad(offset, 2, cls.max_offset)+\
             "|"
         padded_hex = \
-            "|T:"  + self.pad(tag,    16, self.max_tag)  +\
-            "| I:" + self.pad(index,  16, self.max_index) +\
-            "| O:" + self.pad(offset, 16, self.max_offset)+\
+            "|T:"  + cls.pad(tag,    16, cls.max_tag)  +\
+            "| I:" + cls.pad(index,  16, cls.max_index) +\
+            "| O:" + cls.pad(offset, 16, cls.max_offset)+\
             "|"
         return ("bin:"+padded_bin, "hex:"+padded_hex)
 
-    def split(self, address):
+    @classmethod
+    def split(cls, address):
         # print(f"split: addr:{address}")
-        offset_mask = (1 << self.offset_bits) - 1
+        offset_mask = (1 << cls.sp.bits_off) - 1
         offset = address & offset_mask
-        index_mask = (1 << self.index_bits) - 1
-        index = (address >> self.offset_bits) & index_mask
-        tag = address >> (self.index_bits + self.offset_bits)
+        index_mask = (1 << cls.sp.bits_set) - 1
+        index = (address >> cls.sp.bits_off) & index_mask
+        tag = address >> (cls.sp.bits_set + cls.sp.bits_off)
         # print(f"split: t:{tag} i:{index} o:{offset}")
         return tag, index, offset
 
-    def pad(self, number, base, max_val):
+    @classmethod
+    def pad(cls, number, base, max_val):
         group_width = 4
         if base == 2:
             conv_number = bin(number)[2:]

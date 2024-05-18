@@ -5,23 +5,19 @@ from matplotlib.colors import ListedColormap
 from matplotlib.ticker import FuncFormatter #to make a custom tick formatter
 import humanize # to convert raw byte count to KiB, MiB...
 
-from .generic import GenericInstrument
+from .generic import create_up_to_n_ticks
 
-class Map(GenericInstrument):
-    def __init__(self, instr_counter, mfmd, plot_w, plot_h, plot_max_res=2048,
+class Map:
+    def __init__(self, instr_counter, map_metadata, plot_max_res=2048,
                  verb=False):
-        super().__init__(instr_counter, verb=verb)
         # obtain map file metadata
-        self.base_addr = mfmd.base_addr
-        self.mem_size = mfmd.mem_size
-        self.thread_count = mfmd.thread_count
-        self.event_count = mfmd.event_count
-        self.time_size = mfmd.time_size
-        self.X = [i for i in range(self.time_size)] #new
-
-        self.plot_width = plot_w
-        self.plow_height = plot_h
-        aspect_ratio = plot_w/plot_h
+        self.verb = verb
+        self.base_addr = map_metadata.base_addr
+        self.mem_size = map_metadata.mem_size
+        self.thread_count = map_metadata.thread_count
+        self.event_count = map_metadata.event_count
+        self.time_size = map_metadata.time_size
+        self.X = [i for i in range(self.time_size)]
 
         # if mem_size or time_size are larger than the max resolution, keep
         # diving them until they fit in a square of plot_max_res^2
@@ -50,18 +46,9 @@ class Map(GenericInstrument):
         self.plot_color_bg =    '#FFFFFF00' # transparent
 
 
-    def register_access(self, access):
+    def access(self, access):
         """The idea is to take an access happening at (addr, time), and
         map it to (y,x) in self.access_matrix."""
-        if not self.enabled:
-            return
-
-        # add instruction to the correct spot in the timeline
-        # if len(self.X) == 0:
-        #     for i in range(access.time):
-        #         self.X.append(i)
-        # self.X.append(access.time)
-
         # negative: read access, positive: write access
         # abs value: thread ID + 1 (to leave 0 for no-op)
         access_code = access.thread + 1
@@ -139,7 +126,7 @@ class Map(GenericInstrument):
         axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
                          rotation=90)
         num_ticks = 61 #20 # DEBUG
-        x_ticks = self._create_up_to_n_ticks(self.X, base=10, n=num_ticks)
+        x_ticks = create_up_to_n_ticks(self.X, base=10, n=num_ticks)
         axes.set_xticks(x_ticks)
         axes.set_xlabel(self.plot_x_label)
         axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
@@ -153,7 +140,7 @@ class Map(GenericInstrument):
                         # labelpad=-10)
                         ) # DEBUG
         #y_ticks = [0, self.mem_size-1]
-        y_ticks = self._create_up_to_n_ticks(range(self.mem_size),
+        y_ticks = create_up_to_n_ticks(range(self.mem_size),
                                              base=10, n=num_ticks) # DEBUG
         axes.set_yticks(y_ticks)
         axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,

@@ -73,8 +73,8 @@ class Cache:
         # - time  : the timestamp of the instruction.
         addr = access.addr
         n_bytes = access.size
-        self.tools.map.access(access)
-        self.tools.locality.access(access)
+        self.tools.map.add_access(access)
+        self.tools.locality.add_access(access)
 
         # check correct bit_length
         if addr.bit_length() > self.sp.arch:
@@ -136,8 +136,8 @@ class Cache:
                 evicted_block = s.pop_lru_block()
         return
 
-    def describe_cache(self):
-        self.sp.describe(ind='    ')
+    def describe(self, ind='    '):
+        self.sp.describe(ind=ind)
 
 
     # def dump(self, show_last=True):

@@ -20,8 +20,7 @@ class Tools:
 
         # Create other instruments and make them share their
         # X axis (for the plots)
-        self.locality = Locality(cache_specs.cache_size, cache_specs.line_size,
-                                 map_metadata, shared_X=self.map.X,
+        self.locality = Locality(map_metadata, cache_specs, shared_X=self.map.X,
                                  verb=verb)
 
         # self.hit = Hit(self.ic, cache_specs.cache_size, verb=verb)

@@ -207,9 +207,13 @@ def command_line_args_parser():
     args = parser.parse_args()
     return args
 
-    
-
+cache_specs = None
+map_metadata = None
+plot_metadata = None
 def main():
+    global cache_specs
+    global map_metadata
+    global plot_metadata
     args = command_line_args_parser()
 
     print(f'Reading cache parameters: {args.cache}')
@@ -226,7 +230,7 @@ def main():
     map_metadata = map_reader.get_metadata()
     tools = Tools(cache_specs, map_metadata, plot_metadata)
     cache = Cache(cache_specs, tools=tools)
-    cache.describe_cache()
+    cache.describe()
     
     print(f'Tracing Memory Access Pattern: {args.input_file}')
     run_simulation(map_reader, cache, tools)

@@ -46,7 +46,7 @@ class Map:
         self.plot_color_bg =    '#FFFFFF00' # transparent
 
 
-    def access(self, access):
+    def add_access(self, access):
         """The idea is to take an access happening at (addr, time), and
         map it to (y,x) in self.access_matrix."""
         # negative: read access, positive: write access

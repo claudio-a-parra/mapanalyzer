@@ -4,35 +4,63 @@ from .generic import create_up_to_n_ticks
 from address_formatter import AddrFmt
 
 class SingleThreadLocality:
-    def __init__(self, time_win, space_win):
+    def __init__(self, cache_specs, curr_time):
 
-        # window of at most C accesses.
+        # size of cache and block, first address of memory range and its size
+        self.C = cache_specs.cache_size
+        self.B = cache_specs.line_size
+        self.base_addr = base_addr
+        self.mem_size = mem_size
+        
+        # temporal window, time of last access, and spacial locality across time.
         self.time_window = deque()
-        self.time_window_max_size = time_win
-        self.time_last_access = 0
+        self.time_window_size = self.C
+        self.time_last_access = curr_time
+        self.Ls = []
 
-        # To do the space analysis, one must store the whole map, and then
-        # partition in blocks. This member maps block ids (tag,index) to lists.
+        # block -> access-time, space window (one block),
+        # and temporal locality across space.
         self.space_by_blocks = {}
         self.space_window = deque()
-        self.space_window_max_size = space_win
+        self.space_window_size = self.B
+        self.Lt = []
 
-        # final results for this thread
-        self.space_locality_across_time = []
-        self.time_locality_across_space = []
-
-    def time_win_locality(self):
-        # trim time_window to self.time_window_max_size from behind.
-        # compute new space locality from time_window (sort, compute difs, and ls).
-        # Fill space_locality_across_time[] so that next append() has
-        # index = time_last_access.
-        # Append new locality
-        pass
         
-    def access(self, access):
+    def tm_win_to_ls(self):
+        """compute the spacial locality (ls) of the current time-window"""
+        # trim window from left
+        while len(self.time_window) > self.time_window_size:
+            self.time_window.popleft()
+        flat_win = list(self.time_window)
+        
+        # if the window only has one element, then locality is zero.
+        if len(flat_win) < 2:
+            self.Ls.append(0)
+
+        # compute ls(flat_win)=(B-min(B,ds))/B, where ds = addrB - addrA
+        flat_win.sort()
+        ls = flat_win # in-place
+        for i,addrA,addrB in zip(
+                range(len(ls)-1), flat_win[:-1], flat_win[1:]):
+            ls[i]= (self.B - min(self.B, addrB - addrA))/self.B
+        del ls[-1]
+
+        # append avg(ls) to self.Ls
+        avg_ls = sum(ls)/len(ls)
+        while len(self.Ls) < self.time_last_access:
+            self.Ls.append(0)
+        self.Ls.append(avg_ls)
+
+        
+    def all_sp_win_to_lt(self):
+        """compute the time locality of all spacial windows"""
+        blocks = list()
+
+    
+    def add_access(self, access):
         # spacial locality across time
         if access.time > self.time_last_access:
-            self.time_win_locality()
+            self.win_to_ls()
         for offset in range(access.size):
             self.time_window.append(access.addr+offset)
 
@@ -46,13 +74,13 @@ class SingleThreadLocality:
         self.time_last_access = access.time
 
 class Locality:
-    def __init__(self, cache_size, block_size, map_metadata, shared_X=None,
+    def __init__(self, map_metadata, cache_specs, shared_X=None,
                  verb=False):
-        self.cache_size = cache_size
-        self.block_size = block_size
+        self.map_metadata = map_metadata
+        self.cache_specs = cache_specs
         self.X = shared_X
         if shared_X == None:
-            self.X = [i for i in range(map_metadata.time_size)]
+            self.X = [i for i in range(self.map_metadata.time_size)]
 
         # each thread has its own locality.
         self.thr_traces = {}
@@ -67,11 +95,11 @@ class Locality:
         self.plot_color_fill  = '#A2106511' # Fuchsia semi transparent
         self.plot_color_bg    = '#FFFFFF00' # transparent
 
-    def access(self, access):
+    def add_access(self, access):
         if access.thread not in self.thr_traces:
-            self.thr_traces[access.thread] = SingleThreadLocality(
-                self.cache_size, self.block_size)
-        self.thr_traces[access.thread].access(access)
+            self.thr_traces[access.thread] =
+            SingleThreadLocality(self.cache_specs, access.time)
+        self.thr_traces[access.thread].add_access(access)
 
 
 

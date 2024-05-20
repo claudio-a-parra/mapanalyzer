@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
 from collections import deque
-from address_formatter import log2, AddrFmt
+from util import AddrFmt
+from settings import Settings as st
 
 class Block:
     def __init__(self, block_size, tag=None, dirty=False):
@@ -54,13 +54,10 @@ class Set:
     
 
 class Cache:
-    def __init__(self, specs, tools=None):
-        # .arch .cache_size .line_size .asso
-        self.sp = specs
+    def __init__(self, tools=None):
         self.tools = tools
-        
         self.blocks_in_cache = {}
-        self.sets = [Set(self.sp.asso) for _ in range(self.sp.num_sets)]
+        self.sets = [Set(st.cache.asso) for _ in range(st.cache.num_sets)]
 
     def access(self, access):
         """ Access 'n bytes' starting from address 'addr'. If this requires to
@@ -77,7 +74,7 @@ class Cache:
         self.tools.locality.add_access(access)
 
         # check correct bit_length
-        if addr.bit_length() > self.sp.arch:
+        if addr.bit_length() > st.cache.arch:
             raise ValueError("Error: Access issued to address larger than"
                              " the one defined for this cache.")
             exit(1)
@@ -89,15 +86,15 @@ class Cache:
             p_tag = v_tag
 
             # handle multi-line accesses
-            if n_bytes > (self.sp.line_size - offset):
-                this_block_n_bytes = self.sp.line_size - offset
+            if n_bytes > (st.cache.line_size - offset):
+                this_block_n_bytes = st.cache.line_size - offset
             else:
                 this_block_n_bytes = n_bytes
 
             # access this_block
             writing = (access.event == 'W')
             if (p_tag,set_index) not in self.blocks_in_cache:
-                fetched_block = Block(self.sp.line_size, tag=p_tag,
+                fetched_block = Block(st.cache.line_size, tag=p_tag,
                                       dirty=writing)
                 self.blocks_in_cache[(p_tag,set_index)] = fetched_block
                 evicted_block = self.sets[set_index].push_block(fetched_block)
@@ -135,9 +132,6 @@ class Cache:
                     #self.tools.ram.write()
                 evicted_block = s.pop_lru_block()
         return
-
-    def describe(self, ind='    '):
-        self.sp.describe(ind=ind)
 
 
     # def dump(self, show_last=True):

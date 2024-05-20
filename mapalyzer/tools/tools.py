@@ -1,7 +1,7 @@
 import sys
 import matplotlib.pyplot as plt
 
-from .ic import InstrCounter
+from settings import Settings as st
 from .mapplotter import Map
 from .locality import Locality
 from .hit import Hit
@@ -9,19 +9,14 @@ from .usage import UnusedBytes
 from .alias import Alias
 from .siue import SIUEvict
 
-#-------------------------------------------
 class Tools:
-    def __init__(self, cache_specs, map_metadata, plot_metadata, verb=False):
-        self.ic = InstrCounter()
-        self.plot_metadata = plot_metadata
-
+    def __init__(self):
         # Create map plotter
-        self.map = Map(self.ic, map_metadata, plot_metadata.res, verb=verb)
+        self.map = Map()
 
         # Create other instruments and make them share their
         # X axis (for the plots)
-        self.locality = Locality(map_metadata, cache_specs, shared_X=self.map.X,
-                                 verb=verb)
+        self.locality = Locality(shared_X=self.map.X)
 
         # self.hit = Hit(self.ic, cache_specs.cache_size, verb=verb)
         # self.hit.X = self.map.X
@@ -44,44 +39,40 @@ class Tools:
         # # list of all instruments for easy access.
         # self.inst_list = [self.locality, self.hit, self.usage, self.alias,
         #                   self.siu]
-        self.inst_list = []
-
-    def disable_all(self):
-        for tool in self.inst_list:
-            tool.enabled = False
-
+        self.tools_list = [self.locality]
+        return
 
     def plot(self):
-        name_prefix = self.plot_metadata.prefix
-        dpi = self.plot_metadata.dpi
-        out_format = self.plot_metadata.format
+        title_padding=24
         fig,map_axes = plt.subplots(
-            figsize=(self.plot_metadata.width, self.plot_metadata.height))
+            figsize=(st.plot.width, st.plot.height))
         
         # plot MAP only.
-        print(f'    Plotting {self.map.plot_title}.')
-        self.map.plot(map_axes, basename=name_prefix, title=True)
-        filename=f'{name_prefix}{self.map.plot_name_sufix}.{out_format}'
-        print(f'        {filename}')
-        fig.savefig(filename, dpi=dpi, bbox_inches='tight', pad_inches=0)
+        filename=f'{st.plot.prefix}{self.map.plot_name_sufix}.{st.plot.format}'
+        print(f'    {self.map.plot_title:{title_padding}} : {filename}')
+        self.map.plot(map_axes, basename=st.plot.prefix, title=True)
+        fig.savefig(filename, dpi=st.plot.dpi, bbox_inches='tight', pad_inches=0)
 
 
         # plot superposition of MAP and other tools
         fig, tool_axes = plt.subplots(
-            figsize=(self.plot_metadata.width, self.plot_metadata.height))
+            figsize=(st.plot.width, st.plot.height))
         map_axes = tool_axes.twinx()
         tool_axes.set_yticks([])
-        for tool in self.inst_list:
-            print(f'    Plotting {tool.plot_title}.')
+        for tool in self.tools_list:
+            filename=f'{st.plot.prefix}{tool.plot_name_sufix}.{st.plot.format}'
+            print(f'    {tool.plot_title:{title_padding}} : {filename}')
+
             # plot tool and map
-            tool.plot(tool_axes, basename=name_prefix)
+            tool.plot(tool_axes, basename=st.plot.prefix)
             self.map.plot(map_axes)
 
             # save figure
-            filename=f'{name_prefix}{tool.plot_name_sufix}.{out_format}'
-            print(f'        {filename}')
-            fig.savefig(filename, dpi=dpi, bbox_inches='tight', pad_inches=0)
+            fig.savefig(filename, dpi=st.plot.dpi, bbox_inches='tight', pad_inches=0)
             map_axes.cla()
             tool_axes.cla()
-
         return
+
+    def describe(self, ind='    '):
+        for tool in self.tools_list:
+            tool.describe(ind=ind)

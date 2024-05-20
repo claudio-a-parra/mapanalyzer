@@ -1,5 +1,7 @@
 import sys
 
+from settings import Settings as st
+
 class MemAccess:
     """One register from the map file."""
     def __init__(self, time, thread, event, size, addr):
@@ -26,41 +28,19 @@ class MemAccess:
                 f'siz:{self.size}')
 
 
-class MapMetadata:
-    def __init__(self, base, mem, thrs, events, time):
-        self.base_addr = base
-        self.mem_size = mem
-        self.thread_count = thrs
-        self.event_count = events
-        self.time_size = time
-        return
-        
-
 class MapFileReader:
     """iterates over the map file, reading one register at the time."""
-    def __init__(self, file_path):
-        self.file_path = file_path
-        self.base_addr = -1
-        self.block_size = -1
-        self.thread_count = -1
-        self.event_count = -1
-        self.time_size = -1
-
+    def __init__(self):
         # Open file
         try:
-            self.file = open(self.file_path, 'r')
+            self.file = open(st.map.file_path, 'r')
         except FileNotFoundError:
             print(f"File '{self.file_path}' does not exist.")
             sys.exit(1)
 
-        warning_section = '# WARNING'
-        metadata_section = '# METADATA'
-        data_section = '# DATA'
-        line = self.file.readline()
-
         # Print all Warnings.
-        while line.strip() not in (metadata_section,
-                                   data_section):
+        line = self.file.readline()
+        while line.strip() not in (st.map.metadata_header, st.map.data_header):
             if line == '':
                 print('Error: EOF reached before any data.')
                 sys.exit(1)
@@ -69,77 +49,31 @@ class MapFileReader:
                 print('[!] '+line)
             line = self.file.readline()
 
-        # Read Metadata
-        while line.strip() not in (data_section,):
-            if line == '':
-                print('Error: EOF reached before any data.')
-                sys.exit(1)
-            line = line.strip()
-            if line == '' or line[0] == '#':
-                line = self.file.readline()
-                continue
-            try:
-                name,value = line.split(':')
-                name,value = name.strip(),value.strip()
-            except:
-                print(f"Error: File {self.file_path}: "
-                      "Malformed line in Metadata Section:\n"
-                      f"    '{line}'")
-                sys.exit(1)
-            try:
-                if name == 'start-addr':
-                    self.base_addr = int(value, 16)
-                elif name == 'block-size':
-                    self.block_size = int(value, 10)
-                elif name == 'thread-count':
-                    self.thread_count = int(value, 10)
-                elif name == 'event-count':
-                    self.event_count = int(value, 10)
-                elif name == 'max-time':
-                    self.time_size = int(value, 10) + 1
-            except ValueError:
-                print(f"Invalid value for '{name}' in "
-                      "Metadata Section.\n"
-                      f"    {line}")
-                sys.exit(1)
-            line = self.file.readline()
-
-        if self.base_addr == -1 or \
-           self.block_size == -1 or \
-           self.thread_count == -1 or \
-           self.event_count == -1 or \
-           self.time_size == -1:
-            print(f'Error: Incomplete Metadata in {self.file_path}')
-            sys.exit(1)
-
-        self.rewind()
+        self.go_to_section(st.map.data_header)
         return
 
-    def get_metadata(self):
-        return MapMetadata(self.base_addr, self.block_size, self.thread_count,
-                           self.event_count, self.time_size)
 
-    def rewind(self):
+    def go_to_section(self, header):
         if self.file.closed:
             self.file = open(self.file_path, 'r')
         self.file.seek(0)
         # seek the first 50 lines for the '# DATA' section.
         found = False
-        data_section = '# DATA'
         for l in range(50):
             line = self.file.readline().strip()
-            if line == data_section:
-                self.file.readline() # consume columns names line
+            if line == header:
                 found = True
                 break
         # Error if section not found
         if not found:
-            print(f"Error: Section '{data_section}' not found!!")
+            print(f"Error: Section '{header}' not found!!")
             sys.exit(1)
         return
 
     def __iter__(self):
-        self.rewind()
+        self.go_to_section(st.map.data_header)
+        self.file.readline() # consume columns names line
+
         return self
 
     def __next__(self):
@@ -173,5 +107,5 @@ class MapFileReader:
             print('Incorrect value for offset:\n'
                   f'    {off}')
             sys.exit(1)
-        addr = 0 if ev in ('Tc','Td') else self.base_addr + off
+        addr = st.map.start_addr + off
         return MemAccess(time, thr, ev, size, addr)

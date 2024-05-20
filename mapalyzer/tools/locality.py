@@ -1,92 +1,118 @@
 import sys
 from collections import deque
-from .generic import create_up_to_n_ticks
-from address_formatter import AddrFmt
+
+from util import AddrFmt, create_up_to_n_ticks
+from settings import Settings as st
 
 class SingleThreadLocality:
-    def __init__(self, cache_specs, curr_time):
-
-        # size of cache and block, first address of memory range and its size
-        self.C = cache_specs.cache_size
-        self.B = cache_specs.line_size
-        self.base_addr = base_addr
-        self.mem_size = mem_size
-        
-        # temporal window, time of last access, and spacial locality across time.
+    def __init__(self, curr_time):
+        # temporal window; time of last access; spacial locality across time
         self.time_window = deque()
-        self.time_window_size = self.C
         self.time_last_access = curr_time
         self.Ls = []
 
-        # block -> access-time, space window (one block),
-        # and temporal locality across space.
+        # block->acc_time; space window (block); temporal locality across space
         self.space_by_blocks = {}
         self.space_window = deque()
-        self.space_window_size = self.B
         self.Lt = []
-
         
     def tm_win_to_ls(self):
         """compute the spacial locality (ls) of the current time-window"""
         # trim window from left
-        while len(self.time_window) > self.time_window_size:
+        while len(self.time_window) > st.cache.cache_size:
             self.time_window.popleft()
         flat_win = list(self.time_window)
         
         # if the window only has one element, then locality is zero.
         if len(flat_win) < 2:
             self.Ls.append(0)
+            return
 
         # compute ls(flat_win)=(B-min(B,ds))/B, where ds = addrB - addrA
         flat_win.sort()
         ls = flat_win # in-place
-        for i,addrA,addrB in zip(
-                range(len(ls)-1), flat_win[:-1], flat_win[1:]):
-            ls[i]= (self.B - min(self.B, addrB - addrA))/self.B
+        B = st.cache.line_size
+        for i,addr1,addr2 in zip(range(len(ls)-1), flat_win[:-1], flat_win[1:]):
+            ls[i]= (B - min(B, addr2-addr1))/B
         del ls[-1]
 
         # append avg(ls) to self.Ls
-        avg_ls = sum(ls)/len(ls)
+        avg_ls = sum(ls) / len(ls)
         while len(self.Ls) < self.time_last_access:
             self.Ls.append(0)
         self.Ls.append(avg_ls)
 
         
     def all_sp_win_to_lt(self):
-        """compute the time locality of all spacial windows"""
-        blocks = list()
+        """compute the temporal locality of all spacial windows (blocks)"""
+        print(f'{AddrFmt.format_addr(st.map.start_addr)[0]}')
+        tag,idx,_ = AddrFmt.split(st.map.start_addr)
+        print(f'tag:{tag} idx:{idx}')
+        block_first = (tag << st.cache.bits_set) | idx
+        print(f'block_first:{block_first}')
 
+        print(f'{AddrFmt.format_addr(st.map.start_addr+st.map.mem_size)[0]}')
+        tag,idx,_ = AddrFmt.split(st.map.start_addr + st.map.mem_size)
+        print(f'tag:{tag} idx:{idx}')
+
+        block_last = (tag << st.cache.bits_set) | idx
+        print(f'block_last:{block_last}')
+
+        num_blocks = block_last - block_first + 1
+        print(f'num_blocks:{num_blocks}')
+        self.Lt = [0] * num_blocks
+
+        used_blocks = list(self.space_by_blocks.keys())
+        print(used_blocks)
+        for i,(tag,idx) in zip(range(len(used_blocks)),used_blocks):
+            used_blocks[i] = (tag << st.cache.bits_set) | idx
+        print(used_blocks)
+        print(self.Lt)
+        exit(0)
+        used_blocks.sort()
+        C = st.cache.cache_size
+        for blk_idx in used_blocks:
+            blk = self.space_by_blocks[blk_idx]
+            lt = blk # in-place
+            if len(blk) < 2:
+                self.Lt[blk_idx] = 0
+            for i,t1,t2 in zip(range(len(lt)-1), blk[:-1], blk[1:]):
+                lt[i] = (C - min(C, t2-t1)) / C
+            del blk[-1]
+
+            # add avg of blk
+            avg_lt = sum(lt) / len(lt)
+            self.Lt[blk_idx] = avg_lt
     
     def add_access(self, access):
         # spacial locality across time
         if access.time > self.time_last_access:
-            self.win_to_ls()
+            self.tm_win_to_ls()
         for offset in range(access.size):
             self.time_window.append(access.addr+offset)
 
         # temporal locality across space (for now, just filling)
         for offset in range(access.size):
-            t,s,_ = AddrFmt.split(access.addr+offset)
-            if (t,s) not in self.space_by_blocks:
-                self.space_by_blocks[(t,s)] = []
-            self.space_by_blocks[(t,s)].append(access.time)
-        
+            tag,idx,_ = AddrFmt.split(access.addr+offset)
+            if (tag,idx) not in self.space_by_blocks:
+                self.space_by_blocks[(tag,idx)] = []
+            self.space_by_blocks[(tag,idx)].append(access.time)
+
         self.time_last_access = access.time
 
 class Locality:
-    def __init__(self, map_metadata, cache_specs, shared_X=None,
-                 verb=False):
-        self.map_metadata = map_metadata
-        self.cache_specs = cache_specs
-        self.X = shared_X
-        if shared_X == None:
-            self.X = [i for i in range(self.map_metadata.time_size)]
+    def __init__(self, shared_X=None):
+        if shared_X is None:
+            self.X = [i for i in range(st.map.time_size)]
+        else:
+            self.x = shared_X
 
         # each thread has its own locality.
         self.thr_traces = {}
 
         self.plot_name_sufix  = '_plot-01-locality'
         self.plot_title       = 'Locality'
+        self.about            = 'Temporal and Spacial locality'
         self.plot_subtitle    = 'higher is better'
         self.plot_y_label     = 'Degree of locality [%]'
         self.plot_x_label     = 'Instruction'
@@ -95,11 +121,82 @@ class Locality:
         self.plot_color_fill  = '#A2106511' # Fuchsia semi transparent
         self.plot_color_bg    = '#FFFFFF00' # transparent
 
+    def describe(self, ind=''):
+        print(f'{ind}{self.plot_title}: {self.about}')
+        return
+
     def add_access(self, access):
         if access.thread not in self.thr_traces:
-            self.thr_traces[access.thread] =
-            SingleThreadLocality(self.cache_specs, access.time)
+            self.thr_traces[access.thread] = SingleThreadLocality(access.time)
         self.thr_traces[access.thread].add_access(access)
+
+    def plot(self, axes, basename='locality'):
+        for thr_idx in self.thr_traces:
+            print('plotting')
+            thr = self.thr_traces[thr_idx]
+            thr.all_sp_win_to_lt()
+            print(f'thr {thr_idx}:\n'
+                  f'  Ls: {thr.Ls}\n'
+                  f'  Lt: {thr.Lt}\n')
+        return
+
+    # def get_extent(self):
+    #     # fine tune margins to place each quadrilateral of the imshow()
+    #     # right on the tick. So adding a 0.5 margin at each side.
+    #     left_edge = self.X[0] - 0.5
+    #     right_edge = self.X[-1] + 0.5
+    #     bottom_edge = 0 - 0.5
+    #     top_edge = 100 + 0.5 # 100% + a little margin
+    #     extent = (left_edge, right_edge, bottom_edge, top_edge)
+    #     return extent
+
+    # def plot(self, axes, basename='locality', extent=None):
+    #     for thread in self.buffer_traces:
+    #         self.buffer_traces[thread].create_plotable_data(self.X)
+
+    #     # set plot limits
+    #     extent = extent if extent != None else self.get_extent()
+    #     axes.set_xlim(extent[0], extent[1])
+    #     axes.set_ylim(extent[2], extent[3])
+
+    #     # draw the curve and area below it for each thread
+    #     for thread in self.buffer_traces:
+    #         Y = self.buffer_traces[thread].Y
+    #         axes.step(self.X, Y, color=self.plot_color_line,
+    #                   linewidth=1.2, where='mid', zorder=2)
+    #         axes.fill_between(self.X, -1, Y, color='none',
+    #                           facecolor=self.plot_color_fill,
+    #                           linewidth=1.2, step='mid', zorder=1)
+
+    #     # setup title
+    #     axes.set_title(f'{self.plot_title}: {basename}. '
+    #                    f'({self.plot_subtitle})', fontsize=10)
+
+    #     # setup X ticks, labels, and grid
+    #     axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
+    #                      rotation=90)
+    #     x_ticks = create_up_to_n_ticks(self.X, base=10, n=20)
+    #     axes.set_xticks(x_ticks)
+    #     axes.set_xlabel(self.plot_x_label)
+    #     axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
+    #               color='k', linewidth=0.5, zorder=2)
+
+    #     # setup Y ticks, labels, and grid
+    #     axes.tick_params(axis='y', which='both', left=True, right=False,
+    #                      labelleft=True, labelright=False,
+    #                      colors=self.plot_color_text)
+    #     percentages = list(range(100 + 1)) # from 0 to 100
+    #     y_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
+    #     axes.set_yticks(y_ticks)
+    #     axes.yaxis.set_label_position('left')
+    #     axes.set_ylabel(self.plot_y_label, color=self.plot_color_text,
+    #                     labelpad=3.5)
+    #     axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
+    #               color=self.plot_color_line, linewidth=0.5, zorder=3)
+
+    #     return
+
+
 
 
 

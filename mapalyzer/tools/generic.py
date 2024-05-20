@@ -21,29 +21,3 @@ class GenericInstrument:
         self.plot_color_fg1 = '#000000FF' # black 100% opaque
         self.plot_color_fg2 = '#00000066' # black  40% opaque
         self.plot_color_bg =  '#FFFFFF00' # white   0% opaque, transparent.
-
-
-def create_up_to_n_ticks(full_list, base=10, n=10):
-    """
-    return a list of ticks based on full_list. The idea is to find
-    nice numbers (multiples of powers of 10 or 2) and not having
-    more than n elements.
-    """
-    # find a label_step such that we print at most n ticks
-    tick_step = 1
-    tot_ticks = len(full_list)
-    factors = [1,2,2.5,5] if base==10 else [1,1.5]
-    for i in range(14):
-        found = False
-        for f in factors:
-            f_pow_base = int(f * (base ** i))
-            if int(tot_ticks / f_pow_base) <= (n-1):
-                tick_step = f_pow_base
-                found = True
-                break
-        if found:
-            break
-    tick_list = full_list[::tick_step]
-    # print(f'full_list: {full_list}')
-    # print(f'ticks    : {tick_list}')
-    return tick_list

@@ -74,5 +74,6 @@ class Tools:
         return
 
     def describe(self, ind='    '):
+        self.map.describe(ind=ind)
         for tool in self.tools_list:
             tool.describe(ind=ind)

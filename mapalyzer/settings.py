@@ -219,7 +219,7 @@ class MapSpecs:
 
     def describe(self, ind=''):
         print(f'{ind}File          : {self.file_path}\n'
-              f'{ind}First Address : {self.start_addr}\n'
+              f'{ind}First Address : {hex(self.start_addr)}\n'
               f'{ind}Memory size   : {self.mem_size} bytes\n'
               f'{ind}Maximum time  : {self.time_size-1}\n'
               f'{ind}Thread count  : {self.thread_count}\n'

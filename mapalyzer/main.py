@@ -126,7 +126,7 @@ def main():
     tools.describe()
     cache = Cache(tools=tools)
 
-    print(f'\nRETRACING MAP')
+    print(f'\nRETRACING MAP ({st.map.event_count} mem. accesses)')
     run_simulation(map_reader, cache)
 
     print(f'\nPLOTTING ({st.plot.format})')

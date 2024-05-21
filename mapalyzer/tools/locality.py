@@ -19,21 +19,28 @@ class SingleThreadLocality:
     def tm_win_to_ls(self):
         """compute the spacial locality (ls) of the current time-window"""
         # trim window from left
+        print('tm_win_to_ls()')
         while len(self.time_window) > st.cache.cache_size:
             self.time_window.popleft()
-        flat_win = list(self.time_window)
+        flat_time_win = list(self.time_window)
         
         # if the window only has one element, then locality is zero.
-        if len(flat_win) < 2:
+        if len(flat_time_win) < 2:
+            while len(self.Ls) < self.time_last_access:
+                self.Ls.append(0)
             self.Ls.append(0)
+            print(f'Ls[{len(self.Ls)-1}] = {self.Ls[-1]}')
             return
 
-        # compute ls(flat_win)=(B-min(B,ds))/B, where ds = addrB - addrA
-        flat_win.sort()
-        ls = flat_win # in-place
+        # compute ls(flat_time_win)=(B-min(B,ds))/B, where ds = addrB - addrA
+        flat_time_win.sort()
+        ls = flat_time_win # in-place
         B = st.cache.line_size
-        for i,addr1,addr2 in zip(range(len(ls)-1), flat_win[:-1], flat_win[1:]):
+        for i,addr1,addr2 in zip(range(len(ls)-1),
+                                 flat_time_win[:-1],
+                                 flat_time_win[1:]):
             ls[i]= (B - min(B, addr2-addr1))/B
+            print(f'ls[{i}] = {float(ls[i]):04.3f} = ({B} - min({B},{addr2}-{addr1}))/{B}')
         del ls[-1]
 
         # append avg(ls) to self.Ls
@@ -41,46 +48,44 @@ class SingleThreadLocality:
         while len(self.Ls) < self.time_last_access:
             self.Ls.append(0)
         self.Ls.append(avg_ls)
+        print(f'Ls[{len(self.Ls)-1}] = {float(avg_ls):04.3f} = {sum(ls)}/{len(ls)}')
+        return
 
         
     def all_sp_win_to_lt(self):
         """compute the temporal locality of all spacial windows (blocks)"""
-        print(f'{AddrFmt.format_addr(st.map.start_addr)[0]}')
+
+        # create Lt based on the total range of blocks in the memory studied
         tag,idx,_ = AddrFmt.split(st.map.start_addr)
-        print(f'tag:{tag} idx:{idx}')
         block_first = (tag << st.cache.bits_set) | idx
-        print(f'block_first:{block_first}')
-
-        print(f'{AddrFmt.format_addr(st.map.start_addr+st.map.mem_size)[0]}')
-        tag,idx,_ = AddrFmt.split(st.map.start_addr + st.map.mem_size)
-        print(f'tag:{tag} idx:{idx}')
-
+        tag,idx,_ = AddrFmt.split(st.map.start_addr + st.map.mem_size-1)
         block_last = (tag << st.cache.bits_set) | idx
-        print(f'block_last:{block_last}')
+        tot_num_blocks = block_last - block_first + 1
+        self.Lt = [0] * tot_num_blocks
 
-        num_blocks = block_last - block_first + 1
-        print(f'num_blocks:{num_blocks}')
-        self.Lt = [0] * num_blocks
-
+        # obtain the list of all used blocks ids (tag,set_index)
         used_blocks = list(self.space_by_blocks.keys())
-        print(used_blocks)
-        for i,(tag,idx) in zip(range(len(used_blocks)),used_blocks):
-            used_blocks[i] = (tag << st.cache.bits_set) | idx
-        print(used_blocks)
-        print(self.Lt)
-        exit(0)
         used_blocks.sort()
-        C = st.cache.cache_size
-        for blk_idx in used_blocks:
-            blk = self.space_by_blocks[blk_idx]
-            lt = blk # in-place
-            if len(blk) < 2:
-                self.Lt[blk_idx] = 0
-            for i,t1,t2 in zip(range(len(lt)-1), blk[:-1], blk[1:]):
-                lt[i] = (C - min(C, t2-t1)) / C
-            del blk[-1]
 
-            # add avg of blk
+        # for i,(tag,idx) in zip(range(len(used_blocks)),used_blocks):
+        #     used_blocks[i] = (tag << st.cache.bits_set) | idx
+
+        # compute lt for each space window (that is, for each block)
+        C = st.cache.cache_size
+        for tag,idx in used_blocks:
+            blk_idx = ((tag << st.cache.bits_set) | idx) - block_first
+            flat_space_win = self.space_by_blocks[(tag,idx)]
+            lt = flat_space_win # in-place
+            if len(flat_space_win) < 2:
+                self.Lt[blk_idx] = 0
+                continue
+            for i,t1,t2 in zip(range(len(lt)-1),
+                               flat_space_win[:-1],
+                               flat_space_win[1:]):
+                lt[i] = (C - min(C, t2-t1)) / C
+            del lt[-1]
+
+            # append avg(lt)
             avg_lt = sum(lt) / len(lt)
             self.Lt[blk_idx] = avg_lt
     
@@ -126,18 +131,24 @@ class Locality:
         return
 
     def add_access(self, access):
+        print()
+        print()
+        print(f'Access: {access}')
         if access.thread not in self.thr_traces:
             self.thr_traces[access.thread] = SingleThreadLocality(access.time)
         self.thr_traces[access.thread].add_access(access)
 
     def plot(self, axes, basename='locality'):
         for thr_idx in self.thr_traces:
-            print('plotting')
             thr = self.thr_traces[thr_idx]
             thr.all_sp_win_to_lt()
-            print(f'thr {thr_idx}:\n'
-                  f'  Ls: {thr.Ls}\n'
-                  f'  Lt: {thr.Lt}\n')
+            print(f'thr {thr_idx}:\n')
+            print(f'Ls:')
+            for l in thr.Ls:
+                print(f'    {float(l):04.3f}')
+            print(f'Lt:')
+            for l in thr.Lt:
+                print(f'    {float(l):04.3f}')
         return
 
     # def get_extent(self):

@@ -1,3 +1,5 @@
+from settings import Settings as st
+
 class AddrFmt:
     sp = None
     max_tag = None
@@ -74,6 +76,10 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
     nice numbers (multiples of powers of 10 or 2) and not having
     more than n elements.
     """
+    # if two ticks, return the extremes.
+    if n == 2:
+        return [full_list[0], full_list[-1]]
+
     # find a label_step such that we print at most n ticks
     tick_step = 1
     tot_ticks = len(full_list)
@@ -89,6 +95,22 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
         if found:
             break
     tick_list = full_list[::tick_step]
-    # print(f'full_list: {full_list}')
-    # print(f'ticks    : {tick_list}')
     return tick_list
+
+
+def save_fig(fig, plot_title, plot_name_suffix):
+    filename=f'{st.plot.prefix}{plot_name_suffix}.{st.plot.format}'
+    print(f'    {plot_title:{st.plot.ui_title_hpad}}: {filename}')
+    fig.savefig(filename, dpi=st.plot.dpi, bbox_inches='tight',
+                pad_inches=st.plot.img_border_pad)
+    return
+
+
+class PlotStrings:
+    def __init__(self, title='Title', xlab='X', ylab='Y', suffix='__plot',
+                 subtit='Subtitle'):
+        self.title = title
+        self.xlab  = xlab
+        self.ylab  = ylab
+        self.suffix= suffix
+        self.subtit= subtit

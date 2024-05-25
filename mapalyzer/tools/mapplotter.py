@@ -1,52 +1,46 @@
 #!/usr/bin/env python3
 import sys
 from collections import deque
+import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from matplotlib.ticker import FuncFormatter #to make a custom tick formatter
 import humanize # to convert raw byte count to KiB, MiB...
 
-from util import create_up_to_n_ticks
+from util import create_up_to_n_ticks, PlotStrings, save_fig
 from settings import Settings as st
+from palette import Palette
 
 class Map:
-    def __init__(self, plot_max_res=None, verb=None):
-        if plot_max_res is None:
-            plot_max_res = st.plot.res
+    def __init__(self, hue=120, verb=None):
+        self.hue = hue
         if verb is None:
             self.verb = st.verb
         self.X = [i for i in range(st.map.time_size)]
 
         # if mem_size or time_size are larger than the max resolution, keep
-        # diving them until they fit in a square of plot_max_res^2
-        ap_matrix_height = st.map.mem_size if st.map.mem_size <= plot_max_res \
-            else plot_max_res
-        ap_matrix_width = st.map.time_size if st.map.time_size <= plot_max_res \
-            else plot_max_res
+        # diving them until they fit in a square of st.plot.res^2
+        ap_matrix_height = st.map.mem_size if st.map.mem_size <= st.plot.res \
+            else st.plot.res
+        ap_matrix_width = st.map.time_size if st.map.time_size <= st.plot.res \
+            else st.plot.res
 
         # cols: whole memory snapshot at a given instruction
         # rows: byte state across all instructions
         self.access_matrix = [[0] * ap_matrix_width
                               for _ in range(ap_matrix_height)]
 
-        self.plot_name_sufix = '_plot-00-map'
-        self.plot_title = 'Memory Access Pattern'
+        self.name = 'Memory Access Pattern'
         self.about = 'Visual representation of the Memory Access Pattern'
-        self.plot_subtitle = None
-        self.plot_y_label = 'Space [bytes]'
-        self.plot_x_label = 'Instruction'
-        self.plot_min = None
-        self.plot_max = None
-        self.plot_color_text = '#009900'
-        self.plot_color_bg = '#FFFFFF00' # transparent
-        self.plot_color_palette = [ #    read , write
-            #('#4CB24C', '#B24C4C'), #t0: dusty green and red
-            ('#00BB00', '#BB0000'), #t1: green, red
-            ('#0000BB', '#BB00BB'), #t2: blue , purple
-            ]
+        self.meta = PlotStrings(
+            title = self.name,
+            xlab   = 'Instruction',
+            ylab   = 'Space [bytes]',
+            suffix = '_plot-00-map',
+            subtit = None)
         return
 
     def describe(self, ind=''):
-        print(f'{ind}{self.plot_title}: {self.about}')
+        print(f'{ind}{self.name:{st.plot.ui_name_hpad}}: {self.about}')
         return
 
     def add_access(self, access):
@@ -84,12 +78,20 @@ class Map:
             self.access_matrix[mapped_addr][mapped_time] = access_code
 
 
-    def plot(self, axes, basename='map', extent=(0,10,0,10), title=False):
+    def plot(self, top_tool=None, axes=None):
+        # generate color palette
+        thr_count = st.map.thread_count
 
-        # Memory Access Pattern color-map creation
-        # threads_palette = [self.plot_color_read, self.plot_color_write]
-        threads_bg = self.plot_color_bg
-        #colors_pairs_needed = st.map.thread_count # two, R and W, colors per thread
+        if axes is None:
+            standalone = True
+            draw_alpha = 90
+            fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        else:
+            standalone = False
+            draw_alpha = 40
+
+        thr_palette = Palette(hue=self.hue, lig_count=2, hue_count=thr_count,
+                              alpha=draw_alpha)
 
         # Access codes:
         #  -X : thread (X-1) read
@@ -97,19 +99,10 @@ class Map:
         #   0 : no operation.
         # Then, the palette must match the negative and positive values to the
         # read/write colors of the thread.
-        thr_palette = self.plot_color_palette
-        thr_bg = self.plot_color_bg
-        thr_count = st.map.thread_count
-        if thr_count > len(thr_palette):
-            print(f'[!] Warning: The Access Pattern has more threads '
-                  'than colors available to plot. Different threads will '
-                  'share colors.')
-        read_palette = [ thr_palette[i%len(thr_palette)][0]
-                         for i in range(thr_count)]
-        write_palette = [ thr_palette[i%len(thr_palette)][1]
-                          for i in range(thr_count)]
-        cmap = ListedColormap(list(reversed(read_palette)) + [thr_bg] +
-                              write_palette)
+        read_palette =  [thr_palette[i][0] for i in range(thr_count)]
+        write_palette = [thr_palette[i][1] for i in range(thr_count)]
+        cmap = ListedColormap(list(reversed(read_palette)) +
+                              [thr_palette.bg] + write_palette)
 
         # plot the trace
         extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, st.map.mem_size-0.5)
@@ -117,35 +110,40 @@ class Map:
                     aspect='auto', zorder=1, extent=extent,
                     vmin=-thr_count, vmax=thr_count)
 
-        # setup title
-        if title:
-            title_string = f'{self.plot_title}: {basename}'
-            if self.plot_subtitle:
-                title_string += f'\n({self.plot_subtitle})'
-            axes.set_title(title_string, fontsize=10)
 
+        if standalone:
+            # setup title
+            title_string = f'{self.meta.title}: {st.plot.prefix}'
+            if self.meta.subtit:
+                title_string += f'. ({self.meta.subtit})'
+            axes.set_title(title_string, fontsize=10,
+                           pad=st.plot.img_title_vpad)
+            # X axis label, ticks and grid
+            axes.set_xlabel(self.meta.xlab)
+            axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
+                             rotation=90)
+            x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
+            axes.set_xticks(x_ticks)
+            axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
+                      color='k', linewidth=0.667, zorder=2)
 
-        # setup X ticks, labels, and grid
-        axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
-                         rotation=90)
-        num_ticks = 61 #20 # DEBUG
-        x_ticks = create_up_to_n_ticks(self.X, base=10, n=num_ticks)
-        axes.set_xticks(x_ticks)
-        axes.set_xlabel(self.plot_x_label)
-        axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
-                  color='k', linewidth=0.5, zorder=2)
-
-        # setup right Y axis
-        axes.tick_params(axis='y', which='both', left=False, right=True,
-                         labelleft=False, labelright=True, colors=self.plot_color_text)
-        axes.yaxis.set_label_position('right')
-        axes.set_ylabel(self.plot_y_label, color=self.plot_color_text)
-                        # labelpad=-10)
-        #y_ticks = [0, st.map.mem_size-1]
-        y_ticks = create_up_to_n_ticks(range(st.map.mem_size),
-                                             base=10, n=num_ticks) # DEBUG
-        axes.set_yticks(y_ticks)
-        axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
-                  color='k', linewidth=0.5, zorder=2) # DEBUG
+            # Y axis label, ticks and grid
+            #axes.yaxis.set_label_position('right')
+            axes.set_ylabel(self.meta.ylab, color=thr_palette.fg) # labelpad=-10)
+            axes.tick_params(axis='y', which='both', left=True, right=False,
+                             labelleft=True, labelright=False,
+                             colors=thr_palette.fg, width=2)
+            y_ticks = create_up_to_n_ticks(range(st.map.mem_size), base=10,
+                                           n=st.plot.max_map_ytick_count)
+            axes.set_yticks(y_ticks)
+            axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
+                          color=thr_palette.fg, linewidth=3, zorder=2) # DEBUG
+        else:
+            # X and Y axis ticks empty
+            axes.set_xticks([])
+            axes.set_yticks([])
 
         axes.invert_yaxis()
+
+        if standalone:
+            save_fig(fig, self.meta.title, self.meta.suffix)

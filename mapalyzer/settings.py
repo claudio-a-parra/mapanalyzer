@@ -1,5 +1,7 @@
 import sys
-from util import log2
+
+def log2(x):
+    return x.bit_length() - 1
 
 
 class CacheSpecs:
@@ -236,6 +238,13 @@ class PlotSpecs:
         self.dpi = dpi
         self.format = format
         self.prefix = prefix
+        self.max_xtick_count = 32
+        self.max_ytick_count = 32
+        self.max_map_ytick_count = 20
+        self.img_border_pad = 0.05
+        self.img_title_vpad = 6
+        self.ui_title_hpad = 31
+        self.ui_name_hpad = 23
         return
 
     def __str__(self):

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from settings import Settings as st
 from .mapplotter import Map
 from .locality import Locality
-from .hit import Hit
+from .hitmiss import HitMiss
 from .usage import UnusedBytes
 from .alias import Alias
 from .siue import SIUEvict
@@ -14,15 +14,10 @@ class Tools:
         # Create map plotter
         self.map = Map()
 
-        # Create other instruments and make them share their
-        # X axis (for the plots)
+        # Create other instruments with shared X axis (for plots)
         self.locality = Locality(shared_X=self.map.X)
-
-        # self.hit = Hit(self.ic, cache_specs.cache_size, verb=verb)
-        # self.hit.X = self.map.X
-
-        # self.usage = UnusedBytes(self.ic, verb=verb)
-        # self.usage.X = self.map.X
+        #self.hitmiss = HitMiss(shared_X=self.map.X)
+        #self.usage = UnusedBytes(shared_X=self.map.X)
 
 
         # num_sets = cache_specs['size']//(cache_specs['asso']*\
@@ -39,7 +34,7 @@ class Tools:
         # # list of all instruments for easy access.
         # self.inst_list = [self.locality, self.hit, self.usage, self.alias,
         #                   self.siu]
-        self.tools_list = [self.map, self.locality]
+        self.tools_list = [self.map, self.locality] #, self.hitmiss]
         st.plot.ui_name_hpad = max([len(t.name)+1 for t in self.tools_list])
         return
 

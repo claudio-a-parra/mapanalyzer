@@ -9,7 +9,7 @@ class Block:
         self.bytes = [False] * block_size # accessed bytes
         
     def access(self, offset, n_bytes, write=False):
-        """access n bytes in this bloc starting from offset."""
+        """access n bytes in this block starting from offset."""
         # Raise an exception if attempting to access bytes passed the end
         # of the block
         if offset + n_bytes > len(self.bytes):
@@ -24,6 +24,13 @@ class Block:
 
     def count_accessed(self):
         return self.bytes.count(True)
+
+    def __repr__(self):
+        by = ''
+        for b in self.bytes:
+            by += 'X' if b else '_'
+        d = "x" if self.dirty else "_"
+        return f'{by}|{d}'
 
 
 class Set:
@@ -54,8 +61,9 @@ class Set:
     
 
 class Cache:
-    def __init__(self, tools=None):
+    def __init__(self, tools=None, verb=None):
         self.tools = tools
+        self.verb = verb if verb is not None else st.verb
         self.blocks_in_cache = {}
         self.sets = [Set(st.cache.asso) for _ in range(st.cache.num_sets)]
 
@@ -68,6 +76,9 @@ class Cache:
         # - event : read or write event {'R', 'W'}
         # - thread: the thread accessing data
         # - time  : the timestamp of the instruction.
+        if self.verb:
+            print(f'\n\nCache.access({access})')
+            print(f'split: {AddrFmt.split(access.addr)}')
         addr = access.addr
         n_bytes = access.size
         self.tools.map.add_access(access)
@@ -78,6 +89,7 @@ class Cache:
             raise ValueError("Error: Access issued to address larger than"
                              " the one defined for this cache.")
             exit(1)
+
 
         # access the potentially many lines
         while n_bytes > 0:
@@ -92,29 +104,50 @@ class Cache:
                 this_block_n_bytes = n_bytes
 
             # access this_block
+            if self.verb:
+                print(f'Querying block ({p_tag},{set_index}).')
+                print(self)
             writing = (access.event == 'W')
             if (p_tag,set_index) not in self.blocks_in_cache:
-                fetched_block = Block(st.cache.line_size, tag=p_tag,
+                if self.verb:
+                    print(f'Block ({p_tag},{set_index}) MISS.')
+                # fetch block to cache, evicting a resident if needed
+                newly_fetched_block = Block(st.cache.line_size, tag=p_tag,
                                       dirty=writing)
-                self.blocks_in_cache[(p_tag,set_index)] = fetched_block
-                evicted_block = self.sets[set_index].push_block(fetched_block)
-                #self.tools.hitmiss.miss()
-                #self.tools.ram.read()
-                #self.tools.alias.fetch()
-                #self.tools.siue.fetch()
-                #self.tools.usage.update()
-                if evicted_block != None:
+                self.blocks_in_cache[(p_tag,set_index)] = newly_fetched_block
+                resident_block = newly_fetched_block
+                evicted_block = self.sets[set_index].push_block(
+                    newly_fetched_block)
+                if self.verb:
+                    print(f'Block ({p_tag},{set_index}) FETCH.')
+
+                ##self.tools.hitmiss.add_hm(access, (0,1)) # miss++
+                #self.tools.ram.read(access)
+                #self.tools.alias.fetch(access)
+                #self.tools.siue.fetch(access)
+                #self.tools.usage.update(access)
+                if evicted_block is not None:
+                    del self.blocks_in_cache[(evicted_block.tag,set_index)]
+                    if self.verb:
+                        print(f'Block ({evicted_block.tag},{set_index}) '
+                              f'[{evicted_block}] EVICTED.')
                     pass
                     #self.tools.usage.update()
                     if evicted_block.dirty:
                         pass
                         #self.tools.ram.write()
             else:
+                if self.verb:
+                    print(f'Block ({p_tag},{set_index}) HIT.')
                 resident_block = self.blocks_in_cache[(p_tag,set_index)]
-                resident_block.access(offset, this_block_n_bytes, write=writing)
                 self.sets[set_index].touch_block(resident_block)
-                #self.tools.hitmiss.hit()
+                ##self.tools.hitmiss.add_hm(access, (1,0)) # hit++
                 #self.tools.usage.update()
+
+            # mark accessed bytes
+            resident_block.access(offset, this_block_n_bytes, write=writing)
+            if self.verb:
+                print(self)
 
             # update address and reminding bytes to read for a potential new loop
             addr += this_block_n_bytes
@@ -132,6 +165,16 @@ class Cache:
                     #self.tools.ram.write()
                 evicted_block = s.pop_lru_block()
         return
+
+    def __repr__(self):
+        keys = list(self.blocks_in_cache.keys())
+        keys.sort()
+        ret  = '+--Cache--------------\n'
+        ret += '| (tag,set)-->  blk|d\n'
+        for k in keys:
+            ret += f'| {k} --> {self.blocks_in_cache[k]}\n'
+        ret += '+---------------------'
+        return ret
 
 
     # def dump(self, show_last=True):

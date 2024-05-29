@@ -7,25 +7,32 @@ from palette import Palette
 from settings import Settings as st
 
 class SingleThreadLocality:
-    def __init__(self, curr_time, verb=False):
-        self.verb = verb
+    def __init__(self, curr_time, verb=None):
+        self.verb = verb if verb is not None else st.verb
         # temporal window; time of last access; spacial locality across time
         self.time_window = deque()
         self.time_last_access = curr_time
-        self.Ls = []
+        self.Ls = [0] * st.map.time_size
 
         # block->acc_time; space window (block); temporal locality across space
         self.space_by_blocks = {}
         self.space_window = deque()
-        self.Lt = []
-        
-    def tm_win_to_ls(self):
+
+        # create Lt based on the total range of blocks in the memory studied
+        tag,idx,_ = AddrFmt.split(st.map.start_addr)
+        block_first = st.map.start_addr >> st.cache.bits_off
+        block_last = (st.map.start_addr+st.map.mem_size-1) >> \
+            st.cache.bits_off
+        tot_num_blocks = block_last - block_first + 1
+        self.Lt = [-1] * tot_num_blocks
+
+    def time_win_to_ls(self):
         """compute the spacial locality (ls) of the current time-window"""
         # do not run if window has been flushed
         if self.time_window is None:
             return
         if self.verb:
-            print('SingleThreadLocality.tm_win_to_ls():')
+            print('SingleThreadLocality.time_win_to_ls():')
             print(f'time_window[{len(self.time_window)}]: {self.time_window}')
         # trim window from left
         ln = len(self.time_window)
@@ -113,7 +120,7 @@ class SingleThreadLocality:
 
 
     def flush_time_win(self):
-        self.tm_win_to_ls()
+        self.time_win_to_ls()
         self.time_window = None
         return
 
@@ -121,9 +128,9 @@ class SingleThreadLocality:
     def add_access(self, access):
         # spacial locality across time
         if access.time > self.time_last_access:
-            self.tm_win_to_ls()
+            self.time_win_to_ls()
         for offset in range(access.size):
-            self.time_window.append(access.addr+offset-st.map.start_addr)
+            self.time_window.append(access.addr-st.map.start_addr+offset)
 
         # temporal locality across space (for now, just filling)
         for offset in range(access.size):
@@ -141,8 +148,7 @@ class Locality:
             [i for i in range(st.map.time_size)]
         self.hue = hue
         self.verb = verb if verb is not None else st.verb
-
-        # each thread has its own locality.
+        self.time_window = deque()
         self.thr_traces = {}
 
         self.name = 'Locality'
@@ -160,21 +166,16 @@ class Locality:
             ylab   = 'Space [blocks]',
             suffix = '_plot-02-locality-Lt',
             subtit = 'higher is better')
-
-        self.Lst = PlotStrings(
-            title  = 'Space-Time Locality',
-            xlab   = 'Space [blocks]',
-            ylab   = 'Time',
-            suffix = '_plot-03-locality-Lst',
-            subtit  = 'higher is better')
         return
 
 
     def add_access(self, access):
         if self.verb:
-            print()
-            print()
-            print(f'Locality.add_access({access})')
+            print(f'\n\nLocality.add_access({access})')
+
+        # add event to time_window
+
+
         if access.thread not in self.thr_traces:
             self.thr_traces[access.thread] = \
                 SingleThreadLocality(access.time, self.verb)
@@ -195,7 +196,7 @@ class Locality:
 
         padding = 0.5
         X = [-padding] + self.X + [self.X[-1]+padding]
-        for thr_idx,thr_id in enumerate(threads):
+        for thr_idx in threads:
             thr = self.thr_traces[thr_idx]
 
             # Draw spacial locality across time
@@ -217,11 +218,13 @@ class Locality:
         percentages = list(range(100 + 1)) # from 0 to 100
         y_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
         axes.tick_params(axis='y', which='both', left=True, right=False,
-                         labelleft=True, labelright=False, width=3,
-                         colors=pal.fg)
+                         labelleft=True, labelright=False,
+                         width=st.plot.grid_main_width, colors=pal.fg)
         axes.set_yticks(y_ticks)
-        axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
-                  color=pal.fg, linewidth=3, zorder=1)
+        axes.grid(axis='y', which='both',
+                  alpha=0.1, color=pal.fg, zorder=1,
+                  linewidth=st.plot.grid_main_width,
+                  linestyle=st.plot.grid_main_style)
 
         # plot map
         map_axes = axes.twinx()
@@ -230,11 +233,13 @@ class Locality:
         # X axis label, ticks and grid
         axes.set_xlabel(self.Ls.xlab, color='k', labelpad=3.5)
         axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
-                         rotation=90, width=0.33)
+                         rotation=90, width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
         axes.set_xticks(x_ticks)
-        axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
-                  color='k', linewidth=0.33, zorder=1)
+        axes.grid(axis='x', which='both',
+                  alpha=0.1, color='k', zorder=1,
+                  linestyle=st.plot.grid_other_style,
+                  linewidth=st.plot.grid_other_width)
 
         # setup title
         title_string = f'{self.Ls.title}: {st.plot.prefix}'
@@ -258,7 +263,7 @@ class Locality:
         #mem_blocks = [i for i,_ in enumerate(self.thr_traces[0].Lt)]
         block_last_off = (st.map.mem_size) >> st.cache.bits_off
         mem_blocks = [i for i in range(block_last_off)]
-        for thr_idx,thr_id in enumerate(threads):
+        for thr_idx in threads:
             thr = self.thr_traces[thr_idx]
 
             # Draw temporal locality across space
@@ -295,10 +300,13 @@ class Locality:
         axes.set_ylabel(self.Lt.ylab, color='k', labelpad=3.5)
         y_ticks = create_up_to_n_ticks(mem_blocks[1:-1], base=10, n=11)
         axes.tick_params(axis='y', which='both', left=True, right=False,
-                         labelleft=True, labelright=False, width=0.33)
+                         labelleft=True, labelright=False,
+                         width=st.plot.grid_other_width)
         axes.set_yticks(y_ticks)
-        axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
-                  color='k', linewidth=0.33, zorder=1)
+        axes.grid(axis='y', which='both',
+                  alpha=0.1, color='k', zorder=1,
+                  linewidth=st.plot.grid_other_width,
+                  linestyle=st.plot.grid_other_style)
 
         # X axis label, ticks and grid
         axes.set_xlabel(self.Lt.xlab, color=pal.fg, labelpad=3.5)
@@ -307,8 +315,10 @@ class Locality:
                          rotation=-90, colors=pal.fg, width=2)
         x_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
         axes.set_xticks(x_ticks)
-        axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
-                  color=pal.fg, linewidth=3, zorder=1)
+        axes.grid(axis='x', which='both',
+                   alpha=0.1, color=pal.fg, zorder=1,
+                  linewidth=st.plot.grid_main_width,
+                  linestyle=st.plot.grid_main_style)
 
         axes.invert_yaxis()
 
@@ -320,11 +330,6 @@ class Locality:
         save_fig(fig, self.Lt.title, self.Lt.suffix)
 
         return
-
-
-    def plot_Lst(self, top_tool, pal):
-        # I AM HERE
-        pass
 
 
     def plot(self, top_tool=None):
@@ -342,7 +347,6 @@ class Locality:
 
         self.plot_Ls(top_tool, pal)
         self.plot_Lt(top_tool, pal)
-        self.plot_Lst(top_tool, pal)
 
         return
 

@@ -9,7 +9,7 @@ from util import log2, AddrFmt
 from cache import Cache
 from tools import Tools
 
-def run_simulation(map_reader, cache):
+def run_simulation(map_reader, cache, progress=True):
     _,_,byte = AddrFmt.split(st.map.start_addr)
     if byte != 0:
         print(f'[!] Warning: Memory block is not cache aligned. '
@@ -18,14 +18,16 @@ def run_simulation(map_reader, cache):
     tot_instr = st.map.time_size-1
     for access in map_reader:
         # print progress
-        print('\033[2K\r    '
-              f'{(100*access.time/tot_instr):5.1f}% '
-              f'{access.time:8d}/{tot_instr}'
-              ,end='')
-        sys.stdout.flush()
+        if progress:
+            print('\033[2K\r    '
+                  f'{(100*access.time/tot_instr):5.1f}% '
+                  f'{access.time:8d}/{tot_instr}'
+                  ,end='')
+            sys.stdout.flush()
         # perform memory access
         cache.access(access)
-    print()
+    if progress:
+        print()
     cache.flush()
     return
 

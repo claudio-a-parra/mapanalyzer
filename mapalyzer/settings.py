@@ -245,6 +245,10 @@ class PlotSpecs:
         self.img_title_vpad = 6
         self.ui_title_hpad = 31
         self.ui_name_hpad = 23
+        self.grid_main_width = 3
+        self.grid_main_style = '-'
+        self.grid_other_width = 0.667
+        self.grid_other_style = '--'
         return
 
     def __str__(self):

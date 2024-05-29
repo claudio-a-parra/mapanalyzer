@@ -31,7 +31,7 @@ class Map:
 
         self.name = 'Memory Access Pattern'
         self.about = 'Visual representation of the Memory Access Pattern'
-        self.meta = PlotStrings(
+        self.ps = PlotStrings(
             title = self.name,
             xlab   = 'Instruction',
             ylab   = 'Space [bytes]',
@@ -84,15 +84,15 @@ class Map:
 
         if axes is None:
             standalone = True
-            draw_alpha = 90
+            draw_alpha = 80
             fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
         else:
             standalone = False
             draw_alpha = 40
 
-        thr_palette = Palette(hue=self.hue, lig_count=2, hue_count=thr_count,
+        thr_palette = Palette(lightness_count=2, hue_count=thr_count,
                               alpha=draw_alpha)
-
+        tool_palette = Palette(hue=self.hue)
         # Access codes:
         #  -X : thread (X-1) read
         #   X : thread (X-1) write
@@ -107,37 +107,40 @@ class Map:
         # plot the trace
         extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, st.map.mem_size-0.5)
         axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
-                    aspect='auto', zorder=1, extent=extent,
+                    aspect='auto', zorder=2, extent=extent,
                     vmin=-thr_count, vmax=thr_count)
 
 
         if standalone:
             # setup title
-            title_string = f'{self.meta.title}: {st.plot.prefix}'
-            if self.meta.subtit:
-                title_string += f'. ({self.meta.subtit})'
+            title_string = f'{self.ps.title}: {st.plot.prefix}'
+            if self.ps.subtit:
+                title_string += f'. ({self.ps.subtit})'
             axes.set_title(title_string, fontsize=10,
                            pad=st.plot.img_title_vpad)
             # X axis label, ticks and grid
-            axes.set_xlabel(self.meta.xlab)
+            axes.set_xlabel(self.ps.xlab)
             axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
-                             rotation=90)
-            x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
+                             rotation=90, width=st.plot.grid_other_width)
+            x_ticks = create_up_to_n_ticks(self.X, base=10,
+                                           n=st.plot.max_xtick_count)
             axes.set_xticks(x_ticks)
-            axes.grid(axis='x', which='both', linestyle='-', alpha=0.1,
-                      color='k', linewidth=0.667, zorder=2)
+            axes.grid(axis='x', which='both', linestyle=st.plot.grid_other_style,
+                      alpha=0.1, color='k', linewidth=st.plot.grid_other_width,
+                      zorder=1)
 
             # Y axis label, ticks and grid
-            #axes.yaxis.set_label_position('right')
-            axes.set_ylabel(self.meta.ylab, color=thr_palette.fg) # labelpad=-10)
+            axes.set_ylabel(self.ps.ylab, color=tool_palette.fg) # labelpad=-10)
             axes.tick_params(axis='y', which='both', left=True, right=False,
                              labelleft=True, labelright=False,
-                             colors=thr_palette.fg, width=2)
+                             colors=tool_palette.fg,
+                             width=st.plot.grid_main_width)
             y_ticks = create_up_to_n_ticks(range(st.map.mem_size), base=10,
                                            n=st.plot.max_map_ytick_count)
             axes.set_yticks(y_ticks)
             axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
-                          color=thr_palette.fg, linewidth=3, zorder=2) # DEBUG
+                      color=tool_palette.fg, linewidth=st.plot.grid_main_width,
+                      zorder=1)
         else:
             # X and Y axis ticks empty
             axes.set_xticks([])
@@ -146,4 +149,4 @@ class Map:
         axes.invert_yaxis()
 
         if standalone:
-            save_fig(fig, self.meta.title, self.meta.suffix)
+            save_fig(fig, self.ps.title, self.ps.suffix)

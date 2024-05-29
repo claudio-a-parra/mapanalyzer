@@ -19,7 +19,7 @@ def hsl2rgb(h, s, l, a):
 
 class Palette:
     def __init__(self, hue=0, saturation=65, lightness=50, alpha=50,
-                 hue_count=12, lig_count=2):
+                 hue_count=12, lightness_count=2):
         if hasattr(hue, '__getitem__'):
             hues = hue
         else:
@@ -30,8 +30,8 @@ class Palette:
         if hasattr(lightness, '__getitem__'):
             lights = lightness
         else:
-            step = round(100/(lig_count+1))
-            lights = [i*step for i in range(1, lig_count+1)]
+            step = round(100/(lightness_count+1))
+            lights = [i*step for i in range(1, lightness_count+1)]
 
         self.fg = hsl2rgb(hues[0], 100, 23, 100)
         self.bg = hsl2rgb(hues[0], 100, 95, 2)
@@ -41,15 +41,13 @@ class Palette:
 
 
     def __str__(self):
-        print(f'hues  : {hues}')
-        print(f'lights: {lights}')
-        print(f'fg    : {self.fg}')
-        print(f'bg    : {self.bg}')
+        ret = ''
+        ret +=f'fg    : {self.fg}\n'
+        ret +=f'bg    : {self.bg}\n'
+        ret +=f'col   :\n'
         for c in self.col:
-            for v in c:
-                print(f'{v} ')
-            print()
-        return
+            ret += f'       {c}\n'
+        return ret
 
 
     def __getitem__(self, idx):

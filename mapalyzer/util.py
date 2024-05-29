@@ -14,19 +14,24 @@ class AddrFmt:
         AddrFmt.max_offset = 2**cls.sp.bits_off - 1
 
     @classmethod
-    def format_addr(cls, address):
+    def bin(cls, address):
         tag, index, offset = cls.split(address)
         padded_bin = \
             "|T:"  + cls.pad(tag,    2, cls.max_tag)  +\
             "| I:" + cls.pad(index,  2, cls.max_index) +\
             "| O:" + cls.pad(offset, 2, cls.max_offset)+\
             "|"
+        return padded_bin
+
+    @classmethod
+    def hex(cls, address):
+        tag, index, offset = cls.split(address)
         padded_hex = \
             "|T:"  + cls.pad(tag,    16, cls.max_tag)  +\
             "| I:" + cls.pad(index,  16, cls.max_index) +\
             "| O:" + cls.pad(offset, 16, cls.max_offset)+\
             "|"
-        return ("bin:"+padded_bin, "hex:"+padded_hex)
+        return padded_hex
 
     @classmethod
     def split(cls, address):

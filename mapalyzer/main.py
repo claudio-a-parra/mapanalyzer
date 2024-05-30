@@ -10,6 +10,7 @@ from cache import Cache
 from tools import Tools
 
 def run_simulation(map_reader, cache, progress=True):
+    progress = False
     _,_,byte = AddrFmt.split(st.map.start_addr)
     if byte != 0:
         print(f'[!] Warning: Memory block is not cache aligned. '

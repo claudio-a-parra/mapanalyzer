@@ -12,7 +12,7 @@ class SingleThreadLocality:
         # temporal window; time of last access; spacial locality across time
         self.time_window = deque()
         self.time_last_access = curr_time
-        self.Ls = [0] * st.map.time_size
+        self.Ls = [-1] * st.map.time_size
 
         # block->acc_time; space window (block); temporal locality across space
         self.space_by_blocks = {}
@@ -48,14 +48,14 @@ class SingleThreadLocality:
         flat_time_win = list(self.time_window)
 
         # replicate last locality so that new appending index == last access
-        while len(self.Ls) < self.time_last_access:
-            if self.verb:
-                print(f'Ls.append(Ls[-1])')
-            self.Ls.append(self.Ls[-1])
+        # while len(self.Ls) < self.time_last_access:
+        #     if self.verb:
+        #         print(f'Ls.append(Ls[-1])')
+        #     self.Ls.append(self.Ls[-1])
 
         # if the window only has one element, then locality is undefined, assign -1.
         if len(flat_time_win) < 2:
-            self.Ls.append(-1)
+            self.Ls[self.time_last_access] = -1
             if self.verb:
                 print(f'>> Ls[{len(self.Ls)-1}] = {self.Ls[-1]}')
             return
@@ -74,7 +74,7 @@ class SingleThreadLocality:
 
         # append avg(ls) to self.Ls
         avg_ls = sum(ls) / len(ls)
-        self.Ls.append(100*avg_ls) # as percentage
+        self.Ls[self.time_last_access] = 100*avg_ls # as percentage
         if self.verb:
             print(f'>> Ls[{len(self.Ls)-1}] = {float(avg_ls):04.3f} = {sum(ls)}/{len(ls)}')
         return
@@ -113,7 +113,7 @@ class SingleThreadLocality:
                 lt[i] = (C - min(C, t2-t1)) / C
             del lt[-1]
 
-            # append avg(lt)
+            # save avg(lt)
             avg_lt = sum(lt) / len(lt)
             self.Lt[blk_idx] = 100 * avg_lt # as percentage
         return
@@ -148,19 +148,31 @@ class Locality:
             [i for i in range(st.map.time_size)]
         self.hue = hue
         self.verb = verb if verb is not None else st.verb
-        self.time_window = deque()
-        self.thr_traces = {}
-
         self.name = 'Locality'
         self.about = ('Spacial locality across Time, and Temporal locality '
                       'across space')
-        self.Ls = PlotStrings(
+
+        ## Spacial locality across time
+        self.time_window = deque() #of the size of the cache.
+        self.time_last_access = 0
+        self.Ls = [-1] * st.map.time_size
+        self.psLs = PlotStrings(
             title  = 'Spacial Locality across Time',
             xlab   = 'Time',
             ylab   = 'Degree of Spacial Locality',
             suffix = '_plot-01-locality-Ls',
             subtit = 'higher is better')
-        self.Lt = PlotStrings(
+
+        ## Temporal locality across space
+        self.space_by_blocks = {} #block->list of block access times
+        # Lt size is the total range of blocks in the memory studied
+        tag,idx,_ = AddrFmt.split(st.map.start_addr)
+        block_first = st.map.start_addr >> st.cache.bits_off
+        block_last = (st.map.start_addr+st.map.mem_size-1) >> \
+            st.cache.bits_off
+        tot_num_blocks = block_last - block_first + 1
+        self.Lt = [-1] * tot_num_blocks
+        self.psLt = PlotStrings(
             title  = 'Temporal Locality across Space',
             xlab   = 'Degree of Temporal Locality',
             ylab   = 'Space [blocks]',
@@ -168,18 +180,89 @@ class Locality:
             subtit = 'higher is better')
         return
 
-
     def add_access(self, access):
-        if self.verb:
-            print(f'\n\nLocality.add_access({access})')
+        """if this access belongs to a new time, compute ls for current time
+        window, and then append the current access to the time_window queue"""
 
-        # add event to time_window
+        ## SPACIAL LOCALITY ACROSS TIME
+        # if this access has newer time, compute ls for the current window
+        if access.time > self.time_last_access:
+            self.time_window_to_ls(access.time)
+            self.time_last_access = access.time
 
+        # append accessed bytes to time_window
+        for offset in range(access.size):
+            self.time_window.append(access.addr-st.map.start_addr+offset)
 
-        if access.thread not in self.thr_traces:
-            self.thr_traces[access.thread] = \
-                SingleThreadLocality(access.time, self.verb)
-        self.thr_traces[access.thread].add_access(access)
+        # trim time_window from back if it is larger than the cache size.
+        while len(self.time_window) > st.cache.cache_size:
+            self.time_window.popleft()
+
+        ## TEMPORAL LOCALITY ACROSS SPACE
+        # for now just append access times to the list of each memory block
+        for offset in range(access.size):
+            tag,idx,_ = AddrFmt.split(access.addr+offset)
+            if (tag,idx) not in self.space_by_blocks:
+                self.space_by_blocks[(tag,idx)] = []
+            self.space_by_blocks[(tag,idx)].append(access.time)
+        return
+
+    def time_window_to_ls(self, curr_time):
+        """compute differences and add a new value to Ls"""
+        # obtain a flat window of the last accessed addresses
+        flat_time_window = list(self.time_window)
+
+        # if only one access, there is no deltas to compute. assign Ls[t] = -1
+        if len(flat_time_window) < 2:
+            self.Ls[self.time_last_access] = -1
+            return
+
+        # sort by addresses and compute deltas into ls
+        flat_time_window.sort()
+        ls = flat_time_window # just to reuse memory
+        B = st.cache.line_size
+        for i,a1,a2 in zip(range(len(ls)-1),
+                           flat_time_window[:-1],
+                           flat_time_window[1:]):
+            ls[i] = (B - min(B, a2-a1)) / B
+        del ls[-1]
+
+        # compute average delta of the whole ls array, and write it in Ls.
+        # Replicate that value up to right before the current time
+        avg_ls = 100 * sum(ls) / len(ls)
+        for t in range(self.time_last_access, curr_time):
+            self.Ls[t] = avg_ls
+        #self.Ls[self.time_last_access] = avg_ls
+        return
+
+    def all_space_window_to_lt(self):
+        """for all space windows, compute differences and compose the
+        entirety of Lt"""
+        # obtain the list of all ACTUALLY used blocks
+        used_blocks = list(self.space_by_blocks.keys())
+        used_blocks.sort()
+
+        # compute lt for each space_window
+        C = st.cache.cache_size
+        tag,idx,_ = AddrFmt.split(st.map.start_addr)
+        block_first = (tag << st.cache.bits_set) | idx
+        for tag,idx in used_blocks:
+            # the index of this block in Lt
+            blk_idx = ((tag << st.cache.bits_set) | idx) - block_first
+            flat_space_window = self.space_by_blocks[(tag,idx)]
+            lt = flat_space_window # just to reuse memory
+            if len(flat_space_window) < 2:
+                self.Lt[blk_idx] = -1
+                continue
+            for i,t1,t2 in zip(range(len(lt)-1),
+                               flat_space_window[:-1],
+                               flat_space_window[1:]):
+                lt[i] = (C - min(C, t2-t1)) / C
+            del lt[-1]
+
+            # compute average delta of the whole lt array, and write it in Lt
+            avg_lt = 100 * sum(lt) / len(lt)
+            self.Lt[blk_idx] = avg_lt
         return
 
 
@@ -187,34 +270,40 @@ class Locality:
         print(f'{ind}{self.name:{st.plot.ui_name_hpad}}: {self.about}')
         return
 
+    def plot(self, top_tool=None):
+        # finish up computations
+        self.time_window_to_ls(st.map.time_size)
+        self.all_space_window_to_lt()
+
+        # create palette for threads
+        pal = Palette(hue=self.hue, lightness=[25,80], alpha=[100,60])
+
+        # plot Spacial and Temporal locality tools
+        self.plot_Ls(top_tool, pal)
+        self.plot_Lt(top_tool, pal)
+        return
+
 
     def plot_Ls(self, top_tool, pal):
         # create figure and tool axes
         fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        threads = list(self.thr_traces.keys())
-        threads.sort()
 
+        # pad X and Y=Ls axes for better visualization
         padding = 0.5
-        X = [-padding] + self.X + [self.X[-1]+padding]
-        for thr_idx in threads:
-            thr = self.thr_traces[thr_idx]
+        X = [self.X[0]-padding] + self.X + [self.X[-1]+padding]
+        Ls = [self.Ls[0]] + self.Ls + [self.Ls[-1]]
 
-            # Draw spacial locality across time
-            Ls = [thr.Ls[0]] + thr.Ls + [thr.Ls[-1]]
-            # axes.step(X, Ls,
-            #           color=pal[thr_idx][0],
-            #           linewidth=1.2, where='mid', zorder=2)
-            axes.fill_between(X, -1, Ls, color=pal[thr_idx][0],
-                              facecolor=pal[thr_idx][1],
-                              linewidth=1.2, step='mid', zorder=2)
+        # draw space locality across time
+        axes.fill_between(X, -1, Ls, color=pal[0][0], facecolor=pal[0][1],
+                          linewidth=1.2, step='mid', zorder=2)
 
         # set plot limits
-        axes.set_xlim(self.X[0]-padding, self.X[-1]+padding)
+        axes.set_xlim(X[0], X[-1])
         axes.set_ylim(0-padding, 100+padding)
 
         # Y axis label, ticks, and grid
         axes.yaxis.set_label_position('left')
-        axes.set_ylabel(self.Ls.ylab, color=pal.fg, labelpad=3.5)
+        axes.set_ylabel(self.psLs.ylab, color=pal.fg, labelpad=3.5)
         percentages = list(range(100 + 1)) # from 0 to 100
         y_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
         axes.tick_params(axis='y', which='both', left=True, right=False,
@@ -231,10 +320,11 @@ class Locality:
         top_tool.plot(axes=map_axes)
 
         # X axis label, ticks and grid
-        axes.set_xlabel(self.Ls.xlab, color='k', labelpad=3.5)
+        axes.set_xlabel(self.psLs.xlab, color='k', labelpad=3.5)
         axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
                          rotation=90, width=st.plot.grid_other_width)
-        x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
+        x_ticks = create_up_to_n_ticks(self.X, base=10,
+                                       n=st.plot.max_xtick_count)
         axes.set_xticks(x_ticks)
         axes.grid(axis='x', which='both',
                   alpha=0.1, color='k', zorder=1,
@@ -242,63 +332,40 @@ class Locality:
                   linewidth=st.plot.grid_other_width)
 
         # setup title
-        title_string = f'{self.Ls.title}: {st.plot.prefix}'
-        if self.Ls.subtit:
-            title_string += f'. ({self.Ls.subtit})'
+        title_string = f'{self.psLs.title}: {st.plot.prefix}'
+        if self.psLs.subtit:
+            title_string += f'. ({self.psLs.subtit})'
         axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
 
         # save image
-        save_fig(fig, self.Ls.title, self.Ls.suffix)
-
+        save_fig(fig, self.psLs.title, self.psLs.suffix)
         return
 
 
     def plot_Lt(self, top_tool, pal):
         # create figure and tool axes
         fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        threads = list(self.thr_traces.keys())
-        threads.sort()
 
+        # pad Y and X=Lt axes for better visualization
+        # Y = list of memory blocks. always starting from 0
         padding = 0.5
-        #mem_blocks = [i for i,_ in enumerate(self.thr_traces[0].Lt)]
-        block_last_off = (st.map.mem_size) >> st.cache.bits_off
-        mem_blocks = [i for i in range(block_last_off)]
-        for thr_idx in threads:
-            thr = self.thr_traces[thr_idx]
 
-            # Draw temporal locality across space
-            Lt = [thr.Lt[i] for i in mem_blocks]
-            mem_blocks = [mem_blocks[0]-padding] +\
-                mem_blocks +\
-                [mem_blocks[-1]+padding]
-            Lt = [Lt[0]] + Lt + [Lt[-1]]
-            floor = [-1 for _ in mem_blocks]
-            # axes.step(block_loc, mem_blocks,
-            #           color=pal[thr_idx][0],
-            #           linewidth=1.2, where='mid', zorder=2, marker='.')
-            # axes.plot(block_loc, mem_blocks,
-            #           color=pal[thr_idx][0],
-            #           linewidth=1.2, zorder=2, marker='o')
+        Y = [i for i in range(st.map.mem_size >> st.cache.bits_off)]
+        Y = [Y[0]-padding] + Y + [Y[-1]+padding]
+        Lt = [self.Lt[0]] + self.Lt + [self.Lt[-1]]
 
-            axes.fill_betweenx(mem_blocks, Lt, floor,
-                               color=pal[thr_idx][0],
-                               facecolor=pal[thr_idx][1],
-                               linewidth=1.2, step='mid', zorder=2)
+        # draw time locality across space
+        axes.fill_betweenx(Y, Lt, -1, color=pal[0][0], facecolor=pal[0][1],
+                           linewidth=1.2, step='mid', zorder=2)
 
         # set plot limits
+        axes.set_ylim(Y[0], Y[-1])
         axes.set_xlim(0-padding, 100+padding)
-        axes.set_ylim(mem_blocks[0], mem_blocks[-1])
-
-        # setup title
-        title_string = f'{self.Lt.title}: {st.plot.prefix}'
-        if self.Lt.subtit:
-            title_string += f'. ({self.Lt.subtit})'
-        axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
 
         # Y axis label, ticks, and grid
         axes.yaxis.set_label_position('left')
-        axes.set_ylabel(self.Lt.ylab, color='k', labelpad=3.5)
-        y_ticks = create_up_to_n_ticks(mem_blocks[1:-1], base=10, n=11)
+        axes.set_ylabel(self.psLt.ylab, color='k', labelpad=3.5)
+        y_ticks = create_up_to_n_ticks(Y[1:-1], base=10, n=11)
         axes.tick_params(axis='y', which='both', left=True, right=False,
                          labelleft=True, labelright=False,
                          width=st.plot.grid_other_width)
@@ -309,7 +376,7 @@ class Locality:
                   linestyle=st.plot.grid_other_style)
 
         # X axis label, ticks and grid
-        axes.set_xlabel(self.Lt.xlab, color=pal.fg, labelpad=3.5)
+        axes.set_xlabel(self.psLt.xlab, color=pal.fg, labelpad=3.5)
         percentages = list(range(100 + 1)) # from 0 to 100
         axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
                          rotation=-90, colors=pal.fg, width=2)
@@ -326,29 +393,17 @@ class Locality:
         map_axes = fig.add_axes(axes.get_position(), frameon=False)
         top_tool.plot(axes=map_axes)
 
+        # setup title
+        title_string = f'{self.psLt.title}: {st.plot.prefix}'
+        if self.psLt.subtit:
+            title_string += f'. ({self.psLt.subtit})'
+        axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
+
         # save image
-        save_fig(fig, self.Lt.title, self.Lt.suffix)
+        save_fig(fig, self.psLt.title, self.psLt.suffix)
 
         return
 
-
-    def plot(self, top_tool=None):
-        # finish up computations
-        threads = list(self.thr_traces.keys())
-        threads.sort()
-        for thr_idx in threads:
-            thr = self.thr_traces[thr_idx]
-            thr.flush_time_win()
-            thr.all_sp_win_to_lt()
-
-        # create palette for threads
-        pal = Palette(hue=self.hue, lightness=[25,80], hue_count=len(threads),
-                      alpha=80)
-
-        self.plot_Ls(top_tool, pal)
-        self.plot_Lt(top_tool, pal)
-
-        return
 
 
 

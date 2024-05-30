@@ -33,7 +33,7 @@ class Map:
         self.about = 'Visual representation of the Memory Access Pattern'
         self.ps = PlotStrings(
             title = self.name,
-            xlab   = 'Instruction',
+            xlab   = 'Time',
             ylab   = 'Space [bytes]',
             suffix = '_plot-00-map',
             subtit = None)
@@ -129,23 +129,27 @@ class Map:
                       alpha=0.1, color='k', linewidth=st.plot.grid_other_width,
                       zorder=1)
 
-            # Y axis label, ticks and grid
-            axes.set_ylabel(self.ps.ylab, color=tool_palette.fg) # labelpad=-10)
-            axes.tick_params(axis='y', which='both', left=True, right=False,
-                             labelleft=True, labelright=False,
-                             colors=tool_palette.fg,
-                             width=st.plot.grid_main_width)
-            y_ticks = create_up_to_n_ticks(range(st.map.mem_size), base=10,
-                                           n=st.plot.max_map_ytick_count)
-            axes.set_yticks(y_ticks)
+            # Y axis grid
             axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
                       color=tool_palette.fg, linewidth=st.plot.grid_main_width,
                       zorder=1)
+            ticks_width = st.plot.grid_main_width
         else:
             # X and Y axis ticks empty
             axes.set_xticks([])
             axes.set_yticks([])
+            ticks_width = st.plot.grid_other_width
 
+        # Y axis label and ticks
+        axes.yaxis.set_label_position('right')
+        axes.set_ylabel(self.ps.ylab, color=tool_palette.fg) # labelpad=-10)
+        axes.tick_params(axis='y', which='both', left=False, right=True,
+                         labelleft=False, labelright=True,
+                         colors=tool_palette.fg,
+                         width=ticks_width)
+        y_ticks = create_up_to_n_ticks(range(st.map.mem_size), base=10,
+                                       n=st.plot.max_map_ytick_count)
+        axes.set_yticks(y_ticks)
         axes.invert_yaxis()
 
         if standalone:

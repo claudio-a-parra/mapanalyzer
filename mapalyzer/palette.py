@@ -18,14 +18,20 @@ def hsl2rgb(h, s, l, a):
 
 
 class Palette:
-    def __init__(self, hue=0, saturation=65, lightness=50, alpha=50,
-                 hue_count=1, lightness_count=2):
+    def __init__(self, hue=0, saturation=80, lightness=50, alpha=50,
+                 hue_count=1, saturation_count=2, lightness_count=2):
         if hasattr(hue, '__getitem__'):
             hues = hue
         else:
             base = hue
             step = 360/hue_count
             hues = [(round(i*step)+base)%360 for i in range(hue_count)]
+
+        if hasattr(saturation, '__getitem__'):
+            sats = saturation
+        else:
+            step = round(100/(saturation_count+1))
+            sats = [i*step for i in range(1, saturation_count+1)]
 
         if hasattr(lightness, '__getitem__'):
             lights = lightness
@@ -41,14 +47,14 @@ class Palette:
         if len(lights) != len(alphas):
             raise ValueError('The array alpha must have the same number of '
                              'items as lightness')
-        self.fg = hsl2rgb(hues[0], 100, 25, 100)
-        self.bg = hsl2rgb(hues[0], 100, 95, 2)
+        self.fg = hsl2rgb(hues[0], 100, 30, 100)
+        self.bg = hsl2rgb(hues[0], 100, 99, 100)
 
-        self.col = [[hsl2rgb(h,saturation,l,a) for l,a in zip(lights,alphas)] for h in hues]
+        self.col = [[hsl2rgb(h,s,l,a) for s,l,a in zip(sats,lights,alphas)] for h in hues]
         return
 
 
-    def __repr__(self):
+    def __str__(self):
         ret = ''
         ret +=f'fg    : {self.fg}\n'
         ret +=f'bg    : {self.bg}\n'

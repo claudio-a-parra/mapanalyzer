@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sys # for command line arguments
 import os # for file extension removal
 import argparse # to get command line arguments
@@ -16,19 +15,44 @@ def run_simulation(map_reader, cache, progress=True):
         print(f'[!] Warning: Memory block is not cache aligned. '
               f'First byte is {byte} bytes into the cache line.')
 
-    tot_instr = st.map.time_size-1
+    def print_progress(count, total):
+        print('\033[2K\r    '
+              f'{(100*count/total):5.1f}% '
+              f'{count:8d}/{total}'
+              ,end='')
+        sys.stdout.flush()
+        return
+
+    tot_eve = st.map.event_count
+    eve_count = 0
+    concurrent_acc = []
     for access in map_reader:
-        # print progress
-        if progress:
-            print('\033[2K\r    '
-                  f'{(100*access.time/tot_instr):5.1f}% '
-                  f'{access.time:8d}/{tot_instr}'
-                  ,end='')
-            sys.stdout.flush()
-        # perform memory access
-        cache.access(access)
+        # collect all accesses happening at the same time mark
+        if len(concurrent_acc) == 0 or \
+           concurrent_acc[-1].time == access.time:
+            concurrent_acc.append(access)
+        else:
+            # process all memory accesses at time t-1
+            cache.multi_access(concurrent_acc)
+
+            # print progress
+            if progress:
+                print_progress(eve_count, tot_eve)
+
+            # add first access of time t
+            concurrent_acc = [access]
+
+        eve_count += 1
+
+
     if progress:
         print()
+
+    # process all memory accesses at time t
+    cache.multi_access(concurrent_acc)
+    if progress:
+        print_progress(eve_count, tot_eve)
+
     cache.flush()
     return
 
@@ -120,8 +144,8 @@ def main():
     st.map.describe(ind='    ')
 
     file_prefix = os.path.basename(os.path.splitext(args.input_file)[0])
-    plot_metadata = PlotSpecs(args.px, args.py, args.resolution, args.dpi,
-                              args.format, file_prefix)
+    plot_metadata = PlotSpecs(width=args.px, height=args.py, res=args.resolution,
+                              dpi=args.dpi, format=args.format, prefix=file_prefix)
     st.init_plot(plot_metadata=plot_metadata)
 
     print(f'\nCREATING TOOLS AND MEMORY SYSTEM')

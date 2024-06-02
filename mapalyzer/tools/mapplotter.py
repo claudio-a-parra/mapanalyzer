@@ -12,11 +12,11 @@ from palette import Palette
 
 class Map:
     def __init__(self, hue=120, verb=None):
-        self.hue = hue
+        self.tool_palette = Palette(hue=hue)
         if verb is None:
             self.verb = st.verb
         self.X = [i for i in range(st.map.time_size)]
-
+        self.axes = None
         # if mem_size or time_size are larger than the max resolution, keep
         # diving them until they fit in a square of st.plot.res^2
         ap_matrix_height = st.map.mem_size if st.map.mem_size <= st.plot.res \
@@ -52,7 +52,7 @@ class Map:
         if access.event == 'R':
             access_code *= -1
 
-        # properly register accesses of more than 1 byte
+        # register accesses of more than 1 byte
         for offset in range(access.size):
             # obtain the original coordinates
             addr = access.addr - st.map.start_addr + offset
@@ -74,83 +74,110 @@ class Map:
 
             if self.verb and offset == 0:
                 print(f'map: [{addr},{time}] -> [{mapped_time},{mapped_addr}]')
-            # store the access. add 1 so zero values are interpreted as 'empty'
+            # store the access in space-time matrix
             self.access_matrix[mapped_addr][mapped_time] = access_code
+        return
+
+    def commit(self, time):
+        # this tool does not need to run anything after processing a batch
+        # of concurrent accesses.
+        return
 
 
     def plot(self, top_tool=None, axes=None):
-        # generate color palette
+        # define values for standalone and secondary plot cases
         thr_count = st.map.thread_count
-
+        standalone = False
+        draw_alpha = 55
         if axes is None:
             standalone = True
-            draw_alpha = 80
+            draw_alpha = 100
             fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        else:
-            standalone = False
-            draw_alpha = 40
+        self.axes = axes
 
-        thr_palette = Palette(lightness_count=2, hue_count=thr_count,
-                              alpha=draw_alpha)
-        tool_palette = Palette(hue=self.hue)
-        # Access codes:
+        # Create color maps based on thread and R/W access:
         #  -X : thread (X-1) read
         #   X : thread (X-1) write
         #   0 : no operation.
         # Then, the palette must match the negative and positive values to the
         # read/write colors of the thread.
-        read_palette =  [thr_palette[i][0] for i in range(thr_count)]
-        write_palette = [thr_palette[i][1] for i in range(thr_count)]
-        cmap = ListedColormap(list(reversed(read_palette)) +
-                              [thr_palette.bg] + write_palette)
+        thr_palette = Palette(lightness=[30,65], hue_count=thr_count,
+                              saturation=[45,75], alpha=draw_alpha)
+        rcol = list(reversed([thr_palette[i][0] for i in range(thr_count)]))
+        wcol = [thr_palette[i][1] for i in range(thr_count)]
+        cmap = ListedColormap(rcol + ['#FFFFFF00'] + wcol)
 
-        # plot the trace
+        # set plot limits and draw the MAP
         extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, st.map.mem_size-0.5)
-        axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
-                    aspect='auto', zorder=2, extent=extent,
+        self.axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
+                    aspect='auto', zorder=0, extent=extent,
                     vmin=-thr_count, vmax=thr_count)
+        self.axes.invert_yaxis()
 
-
+        # complete plot setup
+        self.axes.set_xticks([])
+        self.axes.set_yticks([])
         if standalone:
-            # setup title
-            title_string = f'{self.ps.title}: {st.plot.prefix}'
-            if self.ps.subtit:
-                title_string += f'. ({self.ps.subtit})'
-            axes.set_title(title_string, fontsize=10,
-                           pad=st.plot.img_title_vpad)
-            # X axis label, ticks and grid
-            axes.set_xlabel(self.ps.xlab)
-            axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
-                             rotation=90, width=st.plot.grid_other_width)
-            x_ticks = create_up_to_n_ticks(self.X, base=10,
-                                           n=st.plot.max_xtick_count)
-            axes.set_xticks(x_ticks)
-            axes.grid(axis='x', which='both', linestyle=st.plot.grid_other_style,
-                      alpha=0.1, color='k', linewidth=st.plot.grid_other_width,
-                      zorder=1)
+            self.plot_setup_general()
+            self.plot_setup_X_axis()
+            self.plot_setup_Y_axis()
+            save_fig(fig, self.ps.title, self.ps.suffix)
+        return
 
-            # Y axis grid
-            axes.grid(axis='y', which='both', linestyle='-', alpha=0.1,
-                      color=tool_palette.fg, linewidth=st.plot.grid_main_width,
-                      zorder=1)
-            ticks_width = st.plot.grid_main_width
-        else:
-            # X and Y axis ticks empty
-            axes.set_xticks([])
-            axes.set_yticks([])
-            ticks_width = st.plot.grid_other_width
+    def plot_setup_general(self):
+        # background color
+        self.axes.patch.set_facecolor(self.tool_palette.bg)
+        # setup title
+        title_string = f'{self.ps.title}: {st.plot.prefix}'
+        if self.ps.subtit:
+            title_string += f'. ({self.ps.subtit})'
+        self.axes.set_title(title_string, fontsize=10,
+                       pad=st.plot.img_title_vpad)
 
-        # Y axis label and ticks
-        axes.yaxis.set_label_position('right')
-        axes.set_ylabel(self.ps.ylab, color=tool_palette.fg) # labelpad=-10)
-        axes.tick_params(axis='y', which='both', left=False, right=True,
-                         labelleft=False, labelright=True,
-                         colors=tool_palette.fg,
-                         width=ticks_width)
+    def plot_setup_X_axis(self):
+        # label
+        self.axes.set_xlabel(self.ps.xlab)
+        # ticks
+        self.axes.tick_params(axis='x', rotation=-90,
+                         bottom=False, labelbottom=True,
+                         top=False, labeltop=False)
+        x_ticks = create_up_to_n_ticks(self.X, base=10,
+                                       n=st.plot.max_xtick_count)
+        self.axes.set_xticks(x_ticks)
+        self.plot_draw_X_grid()
+        return
+
+    def plot_draw_X_grid(self):
+        ymax = st.map.mem_size-0.5
+        time_sep_lines = [i-0.5 for i in
+                          range(self.X[0],self.X[-1]+1)]
+        self.axes.vlines(x=time_sep_lines, ymin=-0.5, ymax=ymax,
+                         color='k', linewidth=0.33, alpha=0.2, zorder=1)
+        return
+
+    def plot_setup_Y_axis(self):
+        # label
+        #self.axes.yaxis.set_label_position('right')
+        self.axes.set_ylabel(self.ps.ylab, color=self.tool_palette.fg)
+        # ticks
+        self.axes.tick_params(axis='y', colors=self.tool_palette.fg,
+                              left=False, labelleft=True,
+                              right=False, labelright=False)
         y_ticks = create_up_to_n_ticks(range(st.map.mem_size), base=10,
                                        n=st.plot.max_map_ytick_count)
-        axes.set_yticks(y_ticks)
-        axes.invert_yaxis()
+        self.axes.set_yticks(y_ticks)
+        self.plot_draw_Y_grid(byte_sep=True)
+        return
 
-        if standalone:
-            save_fig(fig, self.ps.title, self.ps.suffix)
+    def plot_draw_Y_grid(self, byte_sep=False):
+        if byte_sep:
+            byte_sep_lines = [i-0.5 for i in range(1,st.map.mem_size)]
+            self.axes.hlines(y=byte_sep_lines, xmin=-0.5, xmax=st.map.time_size-0.5,
+                             color=self.tool_palette.fg,
+                             linewidth=0.33, alpha=0.2, zorder=1)
+        block_sep_lines = [i-0.5 for i in
+                           range(0, st.map.mem_size+1, st.cache.line_size)]
+        self.axes.hlines(y=block_sep_lines, xmin=-0.5, xmax=st.map.time_size-0.5,
+                         color=self.tool_palette.fg,
+                         linestyle='--',
+                         linewidth=0.667, alpha=0.3, zorder=1)

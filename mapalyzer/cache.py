@@ -1,5 +1,5 @@
 from collections import deque
-from util import AddrFmt
+from util import AddrFmt, Dbg
 from settings import Settings as st
 
 class Block:
@@ -42,7 +42,7 @@ class Set:
         """push a block to this set. If the set is full, return the evicting
         block, otherwise return None"""
         self.lines.appendleft(block)
-        if len(self.lines) < self.associativity:
+        if len(self.lines) <= self.associativity:
             return None
         return self.lines.pop()
 
@@ -64,12 +64,28 @@ class Cache:
     def __init__(self, tools=None, verb=None):
         self.tools = tools
         self.verb = verb if verb is not None else st.verb
+        #self.verb = True
         self.blocks_in_cache = {}
         self.sets = [Set(st.cache.asso) for _ in range(st.cache.num_sets)]
+        return
+
+    def multi_access(self, concurrent_access):
+        Dbg.i()
+        if self.verb:
+            Dbg.p()
+            Dbg.p(f'TIME: {concurrent_access[0].time}')
+            Dbg.p(concurrent_access)
+        for a in concurrent_access:
+            self.access(a)
+            self.tools.commit(a.time)
+        Dbg.o()
+
+        return
 
     def access(self, access):
         """ Access 'n bytes' starting from address 'addr'. If this requires to
         access multiple cache lines, then generate multiple accesses."""
+        Dbg.i()
         # Access object:
         # - addr  : address of access
         # - size  : the number of bytes accessed
@@ -77,8 +93,7 @@ class Cache:
         # - thread: the thread accessing data
         # - time  : the timestamp of the instruction.
         if self.verb:
-            print(f'\n\nCache.access({access})')
-            print(f'split: {AddrFmt.split(access.addr)}')
+            Dbg.p(f'\n\n\nCACHE.access({access})')
         addr = access.addr
         n_bytes = access.size
         self.tools.map.add_access(access)
@@ -105,12 +120,12 @@ class Cache:
 
             # access this_block
             if self.verb:
-                print(f'Querying block ({p_tag},{set_index}).')
-                print(self)
+                Dbg.p(f'Querying block ({p_tag},{set_index}).')
+                Dbg.p(self)
             writing = (access.event == 'W')
             if (p_tag,set_index) not in self.blocks_in_cache:
                 if self.verb:
-                    print(f'Block ({p_tag},{set_index}) MISS.')
+                    Dbg.p(f'Block ({p_tag},{set_index}) MISS.')
                 # fetch block to cache, evicting a resident if needed
                 newly_fetched_block = Block(st.cache.line_size, tag=p_tag,
                                       dirty=writing)
@@ -119,9 +134,9 @@ class Cache:
                 evicted_block = self.sets[set_index].push_block(
                     newly_fetched_block)
                 if self.verb:
-                    print(f'Block ({p_tag},{set_index}) FETCH.')
+                    Dbg.p(f'Block ({p_tag},{set_index}) FETCH.')
 
-                ##self.tools.hitmiss.add_hm(access, (0,1)) # miss++
+                self.tools.hitmiss.add_hm(access, (0,1)) # miss++
                 #self.tools.ram.read(access)
                 #self.tools.alias.fetch(access)
                 #self.tools.siue.fetch(access)
@@ -129,7 +144,7 @@ class Cache:
                 if evicted_block is not None:
                     del self.blocks_in_cache[(evicted_block.tag,set_index)]
                     if self.verb:
-                        print(f'Block ({evicted_block.tag},{set_index}) '
+                        Dbg.p(f'Block ({evicted_block.tag},{set_index}) '
                               f'[{evicted_block}] EVICTED.')
                     pass
                     #self.tools.usage.update()
@@ -138,23 +153,28 @@ class Cache:
                         #self.tools.ram.write()
             else:
                 if self.verb:
-                    print(f'Block ({p_tag},{set_index}) HIT.')
+                    Dbg.p(f'Block ({p_tag},{set_index}) HIT.')
                 resident_block = self.blocks_in_cache[(p_tag,set_index)]
                 self.sets[set_index].touch_block(resident_block)
-                ##self.tools.hitmiss.add_hm(access, (1,0)) # hit++
+                self.tools.hitmiss.add_hm(access, (1,0)) # hit++
                 #self.tools.usage.update()
 
             # mark accessed bytes
             resident_block.access(offset, this_block_n_bytes, write=writing)
-            if self.verb:
-                print(self)
+            # if self.verb:
+            #     Dbg.p(self)
 
             # update address and reminding bytes to read for a potential new loop
             addr += this_block_n_bytes
             n_bytes -= this_block_n_bytes
 
+        Dbg.o()
+        return
+
     def flush(self):
         """evict all cache lines"""
+        Dbg.i()
+        Dbg.p('flush()')
         for s in self.sets:
             evicted_block = s.pop_lru_block()
             while evicted_block != None:
@@ -164,15 +184,17 @@ class Cache:
                     pass
                     #self.tools.ram.write()
                 evicted_block = s.pop_lru_block()
+        Dbg.o()
         return
 
     def __repr__(self):
         keys = list(self.blocks_in_cache.keys())
         keys.sort()
         ret  = '+--Cache--------------\n'
-        ret += '| (tag,set)-->  blk|d\n'
+        ret += '| tag,set -->  blk|d\n'
         for k in keys:
-            ret += f'| {k} --> {self.blocks_in_cache[k]}\n'
+            blk_id = f'{k[0]:3},{k[1]:3}'
+            ret += f'| {blk_id:>6} --> {self.blocks_in_cache[k]}\n'
         ret += '+---------------------'
         return ret
 

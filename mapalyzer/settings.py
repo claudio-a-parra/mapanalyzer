@@ -59,7 +59,6 @@ class CacheSpecs:
         self.set_derived_values()
         return
 
-
     def set_defaults(self):
         self.arch=64
         self.cache_size=32768
@@ -74,7 +73,6 @@ class CacheSpecs:
         self.set_derived_values()
         return
 
-
     def set_derived_values(self):
         if None not in (self.cache_size, self.asso, self.line_size):
             self.num_sets = self.cache_size // (self.asso * self.line_size)
@@ -88,7 +86,6 @@ class CacheSpecs:
         if None not in (self.arch, self.bits_set, self.bits_off):
             self.bits_tag = self.arch - self.bits_set - self.bits_off
         return
-
 
     def set_value(self, name, val):
         if name not in CacheSpecs.key_map:
@@ -231,10 +228,10 @@ class MapSpecs:
 
 
 class PlotSpecs:
-    def __init__(self, width, height, resolution, dpi, format, prefix):
+    def __init__(self, width=8, height=4, res=1000, dpi=200, format='png', prefix='exp'):
         self.width = width
         self.height = height
-        self.res = resolution
+        self.res = res
         self.dpi = dpi
         self.format = format
         self.prefix = prefix
@@ -245,10 +242,11 @@ class PlotSpecs:
         self.img_title_vpad = 6
         self.ui_title_hpad = 31
         self.ui_name_hpad = 23
-        self.grid_main_width = 3
+        self.grid_main_width = 1
         self.grid_main_style = '-'
-        self.grid_other_width = 0.667
+        self.grid_other_width = 1
         self.grid_other_style = '--'
+        self.linewidth=2
         return
 
     def __str__(self):
@@ -266,9 +264,9 @@ class PlotSpecs:
 
 
 class Settings:
-    cache = None
-    map = None
-    plot = None
+    cache:CacheSpecs = None
+    map:MapSpecs = None
+    plot:PlotSpecs = None
     verb = False
 
 

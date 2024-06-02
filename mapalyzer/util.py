@@ -119,3 +119,28 @@ class PlotStrings:
         self.ylab  = ylab
         self.suffix= suffix
         self.subtit= subtit
+
+
+
+class Dbg:
+    lv = 0
+    step = 4
+    @classmethod
+    def p(cls, m=''):
+        ind = ' ' * Dbg.lv
+        if not isinstance(m, str) and hasattr(m, '__getitem__'):
+            m_lines = [m.__class__()]
+            for l in m:
+                m_lines += [f'├{str(l)}']
+            m_lines[-1] = f'└{m_lines[-1][1:]}'
+        else:
+            m_lines = str(m).split('\n')
+        for l in m_lines:
+            print(f'{ind}{l}')
+        return
+    @classmethod
+    def i(cls):
+        Dbg.lv += cls.step
+    @classmethod
+    def o(cls):
+        Dbg.lv -= cls.step

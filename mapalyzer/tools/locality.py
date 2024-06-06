@@ -2,26 +2,28 @@ import sys
 from collections import deque
 import matplotlib.pyplot as plt
 
-from util import AddrFmt, create_up_to_n_ticks, PlotStrings, save_fig
-from palette import Palette, hsl2rgb
+from util import AddrFmt, create_up_to_n_ticks, PlotStrings, save_fig, Palette, hsl2rgb, Dbg
 from settings import Settings as st
 
 
 class Locality:
-    def __init__(self, shared_X=None, hue=325, verb=None):
+    def __init__(self, shared_X=None, hue=325):
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
         # line and filling colors
-        self.tool_palette = Palette(hue=hue, lightness=[40,90], alpha=[100,75])
+        self.tool_palette = Palette(hue=hue,
+                                    lightness=st.plot.pal_lig,
+                                    saturation=st.plot.pal_sat,
+                                    alpha=st.plot.pal_alp)
         self.axes = None
-        self.verb = verb if verb is not None else st.verb
         self.name = 'Locality'
         self.about = ('Spacial locality across Time, and Temporal locality '
                       'across space')
 
         ## Spacial locality across time
         self.time_window = deque() #of the size of the cache.
-        self.time_window_size = st.cache.cache_size
+        self.time_window_curr_size = 0
+        self.time_window_max_size = st.cache.cache_size
         self.Ls = [-1] * st.map.time_size
         self.psLs = PlotStrings(
             title  = 'Spacial Locality across Time',
@@ -49,34 +51,49 @@ class Locality:
 
     def add_access(self, access):
         ## SPACIAL LOCALITY ACROSS TIME
-        # append accessed bytes to time_window, and trim back if the window
-        # becomes too long
-        for offset in range(access.size):
-            self.time_window.append(access.addr-st.map.start_addr+offset)
-        while len(self.time_window) > self.time_window_size:
-            self.time_window.popleft()
+        # Append access address to the time window. Trim the access window if
+        # it is too long.
+
+        # Use the first byte of access to compute the differences, but count
+        # all the bytes in the access to determine the window size.
+        Dbg.p(f'add_access: {access}')
+        self.time_window.append((access.addr-st.map.start_addr,access.size))
+        self.time_window_curr_size += access.size
+        Dbg.p(f'time_window:\n{Dbg.s(self.time_window)}')
+
+        while self.time_window_curr_size > self.time_window_max_size:
+            Dbg.p(f'twcs:{self.time_window_curr_size} > twms:{self.time_window_max_size}')
+            old_access = self.time_window.popleft()
+            Dbg.p(f'old:{old_access}')
+            self.time_window_curr_size -= old_access[1]
+            Dbg.p(f'new twcs:{self.time_window_curr_size}')
+        #input('.')
 
         ## TEMPORAL LOCALITY ACROSS SPACE
-        # append access times to each memory-block's list
-        for offset in range(access.size):
-            tag,idx,_ = AddrFmt.split(access.addr+offset)
-            if (tag,idx) not in self.space_by_blocks:
-                self.space_by_blocks[(tag,idx)] = []
-            self.space_by_blocks[(tag,idx)].append(access.time)
+        # Append access times to each memory-block's list.
+        # Only register the first byte of the access.
+        tag,idx,_ = AddrFmt.split(access.addr)
+        if (tag,idx) not in self.space_by_blocks:
+            self.space_by_blocks[(tag,idx)] = []
+        self.space_by_blocks[(tag,idx)].append(access.time)
         return
 
     def commit(self, time):
         """compute differences and add a new value to Ls"""
         # obtain a flat window of the last accessed addresses
-        flat_time_window = list(self.time_window)
+        flat_time_window = [x[0] for x in list(self.time_window)]
 
+        Dbg.p(f'COMMIT')
         # if only one access, there is no deltas to compute. assign Ls[t] = -1
         if len(flat_time_window) < 2:
+            Dbg.p(f'flat_time_win_size < 2; return')
             self.Ls[time] = -1
             return
 
         # sort by addresses and compute deltas into ls
         flat_time_window.sort()
+        Dbg.p('flat_time_window:')
+        Dbg.p(flat_time_window)
         ls = flat_time_window # just to reuse memory
         B = st.cache.line_size
         for i,a1,a2 in zip(range(len(ls)-1),
@@ -84,9 +101,12 @@ class Locality:
                            flat_time_window[1:]):
             ls[i] = (B - min(B, a2-a1)) / B
         del ls[-1]
+        Dbg.p('ls:')
+        Dbg.p(ls)
 
         # compute average delta of the whole ls array, and write it in Ls.
         avg_ls = 100 * sum(ls) / len(ls)
+        Dbg.p(f'avg_ls:{avg_ls}')
         self.Ls[time] = avg_ls
         return
 
@@ -148,8 +168,8 @@ class Locality:
 
     def plot_Ls(self, top_tool=None):
         # create figure and tool axes
-        fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        self.axes = axes
+        fig,map_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        self.axes = map_axes.twinx()
 
         # pad X and Y=Ls axes for better visualization
         padding = 0.5
@@ -167,13 +187,12 @@ class Locality:
 
         # draw map
         if top_tool is not None:
-            map_axes = axes.twinx()
-            top_tool.plot(axes=map_axes)
-            top_tool.plot_draw_Y_grid()
+            top_tool.plot(axes=map_axes, xlab=True)
+            #top_tool.plot_draw_Y_grid()
 
         # complete plot setup
-        axes.set_xticks([])
-        axes.set_yticks([])
+        self.axes.set_xticks([])
+        self.axes.set_yticks([])
         self.plot_setup_general(self.psLs)
         self.plot_Ls_setup_X()
         self.plot_Ls_setup_Y()
@@ -182,7 +201,7 @@ class Locality:
 
     def plot_Ls_setup_X(self):
         # X axis label, ticks and grid
-        self.axes.set_xlabel(self.psLs.xlab, color='k')
+        #self.axes.set_xlabel(self.psLs.xlab, color='k')
         self.axes.tick_params(axis='x', rotation=-90,
                          bottom=False, labelbottom=True,
                          top=False, labeltop=False,
@@ -190,10 +209,10 @@ class Locality:
         x_ticks = create_up_to_n_ticks(self.X, base=10,
                                        n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
-        self.axes.grid(axis='x', which='both',
-                  alpha=0.1, color='k', zorder=1,
-                  linestyle=st.plot.grid_other_style,
-                  linewidth=st.plot.grid_other_width)
+        # self.axes.grid(axis='x', which='both',
+        #           alpha=0.1, color='k', zorder=1,
+        #           linestyle=st.plot.grid_other_style,
+        #           linewidth=st.plot.grid_other_width)
 
     def plot_Ls_setup_Y(self):
         # Y axis label, ticks, and grid
@@ -207,21 +226,23 @@ class Locality:
                               width=st.plot.grid_main_width,
                               colors=self.tool_palette.fg)
         self.axes.set_yticks(y_ticks)
-        self.axes.grid(axis='y', which='both',
-                       alpha=0.1, color=self.tool_palette.fg, zorder=1,
+        self.axes.grid(axis='y', which='both', color=self.tool_palette.fg,
+                       zorder=1,
+                       alpha=st.plot.grid_main_alpha,
                        linewidth=st.plot.grid_main_width,
                        linestyle=st.plot.grid_main_style)
 
 
     def plot_Lt(self, top_tool=None):
         # create figure and tool axes
-        fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        self.axes = axes
+        fig,map_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        self.axes = fig.add_axes(map_axes.get_position(), frameon=False)
 
         # pad Y and X=Lt axes for better visualization
         # Y = list of memory blocks. always starting from 0
         padding = 0.5
-        Y = [i for i in range(st.map.mem_size >> st.cache.bits_off)]
+        Y = [i for i in range((st.map.mem_size+st.cache.line_size-1)
+                              >> st.cache.bits_off)]
         Y = [Y[0]-padding] + Y + [Y[-1]+padding]
         Lt = [self.Lt[0]] + self.Lt + [self.Lt[-1]]
 
@@ -236,13 +257,12 @@ class Locality:
 
         # plot map
         if top_tool is not None:
-            map_axes = fig.add_axes(axes.get_position(), frameon=False)
-            top_tool.plot(axes=map_axes)
+            top_tool.plot(axes=map_axes, xlab=False)
             top_tool.plot_draw_Y_grid()
 
         # complete plot setup
-        axes.set_xticks([])
-        axes.set_yticks([])
+        self.axes.set_xticks([])
+        self.axes.set_yticks([])
         self.plot_setup_general(self.psLt)
         self.plot_Lt_setup_X()
         self.plot_Lt_setup_Y()
@@ -257,22 +277,22 @@ class Locality:
                               width=st.plot.grid_main_width)
         x_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
         self.axes.set_xticks(x_ticks)
-        self.axes.grid(axis='x', which='both',
-                       alpha=0.1, color=self.tool_palette.fg, zorder=1,
+        self.axes.grid(axis='x', which='both', color=self.tool_palette.fg,
+                       zorder=1,
+                       alpha=st.plot.grid_main_alpha,
                        linewidth=st.plot.grid_main_width,
                        linestyle=st.plot.grid_main_style)
         return
 
     def plot_Lt_setup_Y(self):
-        mem_color = hsl2rgb(120,100,30,100)
         self.axes.yaxis.set_label_position('left')
-        self.axes.set_ylabel(self.psLt.ylab, color=mem_color)
+        self.axes.set_ylabel(self.psLt.ylab, color='k')
         list_of_blocks = [i for i in
                           range(st.map.mem_size >> st.cache.bits_off)]
         y_ticks = create_up_to_n_ticks(list_of_blocks, base=10, n=11)
         self.axes.tick_params(axis='y', which='both', left=False, right=False,
                               labelleft=True, labelright=False,
-                              colors=mem_color,
+                              colors='k',
                               width=st.plot.grid_other_width)
         self.axes.set_yticks(y_ticks)
         # self.axes.grid(axis='y', which='both',

@@ -3,13 +3,12 @@ from collections import deque
 import matplotlib.pyplot as plt
 
 
-from util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg
-from palette import Palette
+from util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette
 from settings import Settings as st
 
 
 class ThreadHitMiss:
-    def __init__(self, verb=False):
+    def __init__(self):
         self.hit_count = 0
         self.miss_count = 0
         self.time_last_increment = 0
@@ -43,7 +42,11 @@ class HitMiss:
     def __init__(self, shared_X=None, hue=30):
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
-        self.tool_palette = Palette(hue=hue, lightness=[40,90], alpha=[100,75])
+        self.tool_palette = Palette(hue=hue,
+                                    lightness=st.plot.pal_lig,
+                                    saturation=st.plot.pal_sat,
+                                    alpha=st.plot.pal_alp)
+
         self.time_window = deque()
         self.time_window_size = st.cache.num_sets*st.cache.asso
         self.thr_traces = {}
@@ -68,7 +71,7 @@ class HitMiss:
         # queue event to time_window, and increment the thread's counters
         self.time_window.append((access,hm))
         if access.thread not in self.thr_traces:
-            self.thr_traces[access.thread] = ThreadHitMiss(access.time)
+            self.thr_traces[access.thread] = ThreadHitMiss()
         self.thr_traces[access.thread].update_counters(hm, access.time)
 
         # dequeue event from time_window, and decrement the thread's counters
@@ -94,13 +97,18 @@ class HitMiss:
         threads = list(self.thr_traces.keys())
         threads.sort()
         thr_num = len(threads)
+        if thr_num < 1:
+            raise ValueError('HitMiss registered no activity!')
 
         # create color palettes
-        thr_pal = Palette(lightness=[40,90], hue_count=thr_num,
-                          alpha=[80,65])
+        thr_pal = Palette(hue_count=thr_num,
+                          lightness=st.plot.pal_lig,
+                          saturation=st.plot.pal_sat,
+                          alpha=st.plot.pal_alp)
 
         # create figure and tool axes
-        fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        fig,map_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        axes = map_axes.twinx()
         axes.patch.set_facecolor(self.tool_palette.bg)
 
         # draw one plot for each thread.
@@ -125,21 +133,22 @@ class HitMiss:
         y_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
         axes.tick_params(axis='y', which='both', left=True, right=False,
                          labelleft=True, labelright=False,
-                         width=st.plot.grid_main_width, colors=self.tool_palette.fg)
+                         width=st.plot.grid_main_width,
+                         colors=self.tool_palette.fg)
         axes.set_yticks(y_ticks)
-        axes.grid(axis='y', which='both',
-                  alpha=0.1, color=self.tool_palette.fg, zorder=1,
+        axes.grid(axis='y', which='both', color=self.tool_palette.fg,
+                  zorder=1,
+                  alpha=st.plot.grid_main_alpha,
                   linewidth=st.plot.grid_main_width,
                   linestyle=st.plot.grid_main_style)
 
         # plot map
-        map_axes = axes.twinx()
-        top_tool.plot(axes=map_axes)
-        top_tool.plot_draw_Y_grid()
+        #map_axes = axes.twinx()
+        top_tool.plot(axes=map_axes, xlab=True)
+        #top_tool.plot_draw_Y_grid()
 
 
-        # X axis label, ticks and grid
-        axes.set_xlabel(self.ps.xlab)
+        # X axis ticks and grid
         axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
                          rotation=-90, width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)

@@ -5,7 +5,8 @@ from settings import Settings as st
 from .mapplotter import Map
 from .locality import Locality
 from .hitmiss import HitMiss
-from .usage import UnusedBytes
+from .cost import Cost
+from .usage import CacheUsage
 from .alias import Alias
 from .siue import SIUEvict
 
@@ -15,12 +16,14 @@ class Tools:
         self.map = Map()
         self.locality = Locality(shared_X=self.map.X)
         self.hitmiss = HitMiss(shared_X=self.map.X)
-        #self.usage = UnusedBytes(shared_X=self.map.X)
+        self.cost = Cost(shared_X=self.map.X)
+        self.usage = CacheUsage(shared_X=self.map.X)
         #self.alias = Alias(shared_X=self.map.X)
         #self.siu = SIUEvict(shared_X=self.map.X)
 
         # list of all tools
-        self.tools_list = [self.map, self.locality, self.hitmiss]
+        self.tools_list = [self.map, self.locality, self.hitmiss,
+                           self.cost, self.usage]
         st.plot.ui_name_hpad = max([len(t.name)+1 for t in self.tools_list])
         return
 

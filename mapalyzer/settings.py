@@ -17,21 +17,20 @@ class CacheSpecs:
 
     def __init__(self, filename=None):
         self.file_path=filename
-        self.arch=None
-        self.cache_size=None
-        self.line_size=None
-        self.asso=None
-        self.fetch=None
-        self.write=None
+        self.arch=64
+        self.cache_size=32768
+        self.line_size=64
+        self.asso=8
+        self.fetch=1
+        self.write=2
         self.num_sets = None
         self.bits_set = None
         self.bits_off = None
         self.bits_tag = None
-        # if no file was given, fill with the defaults.
         if filename is None:
-            self.set_defaults()
             self.set_derived_values()
             return
+
         try:
             with open(filename, 'r') as cache_config_file:
                 for line in cache_config_file:
@@ -55,21 +54,6 @@ class CacheSpecs:
         except FileNotFoundError:
             print(f"[!] File {filename} does not exist. Using default "
                   "configuration.")
-            self.set_defaults()
-        self.set_derived_values()
-        return
-
-    def set_defaults(self):
-        self.arch=64
-        self.cache_size=32768
-        self.line_size=64
-        self.asso=8
-        self.fetch=1
-        self.write=2
-        self.num_sets = None
-        self.bits_set = None
-        self.bits_off = None
-        self.bits_tag = None
         self.set_derived_values()
         return
 
@@ -242,11 +226,21 @@ class PlotSpecs:
         self.img_title_vpad = 6
         self.ui_title_hpad = 31
         self.ui_name_hpad = 23
-        self.grid_main_width = 1
+
+        # plot line settings
+        self.linewidth=1.5
+        self.pal_lig=[60,75]
+        self.pal_sat=[30,55]
+        self.pal_alp=[100,30]
+
+        # plot grids settings
+        self.grid_main_width = 0.5
         self.grid_main_style = '-'
-        self.grid_other_width = 1
+        self.grid_main_alpha = 0.2
+
+        self.grid_other_width = 0.5
         self.grid_other_style = '--'
-        self.linewidth=2
+        self.grid_other_alpha = 0
         return
 
     def __str__(self):

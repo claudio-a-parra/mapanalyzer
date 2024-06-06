@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import sys # for command line arguments
 import os # for file extension removal
 import argparse # to get command line arguments
@@ -24,34 +26,32 @@ def run_simulation(map_reader, cache, progress=True):
         return
 
     tot_eve = st.map.event_count
-    eve_count = 0
+    eve_count = -1
     concurrent_acc = []
     for access in map_reader:
+        eve_count += 1
         # collect all accesses happening at the same time mark
         if len(concurrent_acc) == 0 or \
            concurrent_acc[-1].time == access.time:
             concurrent_acc.append(access)
-        else:
-            # process all memory accesses at time t-1
-            cache.multi_access(concurrent_acc)
+            continue
 
-            # print progress
-            if progress:
-                print_progress(eve_count, tot_eve)
+        # process all memory accesses at time t-1
+        cache.multi_access(concurrent_acc)
 
-            # add first access of time t
-            concurrent_acc = [access]
+        # print progress
+        if progress:
+            print_progress(eve_count, tot_eve)
 
-        eve_count += 1
-
-
-    if progress:
-        print()
+        # add first access of time t
+        concurrent_acc = [access]
 
     # process all memory accesses at time t
+    eve_count += 1
     cache.multi_access(concurrent_acc)
     if progress:
         print_progress(eve_count, tot_eve)
+        print()
 
     cache.flush()
     return

@@ -39,7 +39,7 @@ class ThreadHitMiss:
         return ret_str
 
 class HitMiss:
-    def __init__(self, shared_X=None, hue=30):
+    def __init__(self, shared_X=None, hue=0):
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
         self.tool_palette = Palette(hue=hue,

@@ -219,18 +219,18 @@ class PlotSpecs:
         self.dpi = dpi
         self.format = format
         self.prefix = prefix
-        self.max_xtick_count = 32
-        self.max_ytick_count = 32
-        self.max_map_ytick_count = 20
+        self.max_xtick_count = 11
+        self.max_ytick_count = 35
+        self.max_map_ytick_count = 11
         self.img_border_pad = 0.05
         self.img_title_vpad = 6
         self.ui_title_hpad = 31
         self.ui_name_hpad = 23
 
         # plot line settings
-        self.linewidth=1.5
+        self.linewidth=1.2
         self.pal_lig=[60,75]
-        self.pal_sat=[30,55]
+        self.pal_sat=[50,75]
         self.pal_alp=[100,30]
 
         # plot grids settings

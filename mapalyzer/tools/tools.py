@@ -7,8 +7,8 @@ from .locality import Locality
 from .hitmiss import HitMiss
 from .cost import Cost
 from .usage import CacheUsage
-from .alias import Alias
-from .siue import SIUEvict
+#from .alias import Alias
+from .siue import SIUEviction
 
 class Tools:
     def __init__(self):
@@ -19,7 +19,7 @@ class Tools:
         self.cost = Cost(shared_X=self.map.X)
         self.usage = CacheUsage(shared_X=self.map.X)
         #self.alias = Alias(shared_X=self.map.X)
-        #self.siu = SIUEvict(shared_X=self.map.X)
+        self.siu = SIUEviction(shared_X=self.map.X)
 
         # list of all tools
         self.tools_list = [self.map, self.locality, self.hitmiss,

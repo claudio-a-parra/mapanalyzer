@@ -89,7 +89,7 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
     # find a label_step such that we print at most n ticks
     tick_step = 1
     tot_ticks = len(full_list)
-    factors = [1,2,2.5,5] if base==10 else [1,1.5]
+    factors = [1,2,2.5,5] if base==10 else [1]
     for i in range(14):
         found = False
         for f in factors:
@@ -143,12 +143,14 @@ class Dbg:
     def s(cls, m=''):
         ind = ' ' * Dbg.lv
         if not isinstance(m, str) and hasattr(m, '__getitem__'):
-            m_lines = [m.__class__()]
+            m_lines = [str(m.__class__)]
             for l in m:
-                m_lines += [f'├{str(l)}']
-            m_lines[-1] = f'└{m_lines[-1][1:]}'
+                m_lines += [f' ├ {str(l)}']
+            m_lines[-1] = f' └ {m_lines[-1][3:]}'
         else:
             m_lines = str(m).split('\n')
+
+        # add indentation
         ret_val = ''
         for l in m_lines:
             ret_val += f'{ind}{l}\n'
@@ -181,39 +183,40 @@ def hsl2rgb(h, s, l, a):
 
 
 class Palette:
-    def __init__(self, hue=0, saturation=80, lightness=50, alpha=50,
-                 hue_count=1, saturation_count=2, lightness_count=2):
+    def __init__(self, hue=0, hue_count=1, saturation=[50], lightness=[50],
+                 alpha=[80]):
         if hasattr(hue, '__getitem__'):
-            hues = hue
+            hues = [i%360 for i in hue]
         else:
-            base = hue
+            base = hue%360
             step = 360/hue_count
             hues = [(round(i*step)+base)%360 for i in range(hue_count)]
 
         if hasattr(saturation, '__getitem__'):
             sats = saturation
         else:
-            step = round(100/(saturation_count+1))
-            sats = [i*step for i in range(1, saturation_count+1)]
+            step = round(100/(saturation+1))
+            sats = [i*step for i in range(1, saturation+1)]
 
         if hasattr(lightness, '__getitem__'):
             lights = lightness
         else:
-            step = round(100/(lightness_count+1))
-            lights = [i*step for i in range(1, lightness_count+1)]
+            step = round(100/(lightness+1))
+            lights = [i*step for i in range(1, lightness+1)]
 
         if hasattr(alpha, '__getitem__'):
             alphas = alpha
         else:
             alphas = [alpha] * len(lights)
 
-        if len(lights) != len(alphas):
-            raise ValueError('The array alpha must have the same number of '
-                             'items as lightness')
-        self.fg = hsl2rgb(hues[0], 85, 40, 100)
-        self.bg = hsl2rgb(hues[0], 100, 100, 100)
-
-        self.col = [[hsl2rgb(h,s,l,a) for s,l,a in zip(sats,lights,alphas)] for h in hues]
+        if not (len(sats) == len(lights) == len(alphas)):
+            raise ValueError('If saturation, lightness or alpha are arrays, they have to be of the '
+                             'same length. Otherwise provide integers')
+        self.fg = hsl2rgb(hues[0], 100, 25, 100)
+        self.bg = hsl2rgb(hues[0], 100, 95, 10)
+        self.col = [
+            [hsl2rgb(h,s,l,a) for s,l,a in zip(sats,lights,alphas)]
+            for h in hues]
         return
 
 

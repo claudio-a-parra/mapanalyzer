@@ -6,7 +6,7 @@ from util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette
 from settings import Settings as st
 
 class CacheUsage:
-    def __init__(self, shared_X=None, hue=230):
+    def __init__(self, shared_X=None, hue=120):
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
         self.tool_palette = Palette(hue=[hue],

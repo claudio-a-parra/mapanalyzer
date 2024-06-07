@@ -114,7 +114,13 @@ class Map:
         cmap = ListedColormap(rcol + ['#FFFFFF00'] + wcol)
 
         # set plot limits and draw the MAP
-        extent = (self.X[0]-0.5, self.X[-1]+0.5, 0-0.5, st.map.mem_size-0.5)
+        mem_min_display = 0
+        mem_max_display = ((st.map.mem_size+st.cache.line_size-1)
+                           >> st.cache.bits_off) * st.cache.line_size
+        mem_max_display = st.map.mem_size
+
+        extent = (self.X[0]-0.5, self.X[-1]+0.5,
+                  mem_min_display-0.5, mem_max_display-0.5)
         self.axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
                     aspect='auto', zorder=0, extent=extent,
                     vmin=-thr_count, vmax=thr_count)
@@ -130,6 +136,7 @@ class Map:
             save_fig(fig, self.ps.title, self.ps.suffix)
         else:
             self.plot_setup_X_axis(xlab=xlab)
+        exit(0)
         return
 
     def plot_setup_general(self):
@@ -143,7 +150,7 @@ class Map:
                        pad=st.plot.img_title_vpad)
 
     def plot_setup_X_axis(self, xlab=False, grid=False):
-        if xlab == False:
+        if not xlab:
             return
         # label
         self.axes.set_xlabel(self.ps.xlab)
@@ -162,8 +169,9 @@ class Map:
         ymax = st.map.mem_size-0.5
         time_sep_lines = [i-0.5 for i in
                           range(self.X[0],self.X[-1]+1)]
-        self.axes.vlines(x=time_sep_lines, ymin=-0.5, ymax=ymax,
-                         color='k', linewidth=0.33, alpha=0.2, zorder=1)
+        if len(time_sep_lines) < 100:
+            self.axes.vlines(x=time_sep_lines, ymin=-0.5, ymax=ymax,
+                             color='k', linewidth=0.33, alpha=0.2, zorder=1)
         return
 
     def plot_setup_Y_axis(self):
@@ -178,19 +186,25 @@ class Map:
                                        n=st.plot.max_map_ytick_count)
         self.axes.set_yticks(y_ticks)
 
-        bs = False if st.map.mem_size > 64 else True
-        self.plot_draw_Y_grid(byte_sep=bs)
+
+        self.plot_draw_Y_grid()
         return
 
-    def plot_draw_Y_grid(self, byte_sep=False):
+    def plot_draw_Y_grid(self, byte_sep=True):
+        if st.map.mem_size > 64:
+            byte_sep = False
+
         if byte_sep:
             byte_sep_lines = [i-0.5 for i in range(1,st.map.mem_size)]
             self.axes.hlines(y=byte_sep_lines, xmin=-0.5, xmax=st.map.time_size-0.5,
-                             color=self.tool_palette.fg,
+                             color=self.tool_palette[0][0],
                              linewidth=0.33, alpha=0.2, zorder=1)
+
         block_sep_lines = [i-0.5 for i in
                            range(0, st.map.mem_size+1, st.cache.line_size)]
-        self.axes.hlines(y=block_sep_lines, xmin=-0.5, xmax=st.map.time_size-0.5,
-                         color=self.tool_palette.fg,
-                         linestyle='-',
-                         linewidth=1, alpha=0.3, zorder=1)
+        Dbg.P(f'bsl: {len(block_sep_lines)}')
+        if len(block_sep_lines) <= 100:
+            self.axes.hlines(y=block_sep_lines, xmin=-0.5,
+                             xmax=st.map.time_size-0.5,
+                             color=self.tool_palette[0][0],
+                             linestyle='-', linewidth=1, alpha=0.3, zorder=1)

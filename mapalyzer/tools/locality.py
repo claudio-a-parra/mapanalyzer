@@ -237,14 +237,24 @@ class Locality:
         # create figure and tool axes
         fig,map_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
         self.axes = fig.add_axes(map_axes.get_position(), frameon=False)
+        self.axes.patch.set_facecolor(self.tool_palette.bg)
 
         # pad Y and X=Lt axes for better visualization
         # Y = list of memory blocks. always starting from 0
         padding = 0.5
         Y = [i for i in range((st.map.mem_size+st.cache.line_size-1)
                               >> st.cache.bits_off)]
-        Y = [Y[0]-padding] + Y + [Y[-1]+padding]
+
+
+        # BUG: it shifts if not a whole block
+        x = 0 #   b150 l4
+        x = 0.5 # b 20 l4
+        Y = [Y[0]-padding] + Y + [Y[-1]+0.5]
+
+
         Lt = [self.Lt[0]] + self.Lt + [self.Lt[-1]]
+
+        Dbg.P(f'Y,Lt :{Dbg.s(list(zip(Y,Lt)))}')
 
         # set plot limits and draw time locality across space
         self.axes.set_ylim(Y[0], Y[-1])
@@ -267,6 +277,7 @@ class Locality:
         self.plot_Lt_setup_X()
         self.plot_Lt_setup_Y()
         save_fig(fig, self.psLt.title, self.psLt.suffix)
+        exit(0)
         return
 
     def plot_Lt_setup_X(self):
@@ -289,8 +300,9 @@ class Locality:
         self.axes.set_ylabel(self.psLt.ylab, color='k')
         list_of_blocks = [i for i in
                           range(st.map.mem_size >> st.cache.bits_off)]
-        y_ticks = create_up_to_n_ticks(list_of_blocks, base=10, n=11)
-        self.axes.tick_params(axis='y', which='both', left=False, right=False,
+        y_ticks = create_up_to_n_ticks(list_of_blocks, base=10,
+                                       n=st.plot.max_ytick_count)
+        self.axes.tick_params(axis='y', which='both', left=True, right=False,
                               labelleft=True, labelright=False,
                               colors='k',
                               width=st.plot.grid_other_width)

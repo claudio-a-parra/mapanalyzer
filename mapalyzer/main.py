@@ -140,12 +140,14 @@ def main():
 
     print(f'\nMEMORY ACCESS PATTERN')
     st.init_map(args.input_file)
+    st.init_map_derived()
     map_reader = MapFileReader()
     st.map.describe(ind='    ')
 
     file_prefix = os.path.basename(os.path.splitext(args.input_file)[0])
-    plot_metadata = PlotSpecs(width=args.px, height=args.py, res=args.resolution,
-                              dpi=args.dpi, format=args.format, prefix=file_prefix)
+    plot_metadata = PlotSpecs(width=args.px, height=args.py,
+                              res=args.resolution, dpi=args.dpi,
+                              format=args.format, prefix=file_prefix)
     st.init_plot(plot_metadata=plot_metadata)
 
     print(f'\nCREATING TOOLS AND MEMORY SYSTEM')

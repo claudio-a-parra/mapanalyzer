@@ -24,6 +24,9 @@ class Tools:
         # list of all tools
         self.tools_list = [self.map, self.locality, self.hitmiss,
                            self.cost, self.usage]
+
+        self.tools_list = [self.map, self.locality]
+
         st.plot.ui_name_hpad = max([len(t.name)+1 for t in self.tools_list])
         return
 
@@ -37,5 +40,5 @@ class Tools:
 
     def plot(self):
         for t in self.tools_list:
-            t.plot(top_tool=self.map)
+            t.plot(map_tool=self.map)
         return

@@ -213,7 +213,7 @@ class Palette:
             raise ValueError('If saturation, lightness or alpha are arrays, they have to be of the '
                              'same length. Otherwise provide integers')
         self.fg = hsl2rgb(hues[0], 100, 25, 100)
-        self.bg = hsl2rgb(hues[0], 100, 95, 10)
+        self.bg = hsl2rgb(hues[0], 100, 100, 70)
         self.col = [
             [hsl2rgb(h,s,l,a) for s,l,a in zip(sats,lights,alphas)]
             for h in hues]

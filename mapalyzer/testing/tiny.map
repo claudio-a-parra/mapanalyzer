@@ -1,12 +1,12 @@
 # METADATA
-start-addr   : 0x1
-end-addr     : 0x18
-block-size   : 23
+start-addr   : 3   #0  #0x0
+end-addr     : 26  #23 #0x17
+block-size   : 24
 owner-thread : 0
 slice-size   : 500
 thread-count : 3
-event-count  : 33
-max-time     : 23
+event-count  : 34
+max-time     : 24
 
 # DATA
 time,thread,event,size,offset
@@ -43,3 +43,4 @@ time,thread,event,size,offset
 21,0,W,1,0
 22,1,R,2,14
 23,1,W,2,16
+24,1,W,1,23

@@ -107,5 +107,5 @@ class MapFileReader:
             print('Incorrect value for offset:\n'
                   f'    {off}')
             sys.exit(1)
-        addr = st.map.start_addr + off
+        addr = st.map.aligned_start_addr + st.map.left_pad + off
         return MemAccess(time, thr, ev, size, addr)

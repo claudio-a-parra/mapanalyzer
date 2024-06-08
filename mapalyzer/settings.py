@@ -115,6 +115,7 @@ class MapSpecs:
     data_header = '# DATA'
     key_map = {
         'start-addr'   : ('start_addr',16),
+        'end-addr'     : ('end_addr', 16),
         'thread-count' : ('thread_count',10),
         'event-count'  : ('event_count',10),
         'block-size'   : ('mem_size',10),
@@ -128,10 +129,26 @@ class MapSpecs:
 
         self.file_path = map_filepath
         self.start_addr = None
+        self.end_addr = None
         self.mem_size = None
         self.time_size = None
         self.thread_count = None
         self.event_count = None
+
+        # Derived values
+        # the closest beginning of block at the left of start_addr
+        self.aligned_start_addr = None
+        # the distance between aligned_start_addr and start_addr
+        self.left_pad = None
+        # the distance between end_addr and aligned_end_addr
+        self.right_pad = None
+        # the closest end of block at the right of end_addr
+        self.aligned_end_addr = None
+        # number of bytes included the ones used to complete the blocks at start and end.
+        self.num_padded_bytes = None
+        # number of blocks used by num_padded_bytes
+        self.num_blocks = None
+
         try:
             file = open(self.file_path, 'r')
         except FileNotFoundError:
@@ -162,6 +179,7 @@ class MapSpecs:
             try:
                 name,val = line.split(':')
                 name,val = name.strip(),val.strip()
+                val = val.split('#')[0].strip()
             except:
                 print(f"Error: File {self.file_path}: "
                       "Malformed line in Metadata Section:\n"
@@ -170,7 +188,8 @@ class MapSpecs:
             # check for recognized pair
             if name in MapSpecs.key_map:
                 try:
-                    int_val = int(val, MapSpecs.key_map[name][1])
+                    #int_val = int(val, MapSpecs.key_map[name][1])
+                    int_val = int(val)
                 except ValueError:
                     print(f"Invalid value for '{name}' in "
                           "Metadata Section.\n"
@@ -182,9 +201,16 @@ class MapSpecs:
             line = file.readline()
 
         # if any value is missing, error.
-        if None in (self.start_addr, self.mem_size, self.thread_count,
+        if None in (self.start_addr, self.end_addr, self.mem_size, self.thread_count,
                     self.event_count, self.time_size):
-            print(f'Error: Incomplete Metadata in {self.file_path}')
+            print(f'Error: Incomplete Metadata in {self.file_path}.')
+            print(self)
+            sys.exit(1)
+
+        # error if start_addr, mem_size and end_addr are incoherent.
+        if self.end_addr - self.start_addr + 1 != self.mem_size:
+            print(f'Error: The size, start and end address of the memory '
+                  f'declared is incoherent in {self.file_path}.')
             print(self)
             sys.exit(1)
 
@@ -197,7 +223,8 @@ class MapSpecs:
     def __str__(self):
         ret_str = ''
         for prop in self.__dict__:
-            ret_str += f'{prop:13}: {getattr(self, prop)}\n'
+            if getattr(self, prop) is not None:
+                ret_str += f'{prop:19}= {getattr(self, prop)}\n'
         return ret_str[:-1]
 
     def describe(self, ind=''):
@@ -219,8 +246,8 @@ class PlotSpecs:
         self.dpi = dpi
         self.format = format
         self.prefix = prefix
-        self.max_xtick_count = 11
-        self.max_ytick_count = 35
+        self.max_xtick_count = 20
+        self.max_ytick_count = 11
         self.max_map_ytick_count = 11
         self.img_border_pad = 0.05
         self.img_title_vpad = 6
@@ -237,10 +264,11 @@ class PlotSpecs:
         self.grid_main_width = 0.5
         self.grid_main_style = '-'
         self.grid_main_alpha = 0.2
-
         self.grid_other_width = 0.5
         self.grid_other_style = '--'
         self.grid_other_alpha = 0
+
+        self.fade_bytes_alpha=0.1
         return
 
     def __str__(self):
@@ -267,15 +295,32 @@ class Settings:
     @classmethod
     def init_cache(cls, cache_file):
         cls.cache = CacheSpecs(cache_file)
+        return
 
     @classmethod
     def init_map(cls, map_file):
         cls.map = MapSpecs(map_file)
+        return
 
+    @classmethod
+    def init_map_derived(cls):
+        # compute the shift of addresses to align to blocks.
+        cls.map.left_pad  = cls.map.start_addr & (cls.cache.line_size-1)
+        cls.map.aligned_start_addr = cls.map.start_addr - cls.map.left_pad
+        cls.map.right_pad = (cls.cache.line_size-1) - \
+            (cls.map.end_addr & (cls.cache.line_size-1))
+        cls.map.aligned_end_addr = cls.map.end_addr + cls.map.right_pad
+        cls.map.num_padded_bytes = ((cls.map.end_addr+cls.map.right_pad) -
+                                    (cls.map.start_addr-cls.map.left_pad) + 1)
+        cls.map.num_blocks = cls.map.num_padded_bytes // cls.cache.line_size
+        # print(cls.map)
+        # exit(0)
+        return
 
     @classmethod
     def init_plot(cls, plot_metadata):
         cls.plot = plot_metadata
+        return
 
     @classmethod
     def describe(cls, ind=''):

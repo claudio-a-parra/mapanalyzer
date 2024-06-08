@@ -100,6 +100,7 @@ class Map:
             sat_val = [45,75]
             alp_val = 100
             fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+            fig.patch.set_facecolor('white')
         else:
             standalone = False
             lig_val = [35,70]
@@ -131,21 +132,21 @@ class Map:
         # complete plot setup
         self.axes.set_xticks([])
         self.axes.set_yticks([])
+        self.axes.patch.set_facecolor('white')
+        self.plot_fade_padding_bytes()
         if standalone:
             self.plot_setup_general()
             self.plot_setup_X_axis()
             self.plot_draw_X_grid()
             self.plot_setup_Y_axis()
             self.plot_draw_Y_grid()
-            self.plot_fade_padding_bytes()
             save_fig(fig, self.ps.title, self.ps.suffix)
-        else:
-            self.plot_fade_padding_bytes()
         return
 
     def plot_setup_general(self):
         # background and spines colors
-        self.axes.patch.set_facecolor(self.tool_palette.bg)
+        self.axes.patch.set_facecolor('white')
+        # self.axes.patch.set_facecolor(self.tool_palette.bg)
         # for spine in self.axes.spines.values():
         #     spine.set_edgecolor(self.tool_palette.fg)
 

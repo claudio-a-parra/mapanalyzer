@@ -93,7 +93,8 @@ class HitMiss:
         return
 
 
-    def plot(self, top_tool=None):
+    # HERE!!!
+    def plot(self, map_tool=None):
         threads = list(self.thr_traces.keys())
         threads.sort()
         thr_num = len(threads)
@@ -110,6 +111,11 @@ class HitMiss:
         fig,map_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
         axes = map_axes.twinx()
         axes.patch.set_facecolor(self.tool_palette.bg)
+
+        # plot map
+        #map_axes = axes.twinx()
+        map_tool.plot(axes=map_axes)
+        #top_tool.plot_draw_Y_grid()
 
         # draw one plot for each thread.
         padding = 0.5
@@ -142,13 +148,10 @@ class HitMiss:
                   linewidth=st.plot.grid_main_width,
                   linestyle=st.plot.grid_main_style)
 
-        # plot map
-        #map_axes = axes.twinx()
-        top_tool.plot(axes=map_axes, xlab=True)
-        #top_tool.plot_draw_Y_grid()
 
 
         # X axis ticks and grid
+        axes.set_xlabel(self.ps.xlab, color='k')
         axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
                          rotation=-90, width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)

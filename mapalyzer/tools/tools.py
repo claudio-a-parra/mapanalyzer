@@ -7,7 +7,7 @@ from .locality import Locality
 from .hitmiss import HitMiss
 from .cost import Cost
 from .usage import CacheUsage
-#from .alias import Alias
+from .alias import Aliasing
 from .siue import SIUEviction
 
 class Tools:
@@ -18,15 +18,12 @@ class Tools:
         self.hitmiss = HitMiss(shared_X=self.map.X)
         self.cost = Cost(shared_X=self.map.X)
         self.usage = CacheUsage(shared_X=self.map.X)
-        #self.alias = Alias(shared_X=self.map.X)
+        self.aliasing = Aliasing(shared_X=self.map.X)
         self.siu = SIUEviction(shared_X=self.map.X)
 
         # list of all tools
         self.tools_list = [self.map, self.locality, self.hitmiss,
-                           self.cost, self.usage]
-        self.tools_list = [self.map, self.locality, self.hitmiss,
-                           self.cost]
-        self.tools_list = [self.map, self.locality, self.hitmiss]
+                           self.cost, self.usage, self.aliasing, self.siu]
 
         st.plot.ui_name_hpad = max([len(t.name)+1 for t in self.tools_list])
         return
@@ -41,5 +38,5 @@ class Tools:
 
     def plot(self):
         for t in self.tools_list:
-            t.plot(map_tool=self.map)
+            t.plot(bottom_tool=self.map)
         return

@@ -46,7 +46,7 @@ class MapFileReader:
                 sys.exit(1)
             line = line.strip()
             if line != '':
-                print('    [!] '+line)
+                print('[!] '+line)
             line = self.file.readline()
 
         self.go_to_section(st.map.data_header)

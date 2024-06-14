@@ -80,7 +80,7 @@ def command_line_args_parser():
     
     # Adding arguments
     parser.add_argument(
-        'input_file', metavar='input_file.map', type=str,
+        'input_files', metavar='input_file.map', nargs='+', type=str,
         help='Path of the input Memory Access Pattern file.'
     )
     
@@ -138,30 +138,32 @@ def main():
     AddrFmt.init(st.cache)
     st.cache.describe(ind='    ')
 
-    print(f'\nMEMORY ACCESS PATTERN')
-    st.init_map(args.input_file)
-    st.init_map_derived()
-    map_reader = MapFileReader()
-    st.map.describe(ind='    ')
+    for map_filename in args.input_files:
+        print(f'\nMEMORY ACCESS PATTERN')
+        st.init_map(map_filename)
+        st.init_map_derived()
+        map_reader = MapFileReader()
+        st.map.describe(ind='    ')
 
-    file_prefix = os.path.basename(os.path.splitext(args.input_file)[0])
-    plot_metadata = PlotSpecs(width=args.px, height=args.py,
-                              res=args.resolution, dpi=args.dpi,
-                              format=args.format, prefix=file_prefix)
-    st.init_plot(plot_metadata=plot_metadata)
+        file_prefix = os.path.basename(os.path.splitext(map_filename)[0])
+        plot_metadata = PlotSpecs(width=args.px, height=args.py,
+                                  res=args.resolution, dpi=args.dpi,
+                                  format=args.format, prefix=file_prefix)
+        st.init_plot(plot_metadata=plot_metadata)
 
-    print(f'\nCREATING TOOLS AND MEMORY SYSTEM')
-    tools = Tools()
-    tools.describe()
-    cache = Cache(tools=tools)
+        print(f'\nCREATING TOOLS AND MEMORY SYSTEM')
+        tools = Tools()
+        tools.describe()
+        cache = Cache(tools=tools)
 
-    print(f'\nRETRACING MAP ({st.map.event_count} mem. accesses)')
-    run_simulation(map_reader, cache)
+        print(f'\nRETRACING MAP ({st.map.event_count} mem. accesses)')
+        run_simulation(map_reader, cache)
 
-    print(f'\nPLOTTING ({st.plot.format})')
-    tools.plot()
+        print(f'\nPLOTTING ({st.plot.format})')
+        tools.plot()
 
     print('Done')
+    print('[!] DBG: Addresses are in decimal!')
 
 
 

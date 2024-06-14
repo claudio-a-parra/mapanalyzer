@@ -1,4 +1,5 @@
 import colorsys
+import matplotlib.pyplot as plt
 from settings import Settings as st
 
 class AddrFmt:
@@ -109,6 +110,7 @@ def save_fig(fig, plot_title, plot_name_suffix):
     print(f'    {plot_title:{st.plot.ui_title_hpad}}: {filename}')
     fig.savefig(filename, dpi=st.plot.dpi, bbox_inches='tight',
                 pad_inches=st.plot.img_border_pad)
+    plt.close(fig)
     return
 
 
@@ -127,9 +129,9 @@ class Dbg:
     step = 4
 
     @classmethod
-    def P(cls, m=''):
+    def P(cls, m='', ind=''):
         lines = Dbg.s(m=m)
-        print(f'{lines}', end='')
+        print(f'{ind}{lines}', end='')
         return
 
     @classmethod
@@ -153,6 +155,8 @@ class Dbg:
         # add indentation
         ret_val = ''
         for l in m_lines:
+            if l == '' or l == '\n':
+                continue
             ret_val += f'{ind}{l}\n'
         return ret_val
 

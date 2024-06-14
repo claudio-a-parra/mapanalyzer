@@ -3,8 +3,6 @@ import sys
 from collections import deque
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
-from matplotlib.ticker import FuncFormatter #to make a custom tick formatter
-import humanize # to convert raw byte count to KiB, MiB...
 
 from util import create_up_to_n_ticks, PlotStrings, save_fig, Palette, Dbg
 from settings import Settings as st
@@ -92,7 +90,7 @@ class Map:
         return
 
 
-    def plot(self, map_tool=None, axes=None):
+    def plot(self, bottom_tool=None, axes=None):
         # define values for standalone and auxiliary-plot cases
         if axes is None:
             standalone = True
@@ -130,30 +128,29 @@ class Map:
         self.axes.invert_yaxis()
 
         # complete plot setup
-        self.axes.set_xticks([])
-        self.axes.set_yticks([])
-        self.axes.patch.set_facecolor('white')
-        self.plot_fade_padding_bytes()
         if standalone:
+            self.plot_fade_padding_bytes()
             self.plot_setup_general()
             self.plot_setup_X_axis()
             self.plot_draw_X_grid()
             self.plot_setup_Y_axis()
             self.plot_draw_Y_grid()
             save_fig(fig, self.ps.title, self.ps.suffix)
+        else:
+            self.axes.set_xticks([])
+            self.axes.set_yticks([])
+            self.axes.patch.set_facecolor('white')
+            self.plot_fade_padding_bytes()
         return
 
     def plot_setup_general(self):
         # background and spines colors
         self.axes.patch.set_facecolor('white')
-        # self.axes.patch.set_facecolor(self.tool_palette.bg)
-        # for spine in self.axes.spines.values():
-        #     spine.set_edgecolor(self.tool_palette.fg)
 
         # setup title
         title_string = f'{self.ps.title}: {st.plot.prefix}'
         if self.ps.subtit:
-            title_string += f'. ({self.ps.subtit})xx'
+            title_string += f'. ({self.ps.subtit})'
         self.axes.set_title(title_string, fontsize=10,
                        pad=st.plot.img_title_vpad)
 
@@ -173,19 +170,21 @@ class Map:
 
     def plot_setup_Y_axis(self):
         # spine
-        self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
+        #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
+
         # label
-        #self.axes.yaxis.set_label_position('right')
-        self.axes.set_ylabel(self.ps.ylab, color=self.tool_palette.fg)
+        self.axes.set_ylabel(self.ps.ylab) #, color=self.tool_palette.fg)
+
         # ticks
-        self.axes.tick_params(axis='y', colors=self.tool_palette.fg,
+        self.axes.tick_params(axis='y', #colors=self.tool_palette.fg,
                               left=True, labelleft=True,
-                              right=False, labelright=False)
+                              right=False, labelright=False,
+                              width=st.plot.grid_main_width)
         y_ticks = create_up_to_n_ticks(range(st.map.num_padded_bytes), base=2,
                                        n=st.plot.max_map_ytick_count)
         self.axes.set_yticks(y_ticks)
 
-
+        # grid
         self.plot_draw_Y_grid()
         return
 
@@ -200,31 +199,35 @@ class Map:
         return
 
     def plot_draw_Y_grid(self, byte_sep='auto', block_sep='auto'):
+        max_bytes = st.plot.grid_max_bytes
+        max_blocks = st.plot.grid_max_blocks
         if byte_sep == 'auto':
-            if st.map.num_padded_bytes < 128:
+            if st.map.num_padded_bytes < max_bytes:
                 byte_sep = True
             else:
                 byte_sep = False
 
         if block_sep == 'auto':
-            if st.map.num_blocks < 64:
+            if st.map.num_blocks < max_blocks:
                 block_sep = True
             else:
                 block_sep = False
 
         xmin,xmax = 0-0.5,st.map.time_size-0.5
         if byte_sep:
+            byte_lw = 0.5*(1 - ((st.map.num_padded_bytes-1) / max_bytes))
             byte_sep_lines = [i-0.5 for i in range(1,st.map.num_padded_bytes)]
             self.axes.hlines(y=byte_sep_lines, xmin=xmin, xmax=xmax,
                              color=self.tool_palette[0][0],
-                             linewidth=0.5, alpha=0.2, zorder=1)
+                             linewidth=byte_lw, alpha=0.2, zorder=1)
 
         if block_sep:
+            block_lw = 2*(1 - ((st.map.num_blocks-1) / max_blocks))
             block_sep_lines = [i*st.cache.line_size-0.5
                                for i in range(st.map.num_blocks)]
             self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                              color=self.tool_palette[0][0],
-                             linewidth=1, alpha=0.4, zorder=1)
+                             linewidth=block_lw, alpha=0.4, zorder=1)
         return
 
     def plot_fade_padding_bytes(self):

@@ -42,6 +42,7 @@ class HitMiss:
     def __init__(self, shared_X=None, hue=0):
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
+        self.axes = None
         self.tool_palette = Palette(hue=hue,
                                     lightness=st.plot.pal_lig,
                                     saturation=st.plot.pal_sat,
@@ -87,14 +88,11 @@ class HitMiss:
             if thr.time_last_increment == time:
                 thr.counters_to_ratio(time)
 
-
     def describe(self, ind=''):
         print(f'{ind}{self.name:{st.plot.ui_name_hpad}}: {self.about}')
         return
 
-
-    # HERE!!!
-    def plot(self, map_tool=None):
+    def plot(self, bottom_tool=None):
         threads = list(self.thr_traces.keys())
         threads.sort()
         thr_num = len(threads)
@@ -108,67 +106,83 @@ class HitMiss:
                           alpha=st.plot.pal_alp)
 
         # create figure and tool axes
-        fig,map_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        axes = map_axes.twinx()
-        axes.patch.set_facecolor(self.tool_palette.bg)
+        fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        self.axes = fig.add_axes(bottom_axes.get_position())
 
         # plot map
-        #map_axes = axes.twinx()
-        map_tool.plot(axes=map_axes)
-        #top_tool.plot_draw_Y_grid()
-
-        # draw one plot for each thread.
-        padding = 0.5
-        X = [-padding] + self.X + [self.X[-1]+padding]
-        for thr_idx in threads:
-            thr = self.thr_traces[thr_idx]
-            # Draw spacial locality across time
-            miss_ratio = [thr.miss_ratio[0]] + thr.miss_ratio + [thr.miss_ratio[-1]]
-            axes.fill_between(X, -1, miss_ratio, color=thr_pal[thr_idx][0],
-                              facecolor=thr_pal[thr_idx][1],
-                              linewidth=st.plot.linewidth, step='mid', zorder=2)
+        if bottom_axes is not None:
+            bottom_tool.plot(axes=bottom_axes)
 
         # set plot limits
-        axes.set_xlim(self.X[0]-padding, self.X[-1]+padding)
-        axes.set_ylim(0-padding, 100+padding)
+        padding = 0.5
+        X = [self.X[0]-padding] + self.X + [self.X[-1]+padding]
+        self.axes.set_xlim(X[0], X[-1])
+        self.axes.set_ylim(0-padding, 100+padding)
 
-        # Y axis label, ticks, and grid
-        axes.yaxis.set_label_position('left')
-        axes.set_ylabel(self.ps.ylab, color=self.tool_palette.fg)
-        percentages = list(range(100 + 1)) # from 0 to 100
-        y_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
-        axes.tick_params(axis='y', which='both', left=True, right=False,
-                         labelleft=True, labelright=False,
-                         width=st.plot.grid_main_width,
-                         colors=self.tool_palette.fg)
-        axes.set_yticks(y_ticks)
-        axes.grid(axis='y', which='both', color=self.tool_palette.fg,
-                  zorder=1,
-                  alpha=st.plot.grid_main_alpha,
-                  linewidth=st.plot.grid_main_width,
-                  linestyle=st.plot.grid_main_style)
+        # draw miss ratio for each thread
+        for thr_idx in threads:
+            thr = self.thr_traces[thr_idx]
+            miss_ratio = [thr.miss_ratio[0]] + thr.miss_ratio + [thr.miss_ratio[-1]]
+            self.axes.fill_between(X, -1, miss_ratio, color=thr_pal[thr_idx][0],
+                                   facecolor=thr_pal[thr_idx][1],
+                                   linewidth=st.plot.linewidth, step='mid',
+                                   zorder=2)
 
-
-
-        # X axis ticks and grid
-        axes.set_xlabel(self.ps.xlab, color='k')
-        axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
-                         rotation=-90, width=st.plot.grid_other_width)
-        x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
-        axes.set_xticks(x_ticks)
-        # axes.grid(axis='x', which='both',
-        #           alpha=0.1, color='k', zorder=1,
-        #           linestyle=st.plot.grid_other_style,
-        #           linewidth=st.plot.grid_other_width)
-
-        # setup title
-        title_string = f'{self.ps.title}: {st.plot.prefix}'
-        if self.ps.subtit:
-            title_string += f'. ({self.ps.subtit})'
-        axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
+        # finish plot setup
+        self.plot_setup_Y()
+        self.plot_setup_X()
+        self.plot_setup_general()
 
         # save image
         save_fig(fig, self.ps.title, self.ps.suffix)
 
+
+    def plot_setup_Y(self):
+        # spine
+        #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
+
+        # label
+        self.axes.set_ylabel(self.ps.ylab) #, color=self.tool_palette.fg)
+
+        # ticks
+        self.axes.tick_params(axis='y', #colors=self.tool_palette.fg,
+                              left=True, labelleft=True,
+                              right=False,labelright=False,
+                              width=st.plot.grid_main_width)
+        y_ticks = create_up_to_n_ticks(range(100+1), base=10,
+                                       n=st.plot.max_ytick_count)
+        self.axes.set_yticks(y_ticks)
+
+        # grid
+        self.axes.grid(axis='y', which='both', #color=self.tool_palette.fg,
+                       zorder=1,
+                       alpha=st.plot.grid_main_alpha,
+                       linewidth=st.plot.grid_main_width,
+                       linestyle=st.plot.grid_main_style)
         return
 
+    def plot_setup_X(self):
+        # X axis ticks and grid
+        self.axes.set_xlabel(self.ps.xlab, color='k')
+        self.axes.tick_params(axis='x', which='both',
+                         bottom=True, labelbottom=True,
+                         top=False, labeltop=False,
+                         rotation=-90, width=st.plot.grid_other_width)
+        x_ticks = create_up_to_n_ticks(self.X, base=10,
+                                       n=st.plot.max_xtick_count)
+        self.axes.set_xticks(x_ticks)
+        # axes.grid(axis='x', which='both',
+        #           alpha=0.1, color='k', zorder=1,
+        #           linestyle=st.plot.grid_other_style,
+        #           linewidth=st.plot.grid_other_width)
+        return
+
+    def plot_setup_general(self):
+        # background color
+        self.axes.patch.set_facecolor(self.tool_palette.bg)
+        # setup title
+        title_string = f'{self.ps.title}: {st.plot.prefix}'
+        if self.ps.subtit:
+            title_string += f'. ({self.ps.subtit})'
+        self.axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
+        return

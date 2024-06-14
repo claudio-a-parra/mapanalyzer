@@ -114,8 +114,8 @@ class MapSpecs:
     metadata_header = '# METADATA'
     data_header = '# DATA'
     key_map = {
-        'start-addr'   : ('start_addr',16),
-        'end-addr'     : ('end_addr', 16),
+        'start-addr'   : ('start_addr',10),
+        'end-addr'     : ('end_addr', 10),
         'thread-count' : ('thread_count',10),
         'event-count'  : ('event_count',10),
         'block-size'   : ('mem_size',10),
@@ -188,8 +188,7 @@ class MapSpecs:
             # check for recognized pair
             if name in MapSpecs.key_map:
                 try:
-                    #int_val = int(val, MapSpecs.key_map[name][1])
-                    int_val = int(val)
+                    int_val = int(val, MapSpecs.key_map[name][1])
                 except ValueError:
                     print(f"Invalid value for '{name}' in "
                           "Metadata Section.\n"
@@ -243,7 +242,8 @@ class PlotSpecs:
         self.width = width
         self.height = height
         self.res = res
-        self.dpi = dpi
+        self.dpi = 200 #dpi
+        print('[!] DBG: dpi at 200')
         self.format = format
         self.prefix = prefix
         self.max_xtick_count = 20
@@ -267,6 +267,8 @@ class PlotSpecs:
         self.grid_other_width = 0.5
         self.grid_other_style = '--'
         self.grid_other_alpha = 0
+        self.grid_max_bytes = 96
+        self.grid_max_blocks = 48
 
         self.fade_bytes_alpha=0.1
         return

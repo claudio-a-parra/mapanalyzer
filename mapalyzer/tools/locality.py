@@ -70,16 +70,9 @@ class Locality:
         # Append access times to each memory-block's list.
         # Only register the first byte of the access.
 
-        # old
-        # tag,idx,_ = AddrFmt.split(access.addr)
-        # if (tag,idx) not in self.space_by_blocks:
-        #     self.space_by_blocks[(tag,idx)] = []
-        # self.space_by_blocks[(tag,idx)].append(access.time)
-
         # block id relative to the beginning of the memory, so the first
         # block is 0
-        block_id = (access.addr - st.map.aligned_start_addr) \
-            >> st.cache.bits_off
+        block_id = access.addr >> st.cache.bits_off
         if block_id not in self.space_by_blocks:
             self.space_by_blocks[block_id] = []
         self.space_by_blocks[block_id].append(access.time)
@@ -127,17 +120,6 @@ class Locality:
 
         # compute lt for each space_window
         C = st.cache.cache_size
-
-
-        # old
-        # tag,idx,_ = AddrFmt.split(st.map.start_addr)
-        # block_first = (tag << st.cache.bits_set) | idx
-        # for tag,idx in used_blocks:
-        #     # the index of this block in Lt
-        #     blk_idx = ((tag << st.cache.bits_set) | idx) - block_first
-        #     flat_space_window = self.space_by_blocks[(tag,idx)]
-
-
         for ubi in used_blocks:
             flat_space_window = self.space_by_blocks[ubi]
             lt = flat_space_window # just to reuse memory
@@ -160,13 +142,13 @@ class Locality:
         return
 
 
-    def plot(self, map_tool=None):
+    def plot(self, bottom_tool=None):
         # finish up computations
         self.all_space_window_to_lt()
 
         # plot Spacial and Temporal locality tools
-        self.plot_Ls(map_tool)
-        self.plot_Lt(map_tool)
+        self.plot_Ls(bottom_tool)
+        self.plot_Lt(bottom_tool)
         return
 
     def plot_setup_general(self, ps):
@@ -217,9 +199,9 @@ class Locality:
         # X axis label, ticks and grid
         self.axes.set_xlabel(self.psLs.xlab, color='k')
         self.axes.tick_params(axis='x', rotation=-90,
-                         bottom=False, labelbottom=True,
-                         top=False, labeltop=False,
-                         width=st.plot.grid_other_width)
+                              bottom=True, labelbottom=True,
+                              top=False, labeltop=False,
+                              width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10,
                                        n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
@@ -231,20 +213,21 @@ class Locality:
 
     def plot_Ls_setup_Y(self):
         # spine
-        self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
+        #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
 
         # Y axis label, ticks, and grid
         self.axes.yaxis.set_label_position('left')
-        self.axes.set_ylabel(self.psLs.ylab, color=self.tool_palette.fg)
+        self.axes.set_ylabel(self.psLs.ylab) #, color=self.tool_palette.fg)
         percentages = list(range(100 + 1)) # from 0 to 100
         y_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
         self.axes.tick_params(axis='y', which='both',
                               left=True, labelleft=True,
                               right=False, labelright=False,
                               width=st.plot.grid_main_width,
-                              colors=self.tool_palette.fg)
+                              colors='k') #colors=self.tool_palette.fg)
         self.axes.set_yticks(y_ticks)
-        self.axes.grid(axis='y', which='both', color=self.tool_palette.fg,
+        self.axes.grid(axis='y', which='both', color='k',
+                       #color=self.tool_palette.fg,
                        zorder=1,
                        alpha=st.plot.grid_main_alpha,
                        linewidth=st.plot.grid_main_width,
@@ -259,8 +242,6 @@ class Locality:
         if bottom_tool is not None:
             bottom_tool.plot(axes=bottom_axes)
             block_sep_color = bottom_tool.tool_palette[0][0]
-        else:
-            block_sep_color = '#40BF40'
 
         # pad Y and X=Lt axes for better visualization
         padding = 0.5
@@ -289,17 +270,22 @@ class Locality:
 
     def plot_Lt_setup_X(self):
         # spine
-        self.axes.spines['bottom'].set_edgecolor(self.tool_palette.fg)
+        #self.axes.spines['bottom'].set_edgecolor(self.tool_palette.fg)
 
-        # X axis label, ticks, and grid
-        self.axes.set_xlabel(self.psLt.xlab, color=self.tool_palette.fg)
-        percentages = list(range(100 + 1)) # from 0 to 100
-        self.axes.tick_params(axis='x', bottom=True, top=False, labelbottom=True,
-                              rotation=-90, colors=self.tool_palette.fg,
+        # label
+        self.axes.set_xlabel(self.psLt.xlab) #, color=self.tool_palette.fg)
+
+        # ticks
+        self.axes.tick_params(axis='x', #colors=self.tool_palette.fg,
+                              top=False, labeltop=False,
+                              bottom=True, labelbottom=True, rotation=-90,
                               width=st.plot.grid_main_width)
-        x_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
+        x_ticks = create_up_to_n_ticks(range(100+1), base=10,
+                                       n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
-        self.axes.grid(axis='x', which='both', color=self.tool_palette.fg,
+
+        # grid
+        self.axes.grid(axis='x', which='both', # color=self.tool_palette.fg,
                        zorder=1,
                        alpha=st.plot.grid_main_alpha,
                        linewidth=st.plot.grid_main_width,
@@ -313,18 +299,19 @@ class Locality:
         y_ticks = create_up_to_n_ticks(list_of_blocks, base=10,
                                        n=st.plot.max_ytick_count)
         self.axes.tick_params(axis='y', which='both',
-                              left=False, labelleft=True,
+                              left=True, labelleft=True,
                               right=False, labelright=False,
                               colors='k',
                               width=st.plot.grid_other_width)
         self.axes.set_yticks(y_ticks)
         return
 
-    def plot_Lt_draw_Y_grid(self, color):
+    def plot_Lt_draw_Y_grid(self, color='#40BF40'):
+        max_blocks = st.plot.grid_max_blocks
         xmin,xmax = 0-0.5,101-0.5
-        block_sep_lines = [i-0.5
-                           for i in range(st.map.num_blocks)]
+        block_sep_lines = [i-0.5 for i in range(st.map.num_blocks)]
+        block_lw = 2*(1 - ((st.map.num_blocks-1) / max_blocks))
         self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                          color=color,
-                         linewidth=1, alpha=0.4, zorder=1)
+                         linewidth=block_lw, alpha=0.4, zorder=1)
         return

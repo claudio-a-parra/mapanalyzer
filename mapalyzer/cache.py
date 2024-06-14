@@ -60,7 +60,7 @@ class Set:
         if len(self.lines) == 0:
             return None
         return self.lines.pop()
-    
+
 
 class Cache:
     def __init__(self, tools=None):
@@ -87,15 +87,13 @@ class Cache:
     def access(self, access):
         """ Access 'n bytes' starting from address 'addr'. If this requires to
         access multiple cache lines, then generate multiple accesses."""
-        Dbg.i()
         # Access object:
         # - addr  : address of access
         # - size  : the number of bytes accessed
         # - event : read or write event {'R', 'W'}
         # - thread: the thread accessing data
         # - time  : the timestamp of the instruction.
-        Dbg.p(f'\n\n\nCACHE.access({access})')
-        addr = access.addr
+        addr = access.addr - st.map.aligned_start_addr
         n_bytes = access.size
         self.tools.map.add_access(access)
 
@@ -125,50 +123,43 @@ class Cache:
                                      addr)
             self.tools.locality.add_access(block_access)
             # access this_block
-            Dbg.p(f'Querying block ({p_tag},{set_index}).')
-            Dbg.p(self)
             writing = (access.event == 'W')
             if (p_tag,set_index) not in self.blocks_in_cache:
-                # Cache Miss: fetch block from main memory
-                Dbg.p(f'Block ({p_tag},{set_index}) MISS.')
+                # MISS
                 self.tools.hitmiss.add_hm(access, (0,1)) # miss++
 
-                # fetch block from main memory...
+                # fetch block from main memory
                 fetched_block = Block(st.cache.line_size, tag=p_tag,
                                             dirty=writing)
-                #self.tools.alias.fetch(access)
-                #self.tools.siue.fetch(access)
-
-                # ... and add it to the cache
-                self.blocks_in_cache[(p_tag,set_index)] = fetched_block
+                self.tools.aliasing.fetch(set_index, access.time)
                 self.tools.cost.add_access('r') # read
+
+                # add fetched block to the cache
+                self.blocks_in_cache[(p_tag,set_index)] = fetched_block
                 self.tools.usage.update(delta_valid=st.cache.line_size)
 
                 # handle potentially evicted block
                 evicted_block = self.sets[set_index].push_block(fetched_block)
+                tag_out = None if evicted_block is None else evicted_block.tag
+                self.tools.siu.update(access.time, set_index, p_tag, tag_out)
                 if evicted_block is not None:
+                    # EVICTION
                     del self.blocks_in_cache[(evicted_block.tag,set_index)]
-                    Dbg.p(f'Block ({evicted_block.tag},{set_index}) '
-                          f'[{evicted_block}] EVICTED.')
                     self.tools.usage.update(
                         delta_access=-evicted_block.count_accessed(),
                         delta_valid=-st.cache.line_size)
-
                     if evicted_block.dirty:
-                        Dbg.p(f'WRITE (t:{access.time}): {evicted_block}')
+                        # WRITE DIRTY BLOCK
                         self.tools.cost.add_access('w') # write
                     else:
-                        Dbg.p(f'DROP (t:{access.time}): {evicted_block}')
-
+                        # DROP CLEAN BLOCK
+                        pass
                 resident_block = fetched_block
-
-                Dbg.p(f'READ: {access}')
-
             else:
-                Dbg.p(f'Block ({p_tag},{set_index}) HIT.')
+                # HIT
                 resident_block = self.blocks_in_cache[(p_tag,set_index)]
-                self.sets[set_index].touch_block(resident_block)
                 self.tools.hitmiss.add_hm(access, (1,0)) # hit++
+                self.sets[set_index].touch_block(resident_block)
 
             # mark accessed bytes
             old_ab = resident_block.count_accessed()
@@ -179,20 +170,21 @@ class Cache:
             # update address and reminding bytes to read for a potential new loop
             addr += this_block_n_bytes
             n_bytes -= this_block_n_bytes
-
-        Dbg.o()
         return
 
     def flush(self):
         """evict all cache lines"""
-        for s in self.sets:
+        for set_idx in range(st.cache.num_sets):
+            s = self.sets[set_idx]
             evicted_block = s.pop_lru_block()
-            while evicted_block != None:
-                pass
+            tag_out = None if evicted_block is None else evicted_block.tag
+            while evicted_block is not None:
+                tag_out = evicted_block.tag
+                self.tools.siu.update(st.map.time_size, set_idx, None, tag_out)
                 #self.tools.usage.update()
-                if evicted_block.dirty:
-                    pass
-                    #self.tools.ram.write()
+                #if evicted_block.dirty:
+                #    pass
+                #    #self.tools.ram.write()
                 evicted_block = s.pop_lru_block()
         return
 

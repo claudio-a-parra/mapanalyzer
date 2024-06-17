@@ -13,8 +13,8 @@ from tools import Tools
 def run_simulation(map_reader, cache, progress=True):
     _,_,byte = AddrFmt.split(st.map.start_addr)
     if byte != 0:
-        print(f'[!] Warning: Memory block is not cache aligned. '
-              f'First byte is {byte} bytes into the cache line.')
+        print(f'    Allocated memory is not cache aligned. '
+              f'First address is {byte} bytes into a cache line.')
 
     def print_progress(count, total):
         print('\033[2K\r    '

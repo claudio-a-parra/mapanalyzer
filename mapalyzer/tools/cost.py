@@ -27,7 +27,7 @@ class Cost:
         self.ps = PlotStrings(
             title  = 'Cumulative Main Mem. Access',
             xlab   = 'Time',
-            ylab   = 'Access Count',
+            ylab   = 'Mem. Access Count',
             suffix = '_plot-04-access-count',
             subtit = 'lower is better')
         return

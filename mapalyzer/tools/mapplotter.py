@@ -96,14 +96,14 @@ class Map:
             standalone = True
             lig_val = [35,70]
             sat_val = [45,75]
-            alp_val = 100
+            alp_val = 96
             fig,axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
             fig.patch.set_facecolor('white')
         else:
             standalone = False
             lig_val = [35,70]
             sat_val = [45,75]
-            alp_val = 100
+            alp_val = 96
         self.axes = axes
 
         # Create color maps based on thread and R/W access:
@@ -227,7 +227,7 @@ class Map:
                                for i in range(st.map.num_blocks)]
             self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                              color=self.tool_palette[0][0],
-                             linewidth=block_lw, alpha=0.4, zorder=1)
+                             linewidth=block_lw, alpha=1, zorder=1)
         return
 
     def plot_fade_padding_bytes(self):

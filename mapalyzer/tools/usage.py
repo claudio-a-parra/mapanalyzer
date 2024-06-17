@@ -24,7 +24,7 @@ class CacheUsage:
         self.ps = PlotStrings(
             title  = 'Cache Bytes Usage',
             xlab   = 'Time',
-            ylab   = 'Usage Percentage',
+            ylab   = 'Cache Usage [%]',
             suffix = '_plot-05-usage',
             subtit = 'higher is better')
         return

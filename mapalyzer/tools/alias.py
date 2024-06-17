@@ -11,10 +11,7 @@ class Aliasing:
         self.i = 0
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
-        self.tool_palette = Palette(hue=[hue],
-                                    lightness=st.plot.pal_lig,
-                                    saturation=st.plot.pal_sat,
-                                    alpha=st.plot.pal_alp)
+        self.hue = hue
 
         self.time_window = deque()
         self.time_window_max_size = st.cache.asso * st.cache.num_sets
@@ -67,20 +64,29 @@ class Aliasing:
         # if bottom_tool is not None:
         #     bottom_tool.plot(axes=bottom_axes)
 
-        # create color shade from transparent (0) to solid (1)
-        colors = ['#FFFFFF00', self.tool_palette[0][0]]
-        shade_cmap = mcolors.LinearSegmentedColormap.from_list(
-            'transparency_cmap', colors)
+        self.tool_palette = Palette(hue=self.hue,
+                                    hue_count=st.cache.num_sets,
+                                    lightness=st.plot.pal_lig,
+                                    saturation=st.plot.pal_sat,
+                                    alpha=st.plot.pal_alp)
 
-        # set image extent and draw aliasing
         padding = 0.5
-        ext = (self.X[0]-padding, self.X[-1]+padding,
-               0-padding, st.cache.num_sets-padding)
-        self.axes.set_xlim(ext[0], ext[1])
-        self.axes.set_ylim(ext[2], ext[3])
-        self.axes.imshow(self.aliasing, cmap=shade_cmap, origin='lower',
-                         interpolation=None, aspect='auto', extent=ext,
-                         zorder=1, vmin=0, vmax=1)
+        for s in range(st.cache.num_sets):
+            # create color shade from 0 -> transparent to 1 -> solid
+            colors = ['#FFFFFF00', self.tool_palette[s][0]]
+            shade_cmap = mcolors.LinearSegmentedColormap.from_list(
+                'transparency_cmap', colors)
+
+            # set image extent, and draw aliasing for only one set
+            ext = (self.X[0]-padding, self.X[-1]+padding, s-padding, s+padding)
+            this_set_aliasing = [self.aliasing[s]]
+            self.axes.imshow(this_set_aliasing, cmap=shade_cmap, origin='lower',
+                             interpolation=None, aspect='auto', extent=ext,
+                             zorder=1, vmin=0, vmax=1)
+
+        # set plot's limits
+        self.axes.set_xlim(self.X[0]-padding, self.X[-1]+padding)
+        self.axes.set_ylim(0-padding, st.cache.num_sets-padding)
 
         # finish plot setup
         self.plot_setup_general()
@@ -143,5 +149,5 @@ class Aliasing:
         block_sep_lines = [i-0.5 for i in range(st.cache.num_sets)]
         self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                          color=color,
-                         linewidth=block_lw, alpha=0.4, zorder=2)
+                         linewidth=block_lw, alpha=1, zorder=2)
         return

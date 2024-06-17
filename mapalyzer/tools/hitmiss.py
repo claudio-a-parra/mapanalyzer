@@ -59,7 +59,7 @@ class HitMiss:
         self.ps = PlotStrings(
             title  = 'Miss Ratio',
             xlab   = 'Time',
-            ylab   = 'Cache Miss Ratio',
+            ylab   = 'Cache Miss Ratio [%]',
             suffix = '_plot-03-miss-ratio',
             subtit = 'lower is better')
         return

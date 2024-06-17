@@ -21,7 +21,7 @@ class SIUEviction:
         self.blocks_jumps = [[] for _ in range(st.cache.num_sets)]
 
         self.name = 'SiU Evictions'
-        self.about = ('Blocks that are evicted and fetched again in a short time.')
+        self.about = ('Shows blocks that are evicted and fetched again in a short time.')
 
         self.ps = PlotStrings(
             title  = 'SiU Evictions',
@@ -60,6 +60,58 @@ class SIUEviction:
         max_blocks = st.plot.grid_max_blocks
         set_lw  = max(0.1, 9*(1 - ((st.map.num_blocks-1) / max_blocks)))
         jump_lw = max(0.1, 2*(1 - ((st.map.num_blocks-1) / max_blocks)))
+
+        # draw all sets together
+        fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        bottom_axes.set_xticks([])
+        bottom_axes.set_yticks([])
+        self.axes = fig.add_axes(bottom_axes.get_position())
+
+        # plot map
+        if bottom_tool is not None:
+            bottom_tool.plot(axes=bottom_axes)
+            block_sep_color = bottom_tool.tool_palette[0][0]
+        else:
+            block_sep_color = '#40BF40'
+
+        # set plot limits
+        padding = 0.5
+        self.axes.set_xlim(self.X[0]-padding, self.X[-1]+padding)
+        self.axes.set_ylim(0-padding, st.map.num_blocks-padding)
+
+        for s in range(st.cache.num_sets):
+            set_color = self.tool_palette[s]
+
+            # draw block lifes
+            blocks_lifes = self.blocks_lifes[s]
+            set_blocks = [l[0] for l in blocks_lifes]
+            set_time_in = [l[1]-0.25 for l in blocks_lifes]
+            set_time_out = [l[2]+0.25 for l in blocks_lifes]
+            self.axes.hlines(y=set_blocks, xmin=set_time_in, xmax=set_time_out,
+                             color=set_color[0], linewidth=set_lw, alpha=1,
+                             zorder=2, linestyle='-')
+
+            # draw block jumps
+            blocks_jumps = self.blocks_jumps[s]
+            set_times = [(j[0]+0.25,j[0]+0.75) for j in blocks_jumps]
+            set_block_out = [j[1] for j in blocks_jumps]
+            set_block_in = [j[2] for j in blocks_jumps]
+            for (t0,t1),b0,b1 in zip(set_times,set_block_out,set_block_in):
+                self.axes.plot((t0,t1), (b0,b1),
+                               color=set_color[0], linewidth=jump_lw, alpha=1,
+                               zorder=2, solid_capstyle='round', linestyle='-')
+
+        # finish plot setup
+        self.plot_setup_general(variant=f'All Sets')
+        self.plot_setup_X()
+        #self.plot_draw_X_grid()
+        self.plot_setup_Y()
+        self.plot_draw_Y_grid(block_sep_color)
+
+        # save image
+        save_fig(fig, self.ps.title, f'{self.ps.suffix}_all')
+
+
 
         # draw one plot for each set
         for s in range(st.cache.num_sets):
@@ -110,57 +162,8 @@ class SIUEviction:
             self.plot_draw_Y_grid(block_sep_color)
 
             # save image
-            save_fig(fig, self.ps.title, f'{self.ps.suffix}_s-{s}')
+            save_fig(fig, self.ps.title, f'{self.ps.suffix}_s{s}')
 
-        # draw all sets them together
-        fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        bottom_axes.set_xticks([])
-        bottom_axes.set_yticks([])
-        self.axes = fig.add_axes(bottom_axes.get_position())
-
-        # plot map
-        if bottom_tool is not None:
-            bottom_tool.plot(axes=bottom_axes)
-            block_sep_color = bottom_tool.tool_palette[0][0]
-        else:
-            block_sep_color = '#40BF40'
-
-        # set plot limits
-        padding = 0.5
-        self.axes.set_xlim(self.X[0]-padding, self.X[-1]+padding)
-        self.axes.set_ylim(0-padding, st.map.num_blocks-padding)
-
-        for s in range(st.cache.num_sets):
-            set_color = self.tool_palette[s]
-
-            # draw block lifes
-            blocks_lifes = self.blocks_lifes[s]
-            set_blocks = [l[0] for l in blocks_lifes]
-            set_time_in = [l[1]-0.25 for l in blocks_lifes]
-            set_time_out = [l[2]+0.25 for l in blocks_lifes]
-            self.axes.hlines(y=set_blocks, xmin=set_time_in, xmax=set_time_out,
-                             color=set_color[0], linewidth=set_lw, alpha=1,
-                             zorder=2, linestyle='-')
-
-            # draw block jumps
-            blocks_jumps = self.blocks_jumps[s]
-            set_times = [(j[0]+0.25,j[0]+0.75) for j in blocks_jumps]
-            set_block_out = [j[1] for j in blocks_jumps]
-            set_block_in = [j[2] for j in blocks_jumps]
-            for (t0,t1),b0,b1 in zip(set_times,set_block_out,set_block_in):
-                self.axes.plot((t0,t1), (b0,b1),
-                               color=set_color[0], linewidth=jump_lw, alpha=1,
-                               zorder=2, solid_capstyle='round', linestyle='-')
-
-        # finish plot setup
-        self.plot_setup_general(variant=f'All sets')
-        self.plot_setup_X()
-        #self.plot_draw_X_grid()
-        self.plot_setup_Y()
-        self.plot_draw_Y_grid(block_sep_color)
-
-        # save image
-        save_fig(fig, self.ps.title, f'{self.ps.suffix}_s-all')
         return
 
     def plot_setup_Y(self):
@@ -217,7 +220,7 @@ class SIUEviction:
                            for i in range(st.map.num_blocks)]
         self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                          color=color,
-                         linewidth=lw, alpha=0.4, zorder=1)
+                         linewidth=lw, alpha=1, zorder=1)
         return
 
     def plot_draw_X_grid(self):

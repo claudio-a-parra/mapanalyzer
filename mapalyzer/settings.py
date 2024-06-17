@@ -242,8 +242,8 @@ class PlotSpecs:
         self.width = width
         self.height = height
         self.res = res
-        self.dpi = 200 #dpi
-        print('[!] DBG: dpi at 200')
+        self.dpi = 600 #dpi
+        print(f'[!] DBG: dpi hardcoded to {self.dpi}')
         self.format = format
         self.prefix = prefix
         self.max_xtick_count = 20

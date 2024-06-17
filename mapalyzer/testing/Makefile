@@ -15,7 +15,6 @@ view:
 				feh --auto-reload --scale-down *plot-00*.png & disown ;\
 			else \
 				pdftk $(prefix)-0*.pdf cat output $(prefix).pdf \
-					&& rm $(prefix)-0*.pdf \
 					&& okular $(prefix).pdf & disown ;\
 			fi ;\
 		else \

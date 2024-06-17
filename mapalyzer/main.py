@@ -11,7 +11,6 @@ from cache import Cache
 from tools import Tools
 
 def run_simulation(map_reader, cache, progress=True):
-    progress = False
     _,_,byte = AddrFmt.split(st.map.start_addr)
     if byte != 0:
         print(f'[!] Warning: Memory block is not cache aligned. '
@@ -106,7 +105,7 @@ def command_line_args_parser():
     )
     
     parser.add_argument(
-        '-f', '--format', dest='format', choices=['png', 'pdf'], default='png',
+        '-f', '--format', dest='format', choices=['png', 'pdf'], default='pdf',
         help='Choose the output format of the plots.'
     )
     
@@ -163,8 +162,6 @@ def main():
         tools.plot()
 
     print('Done')
-    print('[!] DBG: Addresses are in decimal!')
-
 
 
 if __name__ == "__main__":

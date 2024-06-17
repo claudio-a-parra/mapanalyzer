@@ -114,8 +114,8 @@ class MapSpecs:
     metadata_header = '# METADATA'
     data_header = '# DATA'
     key_map = {
-        'start-addr'   : ('start_addr',10),
-        'end-addr'     : ('end_addr', 10),
+        'start-addr'   : ('start_addr',16),
+        'end-addr'     : ('end_addr', 16),
         'thread-count' : ('thread_count',10),
         'event-count'  : ('event_count',10),
         'block-size'   : ('mem_size',10),
@@ -242,8 +242,7 @@ class PlotSpecs:
         self.width = width
         self.height = height
         self.res = res
-        self.dpi = 600 #dpi
-        print(f'[!] DBG: dpi hardcoded to {self.dpi}')
+        self.dpi = dpi
         self.format = format
         self.prefix = prefix
         self.max_xtick_count = 20

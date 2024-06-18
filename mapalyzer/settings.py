@@ -177,9 +177,9 @@ class MapSpecs:
                 continue
             # parse name:val
             try:
-                name,val = line.split(':')
+                no_comment_line = line.split('#')[0].strip()
+                name,val = no_comment_line.split(':')
                 name,val = name.strip(),val.strip()
-                val = val.split('#')[0].strip()
             except:
                 print(f"Error: File {self.file_path}: "
                       "Malformed line in Metadata Section:\n"
@@ -207,11 +207,11 @@ class MapSpecs:
             sys.exit(1)
 
         # error if start_addr, mem_size and end_addr are incoherent.
-        # if self.end_addr - self.start_addr + 1 != self.mem_size:
-        #     print(f'Error: The size, start and end address of the memory '
-        #           f'declared is incoherent in {self.file_path}.')
-        #     print(self)
-        #     sys.exit(1)
+        if self.end_addr - self.start_addr + 1 != self.mem_size:
+            print(f'Error: The size, start and end address of the memory '
+                  f'declared is incoherent in {self.file_path}.')
+            print(self)
+            sys.exit(1)
         print('[!] DBG: the memory start, end, and size check is disabled (settings.py:215)')
 
         # convert max-time index (what comes in the file) to time_size

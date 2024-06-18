@@ -332,7 +332,7 @@ VOID malloc_after(ADDRINT retval, THREADID threadid) {
         PIN_ExitApplication(2);
     }
     tracked_block.start = retval;
-    tracked_block.end = retval + tracked_block.size;
+    tracked_block.end = retval + tracked_block.size - 1;
 
     // if patient called malloc() requesting a block of size 0.
     if (!tracked_block.size) {

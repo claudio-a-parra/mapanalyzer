@@ -219,7 +219,7 @@ class Map:
             byte_sep_lines = [i-0.5 for i in range(1,st.map.num_padded_bytes)]
             self.axes.hlines(y=byte_sep_lines, xmin=xmin, xmax=xmax,
                              color=self.tool_palette[0][0],
-                             linewidth=byte_lw, alpha=0.2, zorder=1)
+                             linewidth=byte_lw, alpha=0.1, zorder=1)
 
         if block_sep:
             block_lw = 2*(1 - ((st.map.num_blocks-1) / max_blocks))
@@ -227,7 +227,7 @@ class Map:
                                for i in range(st.map.num_blocks)]
             self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                              color=self.tool_palette[0][0],
-                             linewidth=block_lw, alpha=1, zorder=1)
+                             linewidth=block_lw, alpha=0.4, zorder=1)
         return
 
     def plot_fade_padding_bytes(self):

@@ -144,9 +144,9 @@ class Aliasing:
 
     def plot_draw_Y_grid(self, color='#40BF40'):
         xmin,xmax = 0-0.5,st.map.time_size-0.5
-        max_sets = 64 #st.plot.grid_max_blocks
+        max_sets = st.plot.grid_max_blocks
         block_lw = 2*(1 - ((st.cache.num_sets-1) / max_sets))
-        block_sep_lines = [i-0.5 for i in range(st.cache.num_sets)]
+        block_sep_lines = [i-0.5 for i in range(st.cache.num_sets+1)]
         self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                          color=color,
                          linewidth=block_lw, alpha=1, zorder=2)

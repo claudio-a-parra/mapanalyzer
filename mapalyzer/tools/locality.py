@@ -307,6 +307,8 @@ class Locality:
         return
 
     def plot_Lt_draw_Y_grid(self, color='#40BF40'):
+        if st.map.num_blocks > st.plot.grid_max_blocks:
+            return
         max_blocks = st.plot.grid_max_blocks
         xmin,xmax = 0-0.5,101-0.5
         block_sep_lines = [i-0.5 for i in range(st.map.num_blocks)]

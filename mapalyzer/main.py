@@ -100,12 +100,12 @@ def command_line_args_parser():
     )
     
     parser.add_argument(
-        '-dpi', '--dpi', dest='dpi', type=int, default=300,
+        '-dpi', '--dpi', dest='dpi', type=int, default=200,
         help='Choose the DPI of the resulting plots.'
     )
     
     parser.add_argument(
-        '-f', '--format', dest='format', choices=['png', 'pdf'], default='pdf',
+        '-f', '--format', dest='format', choices=['png', 'pdf'], default='png',
         help='Choose the output format of the plots.'
     )
     

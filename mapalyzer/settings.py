@@ -212,7 +212,6 @@ class MapSpecs:
                   f'declared is incoherent in {self.file_path}.')
             print(self)
             sys.exit(1)
-        print('[!] DBG: the memory start, end, and size check is disabled (settings.py:215)')
 
         # convert max-time index (what comes in the file) to time_size
         self.time_size +=1
@@ -267,7 +266,7 @@ class PlotSpecs:
         self.grid_other_width = 0.5
         self.grid_other_style = '--'
         self.grid_other_alpha = 0
-        self.grid_max_bytes = 96
+        self.grid_max_bytes = 128
         self.grid_max_blocks = 48
 
         self.fade_bytes_alpha=0.1

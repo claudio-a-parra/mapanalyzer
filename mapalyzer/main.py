@@ -6,7 +6,7 @@ import argparse # to get command line arguments
 
 from map_file_reader import MapFileReader
 from settings import Settings as st, CacheSpecs, PlotSpecs
-from util import log2, AddrFmt
+from util import AddrFmt
 from cache import Cache
 from tools import Tools
 

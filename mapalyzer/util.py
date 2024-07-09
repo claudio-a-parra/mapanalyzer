@@ -43,7 +43,6 @@ class AddrFmt:
         index_mask = (1 << cls.sp.bits_set) - 1
         index = (address >> cls.sp.bits_off) & index_mask
         tag = address >> (cls.sp.bits_set + cls.sp.bits_off)
-        # print(f"split: t:{tag} i:{index} o:{offset}")
         return tag, index, offset
 
     @classmethod
@@ -71,10 +70,6 @@ class AddrFmt:
             #digits = digits.rjust(group_width)
             #ret += " " + digits
         return rev_ret[::-1][1:]
-
-
-def log2(x):
-    return x.bit_length() - 1
 
 
 def create_up_to_n_ticks(full_list, base=10, n=10):

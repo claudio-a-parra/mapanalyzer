@@ -1,9 +1,5 @@
 import sys
 
-def log2(x):
-    return x.bit_length() - 1
-
-
 class CacheSpecs:
     # name in file -> name in class
     key_map = {
@@ -57,20 +53,6 @@ class CacheSpecs:
         self.set_derived_values()
         return
 
-    def set_derived_values(self):
-        if None not in (self.cache_size, self.asso, self.line_size):
-            self.num_sets = self.cache_size // (self.asso * self.line_size)
-
-        if None is not self.num_sets:
-            self.bits_set = log2(self.num_sets)
-
-        if None is not self.line_size:
-            self.bits_off = log2(self.line_size)
-
-        if None not in (self.arch, self.bits_set, self.bits_off):
-            self.bits_tag = self.arch - self.bits_set - self.bits_off
-        return
-
     def set_value(self, name, val):
         if name not in CacheSpecs.key_map:
             print(f'[!] Invalid name {name}. Ignoring line.')
@@ -82,7 +64,21 @@ class CacheSpecs:
                   'It must be integer. Ignoring.')
             return
         setattr(self, CacheSpecs.key_map[name], int_val)
-        self.set_derived_values()
+        return
+
+    def set_derived_values(self):
+        if None not in (self.cache_size, self.asso, self.line_size):
+            self.num_sets = self.cache_size // (self.asso * self.line_size)
+
+        if None is not self.num_sets:
+            self.bits_set = (self.num_sets-1).bit_length()
+
+        if None is not self.line_size:
+            self.bits_off = (self.line_size-1).bit_length()
+
+        if None not in (self.arch, self.bits_set, self.bits_off):
+            self.bits_tag = self.arch - self.bits_set - self.bits_off
+
         return
 
     def __str__(self):
@@ -248,10 +244,14 @@ class PlotSpecs:
         self.max_xtick_count = 20
         self.max_ytick_count = 11
         self.max_map_ytick_count = 11
-        self.img_border_pad = 0.05
-        self.img_title_vpad = 6
+
+        # terminal UI
         self.ui_title_hpad = 31
         self.ui_name_hpad = 23
+
+        # exporting image
+        self.img_border_pad = 0.025
+        self.img_title_vpad = 6
 
         # plot line settings
         self.linewidth=1.2

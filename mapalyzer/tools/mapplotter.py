@@ -224,10 +224,13 @@ class Map:
         if block_sep:
             block_lw = 2*(1 - ((st.map.num_blocks-1) / max_blocks))
             block_sep_lines = [i*st.cache.line_size-0.5
-                               for i in range(st.map.num_blocks)]
-            self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
-                             color=self.tool_palette[0][0],
-                             linewidth=block_lw, alpha=0.4, zorder=1)
+                               for i in range(st.map.num_blocks+1)]
+            # if there is only two lines and they are in the border of the plot
+            # then don't draw anything.
+            if block_sep_lines[-1] != st.cache.line_size-0.5:
+                self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
+                                 color=self.tool_palette[0][0],
+                                 linewidth=block_lw, alpha=0.4, zorder=1)
         return
 
     def plot_fade_padding_bytes(self):

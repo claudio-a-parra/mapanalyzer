@@ -34,15 +34,6 @@ class Locality:
 
         ## Temporal locality across space
         self.space_by_blocks = {} #block->list of block access times
-        # Lt size is the total range of blocks in the memory studied
-        # tag,idx,_ = AddrFmt.split(st.map.start_addr)
-        # block_first = st.map.start_addr >> st.cache.bits_off
-        # block_last = (st.map.start_addr+st.map.mem_size-1) >> \
-        #     st.cache.bits_off
-        # tot_num_blocks = block_last - block_first + 1
-        # self.Lt = [-1] * tot_num_blocks
-
-        # Lt size is the total range of blocks in the memory studied
         self.Lt = [-1] * st.map.num_blocks
         self.psLt = PlotStrings(
             title  = 'Temporal Locality across Space',
@@ -56,22 +47,19 @@ class Locality:
         ## SPACIAL LOCALITY ACROSS TIME
         # Append access address to the time window. Trim the access window if
         # it is too long.
-        # Use the first byte of access to compute the spacial differences, but
-        # count all the bytes in the access to determine the window size.
+        # Use the first byte of the access to compute the spacial differences,
+        # but count all the bytes in the access to determine the window size.
         mem_offset = access.addr - st.map.start_addr
         self.time_window.append((mem_offset,access.size))
         self.time_window_curr_size += access.size
         while self.time_window_curr_size > self.time_window_max_size:
             old_access = self.time_window.popleft()
-            self.time_window_curr_size -= old_access[1]
+            self.time_window_curr_size -= old_access[1] # old_access.size
 
 
         ## TEMPORAL LOCALITY ACROSS SPACE
         # Append access times to each memory-block's list.
         # Only register the first byte of the access.
-
-        # block id relative to the beginning of the memory, so the first
-        # block is 0
         block_id = access.addr >> st.cache.bits_off
         if block_id not in self.space_by_blocks:
             self.space_by_blocks[block_id] = []
@@ -84,17 +72,13 @@ class Locality:
         # obtain a flat window of the last accessed addresses
         flat_time_window = [x[0] for x in list(self.time_window)]
 
-        Dbg.p(f'COMMIT')
-        # if only one access, there is no deltas to compute. assign Ls[t] = -1
+        # if only one access, there is no deltas to compute. assign Ls[t] = 0
         if len(flat_time_window) < 2:
-            Dbg.p(f'flat_time_win_size < 2; return')
-            self.Ls[time] = -1
+            self.Ls[time] = 0
             return
 
         # sort by addresses and compute deltas into ls
         flat_time_window.sort()
-        Dbg.p('flat_time_window:')
-        Dbg.p(flat_time_window)
         ls = flat_time_window # just to reuse memory
         B = st.cache.line_size
         for i,a1,a2 in zip(range(len(ls)-1),
@@ -102,12 +86,9 @@ class Locality:
                            flat_time_window[1:]):
             ls[i] = (B - min(B, a2-a1)) / B
         del ls[-1]
-        Dbg.p('ls:')
-        Dbg.p(ls)
 
         # compute average delta of the whole ls array, and write it in Ls.
         avg_ls = 100 * sum(ls) / len(ls)
-        Dbg.p(f'avg_ls:{avg_ls}')
         self.Ls[time] = avg_ls
         return
 
@@ -124,7 +105,7 @@ class Locality:
             flat_space_window = self.space_by_blocks[ubi]
             lt = flat_space_window # just to reuse memory
             if len(flat_space_window) < 2:
-                self.Lt[ubi] = -1
+                self.Lt[ubi] = 0
                 continue
             for i,t1,t2 in zip(range(len(lt)-1),
                                flat_space_window[:-1],

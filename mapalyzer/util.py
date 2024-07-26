@@ -82,6 +82,9 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
     if n == 2:
         return [full_list[0], full_list[-1]]
 
+    if n == len(full_list):
+        return full_list
+
     # find a label_step such that we print at most n ticks
     tick_step = 1
     tot_ticks = len(full_list)

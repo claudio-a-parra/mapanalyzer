@@ -30,7 +30,8 @@ class Locality:
             xlab   = 'Time',
             ylab   = 'Degree of Spacial Locality',
             suffix = '_plot-01-locality-Ls',
-            subtit = 'higher is better')
+            subtit = '')
+            # subtit = 'higher is better')
 
         ## Temporal locality across space
         self.space_by_blocks = {} #block->list of block access times
@@ -40,7 +41,8 @@ class Locality:
             xlab   = 'Degree of Temporal Locality',
             ylab   = 'Space [blocks]',
             suffix = '_plot-02-locality-Lt',
-            subtit = 'higher is better')
+            subtit = '')
+            # subtit = 'higher is better')
         return
 
     def add_access(self, access):
@@ -88,7 +90,7 @@ class Locality:
         del ls[-1]
 
         # compute average delta of the whole ls array, and write it in Ls.
-        avg_ls = 100 * sum(ls) / len(ls)
+        avg_ls = sum(ls) / len(ls)
         self.Ls[time] = avg_ls
         return
 
@@ -114,7 +116,7 @@ class Locality:
             del lt[-1]
 
             # compute average delta of the whole lt array, and write it in Lt
-            avg_lt = 100 * sum(lt) / len(lt)
+            avg_lt = sum(lt) / len(lt)
             self.Lt[ubi] = avg_lt
         return
 
@@ -136,9 +138,10 @@ class Locality:
         # background color
         self.axes.patch.set_facecolor(self.tool_palette.bg)
         # setup title
-        title_string = f'{ps.title}: {st.plot.prefix}'
+        title_string = f'{ps.title}'
         if ps.subtit:
-            title_string += f'. ({ps.subtit})'
+            title_string += f' ({ps.subtit})'
+        title_string += f'\n{st.plot.prefix}'
         self.axes.set_title(title_string, fontsize=10,
                             pad=st.plot.img_title_vpad)
         return
@@ -154,13 +157,13 @@ class Locality:
             bottom_tool.plot(axes=bottom_axes)
 
         # pad X and Y=Ls axes for better visualization
-        padding = 0.5
+        padding = 0.005
         X = [self.X[0]-padding] + self.X + [self.X[-1]+padding]
         Ls = [self.Ls[0]] + self.Ls + [self.Ls[-1]]
 
         # set plot limits and draw space locality across time
         self.axes.set_xlim(X[0], X[-1])
-        self.axes.set_ylim(0-padding, 100+padding)
+        self.axes.set_ylim(0-padding, 1+padding)
         self.axes.fill_between(X, -1, Ls,
                                color=self.tool_palette[0][0],
                                facecolor=self.tool_palette[0][1],
@@ -199,8 +202,7 @@ class Locality:
         # Y axis label, ticks, and grid
         self.axes.yaxis.set_label_position('left')
         self.axes.set_ylabel(self.psLs.ylab) #, color=self.tool_palette.fg)
-        percentages = list(range(100 + 1)) # from 0 to 100
-        y_ticks = create_up_to_n_ticks(percentages, base=10, n=11)
+        y_ticks = create_up_to_n_ticks([x/10 for x in range(11)], base=10, n=11)
         self.axes.tick_params(axis='y', which='both',
                               left=True, labelleft=True,
                               right=False, labelright=False,
@@ -225,14 +227,14 @@ class Locality:
             block_sep_color = bottom_tool.tool_palette[0][0]
 
         # pad Y and X=Lt axes for better visualization
-        padding = 0.5
-        Y = [-padding] + list(range(st.map.num_blocks)) + \
-            [st.map.num_blocks -padding]
+        padding = 0.005
+        Y = [-0.5] + list(range(st.map.num_blocks)) + \
+            [st.map.num_blocks -0.5]
         Lt = [self.Lt[0]] + self.Lt + [self.Lt[-1]]
 
         # set plot limits and draw time locality across space
         self.axes.set_ylim(Y[0], Y[-1])
-        self.axes.set_xlim(0-padding, 100+padding)
+        self.axes.set_xlim(0-padding, 1+padding)
         self.axes.fill_betweenx(Y, Lt, -1,
                            color=self.tool_palette[0][0],
                            facecolor=self.tool_palette[0][1],
@@ -261,8 +263,7 @@ class Locality:
                               top=False, labeltop=False,
                               bottom=True, labelbottom=True, rotation=-90,
                               width=st.plot.grid_main_width)
-        x_ticks = create_up_to_n_ticks(range(100+1), base=10,
-                                       n=st.plot.max_xtick_count)
+        x_ticks = create_up_to_n_ticks([x/10 for x in range(11)], base=10, n=11)
         self.axes.set_xticks(x_ticks)
 
         # grid
@@ -277,7 +278,7 @@ class Locality:
         self.axes.yaxis.set_label_position('left')
         self.axes.set_ylabel(self.psLt.ylab, color='k')
         list_of_blocks = list(range(st.map.num_blocks))
-        y_ticks = create_up_to_n_ticks(list_of_blocks, base=10,
+        y_ticks = create_up_to_n_ticks(list_of_blocks, base=2,
                                        n=st.plot.max_ytick_count)
         self.axes.tick_params(axis='y', which='both',
                               left=True, labelleft=True,

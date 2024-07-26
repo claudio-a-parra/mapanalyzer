@@ -58,8 +58,8 @@ class SIUEviction:
     def plot(self, bottom_tool=None):
         # define set line width based on the number of blocks
         max_blocks = st.plot.grid_max_blocks
-        set_lw  = max(0.1, 9*(1 - ((st.map.num_blocks-1) / max_blocks)))
-        jump_lw = max(0.1, 2*(1 - ((st.map.num_blocks-1) / max_blocks)))
+        set_lw  = max(0.3, 9*(1 - ((st.map.num_blocks-1) / max_blocks)))
+        jump_lw = max(0.1, 3*(1 - ((st.map.num_blocks-1) / max_blocks)))
 
         # draw all sets together
         fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))

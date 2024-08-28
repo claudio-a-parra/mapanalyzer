@@ -20,10 +20,21 @@ class Locality:
         self.about = ('Spacial locality across Time, and Temporal locality '
                       'across space')
 
-        ## Spacial locality across time
-        self.time_window = deque() #of the size of the cache.
-        self.time_window_curr_size = 0
-        self.time_window_max_size = st.cache.cache_size
+        ## SPATIAL LOCALITY ACROSS TIME
+        # time window chronological access: keeps the temporal order of accesses.
+        # (offset,size)
+        self.tw_chro_acc = deque()
+        # time window unique accesses: keeps one entry per unique access, counting
+        # repetitions. It should keep less or equal than max.
+        # {offset -> number of accesses}
+        self.tw_uniq_acc = {}
+        #self.tw_uniq_acc_max = st.cache.cache_size / st.cache.line_size
+        # time window byte counter: keeps one entry per accessed byte, counting
+        # repeated accesses to that byte.
+        # {offset -> number of accesses}
+        self.tw_byte_count = {}
+        self.tw_byte_count_max = st.cache.cache_size
+        # Spatial Locality vector
         self.Ls = [-1] * st.map.time_size
         self.psLs = PlotStrings(
             title  = 'Spacial Locality across Time',
@@ -33,7 +44,7 @@ class Locality:
             subtit = '')
             # subtit = 'higher is better')
 
-        ## Temporal locality across space
+        ## TEMPORAL LOCALITY ACROSS SPACE
         self.space_by_blocks = {} #block->list of block access times
         self.Lt = [-1] * st.map.num_blocks
         self.psLt = PlotStrings(
@@ -47,17 +58,38 @@ class Locality:
 
     def add_access(self, access):
         ## SPACIAL LOCALITY ACROSS TIME
-        # Append access address to the time window. Trim the access window if
-        # it is too long.
-        # Use the first byte of the access to compute the spacial differences,
-        # but count all the bytes in the access to determine the window size.
-        mem_offset = access.addr - st.map.start_addr
-        self.time_window.append((mem_offset,access.size))
-        self.time_window_curr_size += access.size
-        while self.time_window_curr_size > self.time_window_max_size:
-            old_access = self.time_window.popleft()
-            self.time_window_curr_size -= old_access[1] # old_access.size
+        off = access.addr - st.map.start_addr
 
+        # Add access...
+        # ...to chronological queue
+        self.tw_chro_acc.append((off,access.size))
+        # ... to table of accesses
+        if off not in self.tw_uniq_acc:
+            self.tw_uniq_acc[off] = 1
+        else:
+            self.tw_uniq_acc[off] += 1
+        # ... to table of bytes
+        for b in range(off,off+access.size):
+            if b not in self.tw_byte_count:
+                self.tw_byte_count[b] = 1
+            else:
+                self.tw_byte_count[b] += 1
+
+        # keep table of accesses under max by de-queuing from the
+        # chronological queue.
+        while len(self.tw_byte_count) > self.tw_byte_count_max:
+            old_off,old_size = self.tw_chro_acc.popleft()
+            # decrement/remove access from table of accesses
+            if self.tw_uniq_acc[old_off] == 1:
+                del self.tw_uniq_acc[old_off]
+            else:
+                self.tw_uniq_acc[old_off] -= 1
+            # decrement/remove bytes from table of bytes
+            for b in range(old_off,old_off+old_size):
+                if self.tw_byte_count[b] == 1:
+                    del self.tw_byte_count[b]
+                else:
+                    self.tw_byte_count[b] -= 1
 
         ## TEMPORAL LOCALITY ACROSS SPACE
         # Append access times to each memory-block's list.
@@ -66,32 +98,29 @@ class Locality:
         if block_id not in self.space_by_blocks:
             self.space_by_blocks[block_id] = []
         self.space_by_blocks[block_id].append(access.time)
-
         return
 
     def commit(self, time):
-        """compute differences and add a new value to Ls"""
-        # obtain a flat window of the last accessed addresses
-        flat_time_window = [x[0] for x in list(self.time_window)]
+        """produce the a neighborhood from tw_byte_count's keys and add it
+        to Ls"""
 
-        # if only one access, there is no deltas to compute. assign Ls[t] = 0
-        if len(flat_time_window) < 2:
+        neig = sorted(list(self.tw_byte_count))
+
+        # if only one access, there are no deltas to get, then, Ls[time] = 0
+        if len(neig) < 2:
             self.Ls[time] = 0
             return
 
-        # sort by addresses and compute deltas into ls
-        flat_time_window.sort()
-        ls = flat_time_window # just to reuse memory
-        B = st.cache.line_size
-        for i,a1,a2 in zip(range(len(ls)-1),
-                           flat_time_window[:-1],
-                           flat_time_window[1:]):
-            ls[i] = (B - min(B, a2-a1)) / B
-        del ls[-1]
+        # compute differences among neighbors and store them into dist.
+        dist = neig # just to reuse memory
+        b = st.cache.line_size
+        for j,ni,nj in zip(range(len(dist)-1), neig[:-1], neig[1:]):
+            dist[j] = (b - min(b, nj-ni)) / (b - 1)
+        del dist[-1]
 
-        # compute average delta of the whole ls array, and write it in Ls.
-        avg_ls = sum(ls) / len(ls)
-        self.Ls[time] = avg_ls
+        # get average distance in the neighborhood, and write it in Ls.
+        avg_dist = sum(dist) / len(dist)
+        self.Ls[time] = avg_dist
         return
 
     def all_space_window_to_lt(self):
@@ -101,23 +130,22 @@ class Locality:
         used_blocks = list(self.space_by_blocks.keys())
         used_blocks.sort()
 
-        # compute lt for each space_window
+        # for each window, get its neighborhood, compute distances and store
+        # the average distance in Lt.
         C = st.cache.cache_size
         for ubi in used_blocks:
-            flat_space_window = self.space_by_blocks[ubi]
-            lt = flat_space_window # just to reuse memory
-            if len(flat_space_window) < 2:
+            neig = self.space_by_blocks[ubi]
+            dist = neig # just to reuse memory
+            if len(neig) < 2:
                 self.Lt[ubi] = 0
                 continue
-            for i,t1,t2 in zip(range(len(lt)-1),
-                               flat_space_window[:-1],
-                               flat_space_window[1:]):
-                lt[i] = (C - min(C, t2-t1)) / C
-            del lt[-1]
+            for j,ni,nj in zip(range(len(dist)-1), neig[:-1], neig[1:]):
+                dist[j] = (C - min(C, nj-ni)) / (C-1)
+            del dist[-1]
 
-            # compute average delta of the whole lt array, and write it in Lt
-            avg_lt = sum(lt) / len(lt)
-            self.Lt[ubi] = avg_lt
+            # get average difference in the neighborhood, and write it in Lt.
+            avg_dist = sum(dist) / len(dist)
+            self.Lt[ubi] = avg_dist
         return
 
     def describe(self, ind=''):

@@ -22,16 +22,11 @@ class Locality:
 
         ## SPATIAL LOCALITY ACROSS TIME
         # time window chronological access: keeps the temporal order of accesses.
-        # (offset,size)
+        # (access offset, size)
         self.tw_chro_acc = deque()
-        # time window unique accesses: keeps one entry per unique access, counting
-        # repetitions. It should keep less or equal than max.
-        # {offset -> number of accesses}
-        self.tw_uniq_acc = {}
-        #self.tw_uniq_acc_max = st.cache.cache_size / st.cache.line_size
         # time window byte counter: keeps one entry per accessed byte, counting
         # repeated accesses to that byte.
-        # {offset -> number of accesses}
+        # {byte offset -> number of accesses}
         self.tw_byte_count = {}
         self.tw_byte_count_max = st.cache.cache_size
         # Spatial Locality vector
@@ -63,11 +58,6 @@ class Locality:
         # Add access...
         # ...to chronological queue
         self.tw_chro_acc.append((off,access.size))
-        # ... to table of accesses
-        if off not in self.tw_uniq_acc:
-            self.tw_uniq_acc[off] = 1
-        else:
-            self.tw_uniq_acc[off] += 1
         # ... to table of bytes
         for b in range(off,off+access.size):
             if b not in self.tw_byte_count:
@@ -79,11 +69,6 @@ class Locality:
         # chronological queue.
         while len(self.tw_byte_count) > self.tw_byte_count_max:
             old_off,old_size = self.tw_chro_acc.popleft()
-            # decrement/remove access from table of accesses
-            if self.tw_uniq_acc[old_off] == 1:
-                del self.tw_uniq_acc[old_off]
-            else:
-                self.tw_uniq_acc[old_off] -= 1
             # decrement/remove bytes from table of bytes
             for b in range(old_off,old_off+old_size):
                 if self.tw_byte_count[b] == 1:
@@ -92,13 +77,22 @@ class Locality:
                     self.tw_byte_count[b] -= 1
 
         ## TEMPORAL LOCALITY ACROSS SPACE
-        # Append access times to each memory-block's list.
-        # Only register the first byte of the access.
-        block_id = access.addr >> st.cache.bits_off
-        if block_id not in self.space_by_blocks:
-            self.space_by_blocks[block_id] = []
-        self.space_by_blocks[block_id].append(access.time)
-        return
+        # get the block to which the address belongs
+        #block_id = access.addr >> st.cache.bits_off
+        blkid_start = access.addr >> st.cache.bits_off
+        if blkid_start not in self.space_by_blocks:
+            self.space_by_blocks[blkid_start] = []
+        self.space_by_blocks[blkid_start].append(access.time)
+
+        # in case the reading fell between blocks, the last bytes will be
+        # in the next block.
+        blkid_end = (access.addr + access.size -1) >> st.cache.bits_off
+        if blkid_end == blkid_start:
+            return
+        if blkid_end not in self.space_by_blocks:
+            self.space_by_blocks[blkid_end] = []
+        self.space_by_blocks[blkid_end].append(access.time)
+
 
     def commit(self, time):
         """produce the a neighborhood from tw_byte_count's keys and add it
@@ -136,9 +130,11 @@ class Locality:
         for ubi in used_blocks:
             neig = self.space_by_blocks[ubi]
             dist = neig # just to reuse memory
+            # if there is only one access, there is no locality to compute.
             if len(neig) < 2:
-                self.Lt[ubi] = 0
+                self.Lt[ubi] = -1
                 continue
+
             for j,ni,nj in zip(range(len(dist)-1), neig[:-1], neig[1:]):
                 dist[j] = (C - min(C, nj-ni)) / (C-1)
             del dist[-1]

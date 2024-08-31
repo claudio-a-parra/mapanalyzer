@@ -37,7 +37,7 @@ class Aliasing:
 
         # trim queue to fit max_size
         while len(self.time_window) > self.time_window_max_size:
-            old_set_idx,old_time = self.time_window.popleft()
+            old_set_idx,_ = self.time_window.popleft()
             self.set_counters[old_set_idx] -= 1
         return
 
@@ -59,10 +59,6 @@ class Aliasing:
         bottom_axes.set_xticks([])
         bottom_axes.set_yticks([])
         self.axes = fig.add_axes(bottom_axes.get_position())
-
-        # plot map
-        # if bottom_tool is not None:
-        #     bottom_tool.plot(axes=bottom_axes)
 
         self.tool_palette = Palette(hue=self.hue,
                                     hue_count=st.cache.num_sets,

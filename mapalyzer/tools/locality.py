@@ -33,7 +33,7 @@ class Locality:
         self.Ls = [-1] * st.map.time_size
         self.psLs = PlotStrings(
             title  = 'Spacial Locality across Time',
-            xlab   = 'Time',
+            xlab   = 'Time [accesses]',
             ylab   = 'Degree of Spacial Locality',
             suffix = '_plot-01-locality-Ls',
             subtit = '')

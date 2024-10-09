@@ -4,3 +4,4 @@ example
 pin.log
 pintool.log
 *.pdf
+mem_access_pattern.map

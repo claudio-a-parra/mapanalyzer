@@ -22,18 +22,27 @@
 
 // Tell Pin tool to take note of the memory block reserved by the very
 // next malloc/calloc, so that later, start the trace
-void __attribute__((optimize("O0")))
-mt_select_next_block(void) {}
+#if defined(__GNUC__) && !defined(__clang__)
+void __attribute__((optimize("O0"))) mt_select_next_block(void) {}
+#else
+void __attribute__((noinline, used)) mt_select_next_block(void) {}
+#endif
 
 // starts, from this point, recording all memory accesses to a previously
 // selected memory block.
-void __attribute__((optimize("O0")))
-mt_start_tracing(void) {}
+#if defined(__GNUC__) && !defined(__clang__)
+void __attribute__((optimize("O0"))) mt_start_tracing(void) {}
+#else
+void __attribute__((noinline, used)) mt_start_tracing(void) {}
+#endif
 
 // stops recording memory accesses to a memory block that was previously
 // selected and whos access already started to be recorded.
-void __attribute__((optimize("O0")))
-mt_stop_tracing(void) {}
+#if defined(__GNUC__) && !defined(__clang__)
+void __attribute__((optimize("O0"))) mt_stop_tracing(void) {}
+#else
+void __attribute__((noinline, used)) mt_stop_tracing(void) {}
+#endif
 
 
 // Aligned Memory Allocator: gets a block of memory where the first byte

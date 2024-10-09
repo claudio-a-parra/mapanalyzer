@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "mem_trace.h"
+#include "mem_tracer.h"
 
 int N=512;
 int shared=0;

@@ -23,7 +23,7 @@ class Aliasing:
 
         self.ps = PlotStrings(
             title  = 'Cache Aliasing',
-            xlab   = 'Time',
+            xlab   = 'Time [access instr.]',
             ylab   = 'Cache Sets',
             suffix = '_plot-06-aliasing',
             subtit = 'transparent is better')

@@ -30,10 +30,10 @@ class Locality:
         self.tw_byte_count = {}
         self.tw_byte_count_max = st.cache.cache_size
         # Spatial Locality vector
-        self.Ls = [-1] * st.map.time_size
+        self.Ls = [0] * st.map.time_size
         self.psLs = PlotStrings(
             title  = 'Spacial Locality across Time',
-            xlab   = 'Time [accesses]',
+            xlab   = 'Time [access instr.]',
             ylab   = 'Degree of Spacial Locality',
             suffix = '_plot-01-locality-Ls',
             subtit = '')
@@ -41,7 +41,7 @@ class Locality:
 
         ## TEMPORAL LOCALITY ACROSS SPACE
         self.space_by_blocks = {} #block->list of block access times
-        self.Lt = [-1] * st.map.num_blocks
+        self.Lt = [0] * st.map.num_blocks
         self.psLt = PlotStrings(
             title  = 'Temporal Locality across Space',
             xlab   = 'Degree of Temporal Locality',
@@ -127,16 +127,18 @@ class Locality:
         # for each window, get its neighborhood, compute distances and store
         # the average distance in Lt.
         C = st.cache.cache_size
-        for ubi in used_blocks:
+        B = st.cache.line_size
+        for ubi in used_blocks: #ubi: used-block ID
             neig = self.space_by_blocks[ubi]
             dist = neig # just to reuse memory
             # if there is only one access, there is no locality to compute.
             if len(neig) < 2:
-                self.Lt[ubi] = -1
+                self.Lt[ubi] = 0
                 continue
 
             for j,ni,nj in zip(range(len(dist)-1), neig[:-1], neig[1:]):
-                dist[j] = (C - min(C, nj-ni)) / (C-1)
+                #dist[j] = (C - min(C, nj-ni)) / (C-1)
+                dist[j] = (C - B*min(nj-ni,C//B)) / (C-B)
             del dist[-1]
 
             # get average difference in the neighborhood, and write it in Lt.
@@ -193,7 +195,11 @@ class Locality:
                                facecolor=self.tool_palette[0][1],
                                linewidth=st.plot.linewidth, step='mid',
                                zorder=2)
-
+        # insert average locality
+        avg = sum(self.Ls)/len(self.Ls)
+        self.axes.text(0.97, 0.97, f'Avg: {avg:.2f}', transform=self.axes.transAxes,
+                       fontsize=9, verticalalignment='top', horizontalalignment='right',
+                       bbox=dict(facecolor='#F8F8F8', edgecolor='#F0F0F0'))
         # complete plot setup
         self.axes.set_xticks([])
         self.axes.set_yticks([])
@@ -264,6 +270,11 @@ class Locality:
                            facecolor=self.tool_palette[0][1],
                            linewidth=st.plot.linewidth, step='mid', zorder=2)
         self.axes.invert_yaxis()
+        # insert average locality
+        avg = sum(self.Lt)/len(self.Lt)
+        self.axes.text(0.97, 0.97, f'Avg: {avg:.2f}', transform=self.axes.transAxes,
+                       fontsize=9, verticalalignment='top', horizontalalignment='right',
+                       bbox=dict(facecolor='#F8F8F8', edgecolor='#F0F0F0'))
 
         # complete plot setup
         self.axes.set_xticks([])

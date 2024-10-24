@@ -53,6 +53,7 @@ def run_simulation(map_reader, cache, progress=True):
         print()
 
     cache.flush()
+    cache.tools.commit(st.map.time_size-1)
     return
 
 def command_line_args_parser():

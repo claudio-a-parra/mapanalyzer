@@ -254,7 +254,7 @@ class PlotSpecs:
         self.img_title_vpad = 6
 
         # plot line settings
-        self.linewidth=1.2
+        self.linewidth=1
         self.pal_lig=[60,75]
         self.pal_sat=[50,75]
         self.pal_alp=[100,30]

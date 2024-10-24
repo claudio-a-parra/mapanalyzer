@@ -25,7 +25,7 @@ class SIUEviction:
 
         self.ps = PlotStrings(
             title  = 'SiU Evictions',
-            xlab   = 'Time',
+            xlab   = 'Time [access instr.]',
             ylab   = 'Blocks',
             suffix = '_plot-07-siu-evictions',
             subtit = 'flatter is better')

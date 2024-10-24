@@ -23,7 +23,7 @@ class CacheUsage:
 
         self.ps = PlotStrings(
             title  = 'Cache Bytes Usage',
-            xlab   = 'Time',
+            xlab   = 'Time [access instr.]',
             ylab   = 'Cache Usage [%]',
             suffix = '_plot-05-usage',
             subtit = 'higher is better')
@@ -63,7 +63,11 @@ class CacheUsage:
                                color=self.tool_palette[0][0],
                                facecolor=self.tool_palette[0][1],
                                linewidth=st.plot.linewidth)
-
+        # add average text block
+        avg = sum(self.usage_ratio)/len(self.usage_ratio)
+        self.axes.text(0.985, 0.98, f'Avg: {avg:.2f}', transform=self.axes.transAxes,
+                       fontsize=9, verticalalignment='top', horizontalalignment='right',
+                       bbox=dict(facecolor='#F8F8F8', edgecolor='#F0F0F0'))
         # finish plot setup
         self.plot_setup_Y()
         self.plot_setup_X()

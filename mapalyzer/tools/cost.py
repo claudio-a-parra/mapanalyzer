@@ -26,10 +26,10 @@ class Cost:
 
         self.ps = PlotStrings(
             title  = 'Cumulative Main Mem. Access',
-            xlab   = 'Time',
-            ylab   = 'Mem. Access Count',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Mem. Access [cumul. count]',
             suffix = '_plot-04-access-count',
-            subtit = 'lower is better')
+            subtit = 'horiz. is better')
         return
 
     def add_access(self, rw):
@@ -66,20 +66,32 @@ class Cost:
         if bottom_axes is not None:
             bottom_tool.plot(axes=bottom_axes)
 
-        # set plot limits and draw read and write distributions
+        # set plot limits and draw read and write cumulative distributions
         padding = 0.5
         X = [self.X[0]-padding] + self.X + [self.X[-1]+padding]
         distrs = [self.read_dist, self.write_dist]
-        max_Y = max(distrs[0][-1], distrs[1][-1])
+        stacked_distrs = [
+            # both read and write, to be drawn in the background
+            [distrs[0][i] + distrs[1][i] for i in range(len(distrs[0]))],
+            # only write, to be drawn in the foreground
+            distrs[1]
+        ]
+        max_Y = max(stacked_distrs[0][-1], stacked_distrs[1][-1])
         self.axes.set_xlim(X[0], X[-1])
         self.axes.set_ylim(0-(max_Y/200), max_Y+(max_Y/200))
-        for i,d in enumerate(distrs):
+        for i,d in enumerate(stacked_distrs):
             D = [d[0]] + d + [d[-1]]
             self.axes.fill_between(X, -1, D, step='mid', zorder=2,
                                    color=self.tool_palette[i][0],
                                    facecolor=self.tool_palette[i][1],
                                    linewidth=st.plot.linewidth)
-
+         # insert total number of accesses
+        tot_read = distrs[0][-1]
+        tot_write = distrs[1][-1]
+        text = f'Tot R: {tot_read}\nTot W: {tot_write}'
+        self.axes.text(0.985, 0.025, text, transform=self.axes.transAxes,
+                       fontsize=9, verticalalignment='bottom', horizontalalignment='right',
+                       bbox=dict(facecolor='#F8F8F8', edgecolor='#F0F0F0'))
         # finish plot setup
         self.plot_setup_Y(max_Y)
         self.plot_setup_X()

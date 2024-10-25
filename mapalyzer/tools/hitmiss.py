@@ -132,7 +132,7 @@ class HitMiss:
         for i,thr_idx in enumerate(threads):
             avg = sum(thr.miss_ratio)/len(thr.miss_ratio)
             text += f'Avg t{i}: {avg:.2f}%\n'
-        self.axes.text(0.985, 0.98, text[:-1], transform=self.axes.transAxes,
+        self.axes.text(0.97, 0.97, text[:-1], transform=self.axes.transAxes,
                        fontsize=9, verticalalignment='top', horizontalalignment='right',
                        bbox=dict(facecolor='#F8F8F8', edgecolor='#F0F0F0'))
 

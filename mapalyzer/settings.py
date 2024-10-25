@@ -257,7 +257,7 @@ class PlotSpecs:
         self.linewidth=1
         self.pal_lig=[60,75]
         self.pal_sat=[50,75]
-        self.pal_alp=[100,30]
+        self.pal_alp=[70,35]
 
         # plot grids settings
         self.grid_main_width = 0.5

@@ -253,11 +253,11 @@ class PlotSpecs:
         self.img_border_pad = 0.025
         self.img_title_vpad = 6
 
-        # plot line settings
-        self.linewidth=1
+        # plot line settings: [0]:line [1]:area filling
+        self.linewidth=0.25
         self.pal_lig=[60,75]
         self.pal_sat=[50,75]
-        self.pal_alp=[70,35]
+        self.pal_alp=[80,50] #80,35
 
         # plot grids settings
         self.grid_main_width = 0.5

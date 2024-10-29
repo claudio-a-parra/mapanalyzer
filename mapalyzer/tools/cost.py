@@ -29,7 +29,7 @@ class Cost:
             xlab   = 'Time [access instr.]',
             ylab   = 'Mem. Access [cumul. count]',
             suffix = '_plot-04-access-count',
-            subtit = 'horiz. is better')
+            subtit = 'lower is better')
         return
 
     def add_access(self, rw):
@@ -79,12 +79,28 @@ class Cost:
         max_Y = max(stacked_distrs[0][-1], stacked_distrs[1][-1])
         self.axes.set_xlim(X[0], X[-1])
         self.axes.set_ylim(0-(max_Y/200), max_Y+(max_Y/200))
-        for i,d in enumerate(stacked_distrs):
-            D = [d[0]] + d + [d[-1]]
-            self.axes.fill_between(X, -1, D, step='mid', zorder=2,
-                                   color=self.tool_palette[i][0],
-                                   facecolor=self.tool_palette[i][1],
-                                   linewidth=st.plot.linewidth)
+
+        rwd = [distrs[0][0]+distrs[1][0]] \
+            + [distrs[0][i] + distrs[1][i] for i in range(len(distrs[0]))] \
+            + [distrs[0][-1]+distrs[1][-1]]
+        wd = [distrs[1][0]] + distrs[1] + [distrs[1][-1]]
+        i = 0
+        self.axes.fill_between(X, wd, rwd, step='mid', zorder=2,
+                               color=self.tool_palette[i][0],
+                               facecolor=self.tool_palette[i][1],
+                               linewidth=st.plot.linewidth)
+        i = 1
+        self.axes.fill_between(X, -1, wd, step='mid', zorder=2,
+                               color=self.tool_palette[i][0],
+                               facecolor=self.tool_palette[i][1],
+                               linewidth=st.plot.linewidth)
+
+        # for i,d in enumerate(stacked_distrs):
+        #     D = [d[0]] + d + [d[-1]]
+        #     self.axes.fill_between(X, -1, D, step='mid', zorder=2,
+        #                            color=self.tool_palette[i][0],
+        #                            facecolor=self.tool_palette[i][1],
+        #                            linewidth=st.plot.linewidth)
          # insert total number of accesses
         tot_read = distrs[0][-1]
         tot_write = distrs[1][-1]

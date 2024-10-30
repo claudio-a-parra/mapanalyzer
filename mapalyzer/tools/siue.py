@@ -21,6 +21,7 @@ class SIUEviction:
         self.blocks_jumps = [[] for _ in range(st.cache.num_sets)]
 
         self.name = 'SiU Evictions'
+        self.plotcode = 'S'
         self.about = ('Shows blocks that are evicted and fetched again in a short time.')
 
         self.ps = PlotStrings(

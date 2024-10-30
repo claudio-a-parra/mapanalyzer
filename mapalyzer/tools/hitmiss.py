@@ -53,6 +53,7 @@ class HitMiss:
         self.thr_traces = {}
 
         self.name = 'Miss Ratio'
+        self.plotcode = 'I'
         self.about = ('Thread-wise Cache Miss Ratio on the last memory '
                       'accesses.')
 
@@ -130,8 +131,10 @@ class HitMiss:
         # add per-thread average
         text = ''
         for i,thr_idx in enumerate(threads):
-            avg = sum(thr.miss_ratio)/len(thr.miss_ratio)
+            tot_ops = len(thr.miss_ratio)
+            avg = sum(thr.miss_ratio)/tot_ops
             text += f'Avg t{i}: {avg:.2f}%\n'
+            text += f'M ops t{i}: {tot_ops:,}\n'
         self.axes.text(0.97, 0.97, text[:-1], transform=self.axes.transAxes,
                        fontsize=9, verticalalignment='top', horizontalalignment='right',
                        bbox=dict(facecolor='#F8F8F8', edgecolor='#F0F0F0'))

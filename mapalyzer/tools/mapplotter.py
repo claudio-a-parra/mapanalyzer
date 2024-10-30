@@ -27,6 +27,7 @@ class Map:
                               for _ in range(ap_matrix_height)]
 
         self.name = 'Memory Access Pattern'
+        self.plotcode = 'M'
         self.about = 'Visual representation of the Memory Access Pattern'
         self.ps = PlotStrings(
             title = self.name,

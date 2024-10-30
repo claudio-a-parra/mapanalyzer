@@ -19,6 +19,7 @@ class Aliasing:
         self.aliasing = [[0] * len(self.X) for _ in range(st.cache.num_sets)]
 
         self.name = 'Cache Aliasing'
+        self.plotcode = 'A'
         self.about = ('Proportion in which each set fetches blocks during execution')
 
         self.ps = PlotStrings(

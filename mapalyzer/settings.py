@@ -234,32 +234,37 @@ class MapSpecs:
 
 
 class PlotSpecs:
-    def __init__(self, width=8, height=4, res=1000, dpi=200, format='png', prefix='exp'):
-        self.width = width
-        self.height = height
-        self.res = res
-        self.dpi = dpi
-        self.format = format
-        self.prefix = prefix
-        self.max_xtick_count = 20
-        self.max_ytick_count = 11
-        self.max_map_ytick_count = 11
+    def __init__(self, width=8, height=4, res=1000, dpi=200, format='png', prefix='exp',
+                 include='', y_ranges=''):
+        # Image to export
+        self.width = width # image width
+        self.height = height # image height
+        self.dpi = dpi # resolution of the image
+        self.format = format # format, usually png or pdf
+        self.prefix = prefix # filename prefix
+        self.img_border_pad = 0.025 # padding around the image
+        self.img_title_vpad = 6 # padding between the plot and its title
 
         # terminal UI
         self.ui_title_hpad = 31
         self.ui_name_hpad = 23
 
-        # exporting image
-        self.img_border_pad = 0.025
-        self.img_title_vpad = 6
+        # Plots to be exported
+        self.include = include
 
-        # plot line settings: [0]:line [1]:area filling
+        # Plots Axes
+        self.y_ranges = self.init_y_ranges(y_ranges)
+        self.max_xtick_count = 11
+        self.max_ytick_count = 11
+        self.max_map_ytick_count = 11
+
+        # Plot Lines (of the curves) [0]:line [1]:area filling
         self.linewidth=0.25
         self.pal_lig=[60,75]
         self.pal_sat=[50,75]
-        self.pal_alp=[80,50] #80,35
+        self.pal_alp=[80,50]
 
-        # plot grids settings
+        # Plot Grids
         self.grid_main_width = 0.5
         self.grid_main_style = '-'
         self.grid_main_alpha = 0.2
@@ -269,8 +274,26 @@ class PlotSpecs:
         self.grid_max_bytes = 128
         self.grid_max_blocks = 48
 
-        self.fade_bytes_alpha=0.1
+        # Specific to MAP plot
+        self.res = res # grid resolution
+        self.fade_bytes_alpha=0.1 # fading of bytes out-of-range to complete the block
+
         return
+    def init_y_ranges(self, y_ranges_str):
+        ranges_map = {}
+        if not y_ranges_str:
+            return ranges_map
+        rang_arr = y_ranges_str.split(',')
+        for r in rang_arr:
+            try:
+                pl, min_val, max_val = r.split(':')
+                min_val = int(min_val)
+                max_val = int(max_val)
+            except ValueError:
+                print(f'Error: Y-Range with wrong format "{r}".')
+                exit(1)
+            ranges_map[pl] = (min_val, max_val)
+        return ranges_map
 
     def __str__(self):
         ret_str = ''
@@ -314,8 +337,6 @@ class Settings:
         cls.map.num_padded_bytes = ((cls.map.end_addr+cls.map.right_pad) -
                                     (cls.map.start_addr-cls.map.left_pad) + 1)
         cls.map.num_blocks = cls.map.num_padded_bytes // cls.cache.line_size
-        # print(cls.map)
-        # exit(0)
         return
 
     @classmethod

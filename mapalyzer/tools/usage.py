@@ -19,6 +19,7 @@ class CacheUsage:
         self.usage_ratio = [-1] * len(self.X)
 
         self.name = 'Cache Bytes Usage'
+        self.plotcode = 'U'
         self.about = ('Percentage of valid bytes in cache that are used before eviction')
 
         self.ps = PlotStrings(

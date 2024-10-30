@@ -89,7 +89,7 @@ def command_line_args_parser():
         default=None,
         help='File describing the cache. See "cache.conf" section.'
     )
-    
+
     parser.add_argument(
         '-px', '--plot-x', dest='px', type=float, default=8,
         help="Width of the plots."
@@ -104,7 +104,21 @@ def command_line_args_parser():
         '-dpi', '--dpi', dest='dpi', type=int, default=200,
         help='Choose the DPI of the resulting plots.'
     )
-    
+
+    parser.add_argument(
+        '-p', '--plots', dest='plots', type=str, default='MLICUAS',
+        help="What plots to include. Format: {<plotcode>}\n" +\
+        "Plotcodes: M:map, L:locality, I:miss-ratio, C:main-mem-access-count, U:cache-usage, " +\
+        "A:aliasing, S:SIU-evictions.\nExample: 'MU'"
+    )
+
+    parser.add_argument(
+        '-yr', '--y-ranges', dest='y_ranges', type=str, default='', nargs='?',
+        help="Set a manual range for the Y-axis. Useful to compare several " +\
+        "individually produced plots. Format: {<plotcode>:<min>:<max>,}\n" +\
+        "Example: 'C:0:6000,U:20:30'\n"
+    )
+
     parser.add_argument(
         '-f', '--format', dest='format', choices=['png', 'pdf'], default='png',
         help='Choose the output format of the plots.'
@@ -122,7 +136,7 @@ def command_line_args_parser():
                   f'{max_res}. Using default value {def_res}.')
             return def_res
     parser.add_argument(
-        '-r', '--resolution', dest='resolution', type=check_res, default=512,
+        '-r', '--res', dest='resolution', type=check_res, default=512,
         help=('Maximum resolution of the Memory Access Pattern grid (value '
               'between 4 and 2048).')
     )
@@ -132,7 +146,6 @@ def command_line_args_parser():
 
 def main():
     args = command_line_args_parser()
-
     print(f'CACHE PARAMETERS')
     st.init_cache(args.cache)
     AddrFmt.init(st.cache)
@@ -148,7 +161,8 @@ def main():
         file_prefix = os.path.basename(os.path.splitext(map_filename)[0])
         plot_metadata = PlotSpecs(width=args.px, height=args.py,
                                   res=args.resolution, dpi=args.dpi,
-                                  format=args.format, prefix=file_prefix)
+                                  format=args.format, prefix=file_prefix,
+                                  include=args.plots, y_ranges=args.y_ranges)
         st.init_plot(plot_metadata=plot_metadata)
 
         print(f'\nCREATING TOOLS AND MEMORY SYSTEM')

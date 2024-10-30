@@ -17,6 +17,7 @@ class Locality:
                                     alpha=st.plot.pal_alp)
         self.axes = None
         self.name = 'Locality'
+        self.plotcode = 'L'
         self.about = ('Spacial locality across Time, and Temporal locality '
                       'across space')
 

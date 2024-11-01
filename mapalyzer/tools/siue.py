@@ -21,13 +21,13 @@ class SIUEviction:
         self.blocks_jumps = [[] for _ in range(st.cache.num_sets)]
 
         self.name = 'SiU Evictions'
-        self.plotcode = 'S'
-        self.about = ('Shows blocks that are evicted and fetched again in a short time.')
+        self.plotcode = 'SIU'
+        self.about = ('Blocks that are evicted and fetched again in a short time.')
 
         self.ps = PlotStrings(
-            title  = 'SiU Evictions',
+            title  = 'SIU Evictions',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Blocks',
+            ylab   = 'Memory Blocks',
             suffix = '_plot-07-siu-evictions',
             subtit = 'flatter is better')
         return
@@ -52,17 +52,21 @@ class SIUEviction:
         return
 
     def describe(self, ind=''):
-        print(f'{ind}{self.name:{st.plot.ui_name_hpad}}: {self.about}')
+        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
 
     def plot(self, bottom_tool=None):
+        # only plot if requested
+        if self.plotcode not in st.plot.include:
+            return
+
         # define set line width based on the number of blocks
         max_blocks = st.plot.grid_max_blocks
         set_lw  = max(0.3, 9*(1 - ((st.map.num_blocks-1) / max_blocks)))
         jump_lw = max(0.1, 3*(1 - ((st.map.num_blocks-1) / max_blocks)))
 
-        # draw all sets together
+        # create two set of axes: for the map (bottom) and the tool
         fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
         bottom_axes.set_xticks([])
         bottom_axes.set_yticks([])
@@ -110,7 +114,7 @@ class SIUEviction:
         self.plot_draw_Y_grid(block_sep_color)
 
         # save image
-        save_fig(fig, self.ps.title, f'{self.ps.suffix}_all')
+        save_fig(fig, f'{self.plotcode} all', f'{self.ps.suffix}_all')
 
 
 
@@ -163,19 +167,14 @@ class SIUEviction:
             self.plot_draw_Y_grid(block_sep_color)
 
             # save image
-            save_fig(fig, self.ps.title, f'{self.ps.suffix}_s{s}')
+            save_fig(fig, f'{self.plotcode} s{s}', f'{self.ps.suffix}_s{s}')
 
         return
 
     def plot_setup_Y(self):
-        # spine
         #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
-
-        # label
-        self.axes.set_ylabel(self.ps.ylab) #color=self.tool_palette.fg)
-
-        # ticks
-        self.axes.tick_params(axis='y', #,colors=self.tool_palette.fg,
+        self.axes.set_ylabel(self.ps.ylab)
+        self.axes.tick_params(axis='y',
                               left=True, labelleft=True,
                               right=False, labelright=False,
                               width=st.plot.grid_main_width)

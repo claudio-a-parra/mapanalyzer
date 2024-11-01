@@ -26,9 +26,9 @@ class Map:
         self.access_matrix = [[0] * ap_matrix_width
                               for _ in range(ap_matrix_height)]
 
-        self.name = 'Memory Access Pattern'
-        self.plotcode = 'M'
-        self.about = 'Visual representation of the Memory Access Pattern'
+        self.name = 'Mem. Acc. Patt.'
+        self.plotcode = 'MAP'
+        self.about = 'Visual representation of the Memory Access Pattern.'
         self.ps = PlotStrings(
             title = self.name,
             xlab   = 'Time [access instr.]',
@@ -38,7 +38,7 @@ class Map:
         return
 
     def describe(self, ind=''):
-        print(f'{ind}{self.name:{st.plot.ui_name_hpad}}: {self.about}')
+        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
     def add_access(self, access):
@@ -94,6 +94,9 @@ class Map:
     def plot(self, bottom_tool=None, axes=None):
         # define values for standalone and auxiliary-plot cases
         if axes is None:
+            # only plot if requested
+            if self.plotcode not in st.plot.include:
+                return
             standalone = True
             lig_val = [35,70]
             sat_val = [45,75]
@@ -136,7 +139,7 @@ class Map:
             self.plot_draw_X_grid()
             self.plot_setup_Y_axis()
             self.plot_draw_Y_grid()
-            save_fig(fig, self.ps.title, self.ps.suffix)
+            save_fig(fig, self.plotcode , self.ps.suffix)
         else:
             self.axes.set_xticks([])
             self.axes.set_yticks([])

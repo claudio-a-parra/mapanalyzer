@@ -63,13 +63,11 @@ def command_line_args_parser():
     cache_conf = ('cache.conf:\n'
                   '  The cache file file must have this format:\n'
                   '\n'
-                  '    # Comments start with pound sign\n'
+                  f'   # Comments start with pound sign\n'
                   f'   line_size_bytes     : <value> # default: {cs.line_size}\n'
                   f'   associativity       : <value> # default: {cs.asso}\n'
                   f'   cache_size_bytes    : <value> # default: {cs.cache_size}\n'
-                  f'   arch_size_bits      : <value> # default: {cs.arch}\n'
-                  f'   fetch_time_cost     : <value> # default: {cs.fetch}\n'
-                  f'   writeback_time_cost : <value> # default: {cs.write}\n')
+                  f'   arch_size_bits      : <value> # default: {cs.arch}\n')
     signature = ('By Claudio A. Parra. 2024.\n'
                  'parraca@uci.edu')
 
@@ -80,48 +78,52 @@ def command_line_args_parser():
     
     # Adding arguments
     parser.add_argument(
-        'input_files', metavar='input_file.map', nargs='+', type=str,
-        help='Path of the input Memory Access Pattern file.'
+        'input_files', metavar='MAPFILE', nargs='+', type=str,
+        help='Memory Access Pattern file.'
     )
     
     parser.add_argument(
-        '-c', '--cache', metavar='cache.conf', dest='cache', type=str,
+        '-ca', '--cache', metavar='CACHE', dest='cache', type=str,
         default=None,
         help='File describing the cache. See "cache.conf" section.'
     )
 
     parser.add_argument(
-        '-px', '--plot-x', dest='px', type=float, default=8,
+        '-pw', '--plot-width', metavar='WIDTH', dest='plot_width', type=float, default=8,
         help="Width of the plots."
     )
     
     parser.add_argument(
-        '-py', '--plot-y', dest='py', type=float, default=4,
+        '-ph', '--plot-height', metavar='HEIGHT', dest='plot_height', type=float, default=4,
         help="Height of the plots."
     )
     
     parser.add_argument(
-        '-dpi', '--dpi', dest='dpi', type=int, default=200,
+        '-dp', '--dpi', metavar='DPI', dest='dpi', type=int, default=200,
         help='Choose the DPI of the resulting plots.'
     )
 
     parser.add_argument(
-        '-p', '--plots', dest='plots', type=str, default='MLICUAS',
-        help="What plots to include. Format: {<plotcode>}\n" +\
-        "Plotcodes: M:map, L:locality, I:miss-ratio, C:main-mem-access-count, U:cache-usage, " +\
-        "A:aliasing, S:SIU-evictions.\nExample: 'MU'"
+        '-pl', '--plots', metavar='PLOTCODES', dest='plotcodes', type=str, default='all',
+        help=("Plots to obtain:\n"+
+              "\n".join(f"    {code:4} : {defin}" for code, defin in st.PLOTCODES.items())+"\n"+
+              "Format: 'all' | PLOTCODE{,PLOTCODE}\n"
+              "Example: 'MAP,CMR,CUR'")
     )
 
     parser.add_argument(
-        '-yr', '--y-ranges', dest='y_ranges', type=str, default='', nargs='?',
-        help="Set a manual range for the Y-axis. Useful to compare several " +\
-        "individually produced plots. Format: {<plotcode>:<min>:<max>,}\n" +\
-        "Example: 'C:0:6000,U:20:30'\n"
+        '-yr', '--y-ranges', metavar='YRANGES', dest='y_ranges', type=str, default='',
+        help=("Set a manual range for the Y-axis. Useful to compare several "
+              "individually produced plots.\n"
+              "Given that TLD is rotated, YRANGE actually restrict the X axis."
+              "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
+              "Example: 'TLD:0.3:0.7,CMR:20:30,CMMA:0:6000'")
     )
 
     parser.add_argument(
-        '-f', '--format', dest='format', choices=['png', 'pdf'], default='png',
-        help='Choose the output format of the plots.'
+        '-fr', '--format', metavar='FORMAT', dest='format', choices=['png', 'pdf'], default='png',
+        help=("Choose the output format of the plots.\n"
+              "Format: 'pdf' | 'png'")
     )
     
     def check_res(val):
@@ -159,10 +161,10 @@ def main():
         st.map.describe(ind='    ')
 
         file_prefix = os.path.basename(os.path.splitext(map_filename)[0])
-        plot_metadata = PlotSpecs(width=args.px, height=args.py,
+        plot_metadata = PlotSpecs(width=args.plot_width, height=args.plot_height,
                                   res=args.resolution, dpi=args.dpi,
                                   format=args.format, prefix=file_prefix,
-                                  include=args.plots, y_ranges=args.y_ranges)
+                                  include_plots=args.plotcodes, y_ranges=args.y_ranges)
         st.init_plot(plot_metadata=plot_metadata)
 
         print(f'\nCREATING TOOLS AND MEMORY SYSTEM')
@@ -170,10 +172,10 @@ def main():
         tools.describe()
         cache = Cache(tools=tools)
 
-        print(f'\nRETRACING MAP ({st.map.event_count} mem. accesses)')
+        print(f'\nRETRACING MAP')
         run_simulation(map_reader, cache)
 
-        print(f'\nPLOTTING ({st.plot.format})')
+        print(f'\nPLOTTING')
         tools.plot()
 
     print('Done')

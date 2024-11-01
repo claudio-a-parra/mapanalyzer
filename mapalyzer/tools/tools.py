@@ -38,6 +38,5 @@ class Tools:
 
     def plot(self):
         for t in self.tools_list:
-            if t.plotcode in st.plot.include:
-                t.plot(bottom_tool=self.map)
+            t.plot(bottom_tool=self.map)
         return

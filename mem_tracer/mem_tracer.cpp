@@ -13,7 +13,11 @@ accesses to such memory block. The tool records:
  - the kind of access (R for read, W for write).
  - the size of the read/write (in bytes).
  - the offset from the beginning of the block (in bytes).
-The trace is stored in a file called (by default) "mem_access_pattern.map" */
+The trace is stored in a file called (by default) "mem_access_pattern.map"
+
+Pin Manual:
+https://software.intel.com/sites/landingpage/pintool/docs/98869/Pin/doc/html/index.html
+*/
 
 #include "pin.H"
 #include <ctime> // C library 'time.h'

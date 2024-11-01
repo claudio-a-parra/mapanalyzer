@@ -1,5 +1,6 @@
 import sys
 
+HPAD = 17
 class CacheSpecs:
     # name in file -> name in class
     key_map = {
@@ -23,6 +24,10 @@ class CacheSpecs:
         self.bits_set = None
         self.bits_off = None
         self.bits_tag = None
+
+        # terminal UI
+        self.ui_cacheparam_hpad = HPAD
+
         if filename is None:
             self.set_derived_values()
             return
@@ -88,17 +93,15 @@ class CacheSpecs:
         return ret_str[:-1]
 
     def describe(self, ind=''):
-        print(f'{ind}File                 : {self.file_path}\n'
-              f'{ind}Address size         : {self.arch} bits ('
+        print(f'{ind}{"File":{self.ui_cacheparam_hpad}}: {self.file_path}\n'
+              f'{ind}{"Address Size":{self.ui_cacheparam_hpad}}: {self.arch} bits ('
               f'tag:{self.bits_tag} | '
               f'idx:{self.bits_set} | '
               f'off:{self.bits_off})\n'
-              f'{ind}Cache size           : {self.cache_size} bytes\n'
-              f'{ind}Number of sets       : {self.num_sets}\n'
-              f'{ind}Line size            : {self.line_size} bytes\n'
-              f'{ind}Associativity        : {self.asso}-way\n'
-              f'{ind}Main Mem. Fetch cost : {self.fetch} units\n'
-              f'{ind}Main Mem. Write cost : {self.write} units'
+              f'{ind}{"Cache size":{self.ui_cacheparam_hpad}}: {self.cache_size} bytes\n'
+              f'{ind}{"Number of sets":{self.ui_cacheparam_hpad}}: {self.num_sets}\n'
+              f'{ind}{"Line size":{self.ui_cacheparam_hpad}}: {self.line_size} bytes\n'
+              f'{ind}{"Associativity":{self.ui_cacheparam_hpad}}: {self.asso}-way'
         )
         return
 
@@ -130,6 +133,8 @@ class MapSpecs:
         self.time_size = None
         self.thread_count = None
         self.event_count = None
+
+        self.ui_mapparam_hpad = HPAD
 
         # Derived values
         # the closest beginning of block at the left of start_addr
@@ -223,19 +228,19 @@ class MapSpecs:
         return ret_str[:-1]
 
     def describe(self, ind=''):
-        print(f'{ind}File          : {self.file_path}\n'
-              f'{ind}First Address : {hex(self.start_addr)}\n'
-              f'{ind}Memory size   : {self.mem_size} bytes\n'
-              f'{ind}Maximum time  : {self.time_size-1}\n'
-              f'{ind}Thread count  : {self.thread_count}\n'
-              f'{ind}Events count  : {self.event_count}'
+        print(f'{ind}{"File":{self.ui_mapparam_hpad}}: {self.file_path}\n'
+              f'{ind}{"First Address":{self.ui_mapparam_hpad}}: {hex(self.start_addr)}\n'
+              f'{ind}{"Memory Size":{self.ui_mapparam_hpad}}: {self.mem_size} bytes\n'
+              f'{ind}{"Maximum Time":{self.ui_mapparam_hpad}}: {self.time_size-1}\n'
+              f'{ind}{"Thread Count":{self.ui_mapparam_hpad}}: {self.thread_count}\n'
+              f'{ind}{"Event Count":{self.ui_mapparam_hpad}}: {self.event_count}'
         )
         return
 
 
 class PlotSpecs:
     def __init__(self, width=8, height=4, res=1000, dpi=200, format='png', prefix='exp',
-                 include='', y_ranges=''):
+                 include_plots='', y_ranges=''):
         # Image to export
         self.width = width # image width
         self.height = height # image height
@@ -246,11 +251,11 @@ class PlotSpecs:
         self.img_title_vpad = 6 # padding between the plot and its title
 
         # terminal UI
-        self.ui_title_hpad = 31
-        self.ui_name_hpad = 23
+        self.ui_toolname_hpad = HPAD
+        self.ui_plotname_hpad = HPAD
 
         # Plots to be exported
-        self.include = include
+        self.include = self.init_include_plots(include_plots)
 
         # Plots Axes
         self.y_ranges = self.init_y_ranges(y_ranges)
@@ -274,26 +279,45 @@ class PlotSpecs:
         self.grid_max_bytes = 128
         self.grid_max_blocks = 48
 
+        # Text boxes
+        self.tbox_bg='#FFFFFF88'
+        self.tbox_border='#CC000000' # transparent
+        self.tbox_font='monospace'
+        self.tbox_font_size=9
+
+
         # Specific to MAP plot
         self.res = res # grid resolution
         self.fade_bytes_alpha=0.1 # fading of bytes out-of-range to complete the block
 
         return
+
+    def init_include_plots(self, user_plotcodes_str):
+        user_plotcodes = [x.strip() for x in user_plotcodes_str.upper().split(',')]
+        including = set(Settings.PLOTCODES.keys())
+        if user_plotcodes and 'ALL' not in user_plotcodes:
+            including = set()
+            for up in user_plotcodes:
+                if up in Settings.PLOTCODES:
+                    including.add(up)
+                else:
+                    print(f'Warning: Unknown plotcode "{up}".')
+        return including
+
     def init_y_ranges(self, y_ranges_str):
-        ranges_map = {}
-        if not y_ranges_str:
-            return ranges_map
-        rang_arr = y_ranges_str.split(',')
-        for r in rang_arr:
-            try:
-                pl, min_val, max_val = r.split(':')
-                min_val = int(min_val)
-                max_val = int(max_val)
-            except ValueError:
-                print(f'Error: Y-Range with wrong format "{r}".')
-                exit(1)
-            ranges_map[pl] = (min_val, max_val)
-        return ranges_map
+        user_ranges = [r.strip() for r in y_ranges_str.upper().split(',')]
+        ranges = dict()
+        if user_ranges and 'FULL' not in user_ranges:
+            for ran in user_ranges:
+                try:
+                    plcod, min_val, max_val = ran.split(':')
+                    min_val = float(min_val)
+                    max_val = float(max_val)
+                except ValueError:
+                    print(f'Error: Y-Range with wrong format "{ran}".')
+                    exit(1)
+                ranges[plcod] = (min_val, max_val)
+        return ranges
 
     def __str__(self):
         ret_str = ''
@@ -313,6 +337,16 @@ class Settings:
     cache:CacheSpecs = None
     map:MapSpecs = None
     plot:PlotSpecs = None
+    PLOTCODES = {
+        'MAP': 'Graphic MAP',
+        'SLD': 'Spatial Locality Degree',
+        'TLD': 'Temporal Locality Degree',
+        'CMR': 'Cache Miss Ratio',
+        'CMMA': 'Cumulative Main Memory Access',
+        'CUR': 'Cache Usage Ratio',
+        'AD': 'Aliasing Density',
+        'SIU': 'Still-in-Use Evictions'
+    }
     verb = False
 
 

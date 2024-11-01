@@ -19,11 +19,11 @@ class Aliasing:
         self.aliasing = [[0] * len(self.X) for _ in range(st.cache.num_sets)]
 
         self.name = 'Cache Aliasing'
-        self.plotcode = 'A'
-        self.about = ('Proportion in which each set fetches blocks during execution')
+        self.plotcode = 'AD'
+        self.about = ('Proportion in which each set fetches blocks during execution.')
 
         self.ps = PlotStrings(
-            title  = 'Cache Aliasing',
+            title  = 'Aliasing Density',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Sets',
             suffix = '_plot-06-aliasing',
@@ -50,12 +50,16 @@ class Aliasing:
         return
 
     def describe(self, ind=''):
-        print(f'{ind}{self.name:{st.plot.ui_name_hpad}}: {self.about}')
+        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
 
     def plot(self, bottom_tool=None):
-        # create figure and tool axes
+        # only plot if requested
+        if self.plotcode not in st.plot.include:
+            return
+
+        # create two set of axes: for the map (bottom) and the tool
         fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
         bottom_axes.set_xticks([])
         bottom_axes.set_yticks([])
@@ -91,18 +95,13 @@ class Aliasing:
         self.plot_setup_Y()
 
         # save image
-        save_fig(fig, self.ps.title, self.ps.suffix)
+        save_fig(fig, self.plotcode, self.ps.suffix)
         return
 
     def plot_setup_Y(self):
-        # spine
         #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
-
-        # label
-        self.axes.set_ylabel(self.ps.ylab) #color=self.tool_palette.fg)
-
-        # ticks
-        self.axes.tick_params(axis='y', #colors=self.tool_palette.fg,
+        self.axes.set_ylabel(self.ps.ylab)
+        self.axes.tick_params(axis='y',
                               left=True, labelleft=True,
                               right=False, labelright=False,
                               width=st.plot.grid_main_width)

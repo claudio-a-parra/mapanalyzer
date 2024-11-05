@@ -1,0 +1,7 @@
+obj-intel64/
+mem_trace_log*
+example
+pin.log
+pintool.log
+*.pdf
+mem_access_pattern.map

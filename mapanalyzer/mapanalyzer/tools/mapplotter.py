@@ -30,7 +30,7 @@ class Map:
         self.plotcode = 'MAP'
         self.about = 'Visual representation of the Memory Access Pattern.'
         self.ps = PlotStrings(
-            title = self.name,
+            title = 'MAP',
             xlab   = 'Time [access instr.]',
             ylab   = 'Space [bytes]',
             suffix = '_plot-00-map',

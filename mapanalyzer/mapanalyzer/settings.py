@@ -160,10 +160,10 @@ class MapSpecs:
         # Skip to metadata section
         line = file.readline()
         while line.strip() != MapSpecs.metadata_header:
-            print(f'line: |{line}|')
             if line == '':
                 print('Error: EOF reached before any metadata.')
                 sys.exit(1)
+            print(f'    {line.strip()}')
             line = file.readline()
 
         # Read Metadata
@@ -240,7 +240,7 @@ class MapSpecs:
 
 class PlotSpecs:
     def __init__(self, width=8, height=4, res=1000, dpi=200, format='png', prefix='exp',
-                 include_plots='', y_ranges=''):
+                 include_plots='', x_orient='', y_ranges=''):
         # Image to export
         self.width = width # image width
         self.height = height # image height
@@ -262,6 +262,7 @@ class PlotSpecs:
         self.max_xtick_count = 11
         self.max_ytick_count = 11
         self.max_map_ytick_count = 11
+        self.x_orient = x_orient;
 
         # Plot Lines (of the curves) [0]:line [1]:area filling
         self.linewidth=0.25

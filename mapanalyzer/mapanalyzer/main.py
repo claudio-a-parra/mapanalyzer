@@ -121,6 +121,11 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
+        '-xo', '--x-tick-ori', metavar='ORI', dest='x_orient', choices=['h', 'v'], default='v',
+        help="Orientation of the X-axis tick labels."
+    )
+
+    parser.add_argument(
         '-fr', '--format', metavar='FORMAT', dest='format', choices=['png', 'pdf'], default='png',
         help=("Choose the output format of the plots.\n"
               "Format: 'pdf' | 'png'")
@@ -164,7 +169,8 @@ def main():
         plot_metadata = PlotSpecs(width=args.plot_width, height=args.plot_height,
                                   res=args.resolution, dpi=args.dpi,
                                   format=args.format, prefix=file_prefix,
-                                  include_plots=args.plotcodes, y_ranges=args.y_ranges)
+                                  include_plots=args.plotcodes, x_orient=args.x_orient,
+                                  y_ranges=args.y_ranges)
         st.init_plot(plot_metadata=plot_metadata)
 
         print(f'\nCREATING TOOLS AND MEMORY SYSTEM')

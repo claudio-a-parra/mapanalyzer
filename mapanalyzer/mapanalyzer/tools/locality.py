@@ -34,7 +34,7 @@ class Locality:
         # Spatial Locality vector
         self.Ls = [0] * st.map.time_size
         self.psLs = PlotStrings(
-            title  = 'SLD across Time',
+            title  = 'SLD',
             xlab   = 'Time [access instr.]',
             ylab   = 'Spacial Locality Degree',
             suffix = '_plot-01-locality-Ls',
@@ -45,7 +45,7 @@ class Locality:
         self.space_by_blocks = {} #block->list of block access times
         self.Lt = [0] * st.map.num_blocks
         self.psLt = PlotStrings(
-            title  = 'TLD across Space',
+            title  = 'TLD',
             xlab   = 'Temporal Locality Degree',
             ylab   = 'Space [blocks]',
             suffix = '_plot-02-locality-Lt',

@@ -23,7 +23,7 @@ class Aliasing:
         self.about = ('Proportion in which each set fetches blocks during execution.')
 
         self.ps = PlotStrings(
-            title  = 'Aliasing Density',
+            title  = 'AD',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Sets',
             suffix = '_plot-06-aliasing',
@@ -119,10 +119,11 @@ class Aliasing:
     def plot_setup_X(self):
         # X axis label, ticks and grid
         self.axes.set_xlabel(self.ps.xlab)
+        rot = -90 if st.plot.x_orient == 'v' else 0
         self.axes.tick_params(axis='x',
                               bottom=True, labelbottom=True,
                               top=False, labeltop=False,
-                              rotation=-90, width=st.plot.grid_other_width)
+                              rotation=rot, width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10,
                                        n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
@@ -141,7 +142,7 @@ class Aliasing:
     def plot_draw_Y_grid(self, color='#40BF40'):
         xmin,xmax = 0-0.5,st.map.time_size-0.5
         max_sets = st.plot.grid_max_blocks
-        block_lw = 2*(1 - ((st.cache.num_sets-1) / max_sets))
+        block_lw = 1.5*(1 - ((st.cache.num_sets-1) / max_sets))
         block_sep_lines = [i-0.5 for i in range(st.cache.num_sets+1)]
         self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                          color=color,

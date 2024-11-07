@@ -25,7 +25,7 @@ class SIUEviction:
         self.about = ('Blocks that are evicted and fetched again in a short time.')
 
         self.ps = PlotStrings(
-            title  = 'SIU Evictions',
+            title  = 'SIUE',
             xlab   = 'Time [access instr.]',
             ylab   = 'Memory Blocks',
             suffix = '_plot-07-siu-evictions',

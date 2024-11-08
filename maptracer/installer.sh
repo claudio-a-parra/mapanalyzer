@@ -24,7 +24,7 @@ run() {
 }
 
 install_tool(){
-    echo "Installing $NAME..."
+    remove_tool
     run sudo install -d "$LIB_DIR"
     run sudo install -m 0755 --no-target-directory "$LIB_SRC" "$LIB_DIR/$REALNAME"
     run sudo rm -f "$LIB_DIR/$SONAME"
@@ -34,20 +34,16 @@ install_tool(){
     run sudo install -m 0644 "$HEA_SRC" "$INCLUDE_DIR"
     run 'echo "/usr/local/lib" | sudo tee "/etc/ld.so.conf.d/$LD_CONF" >/dev/null'
     run sudo ldconfig
-    echo "$NAME installed!"
 }
 
 remove_tool(){
-    echo "Removing $NAME..."
     run sudo rm -f "$LIB_DIR/$SONAME" "$LIB_DIR/$SONAME_MAJ" "$LIB_DIR/$REALNAME" "$INCLUDE_DIR/$HEADER" "/etc/ld.so.conf.d/$LD_CONF"
     run sudo ldconfig
-    echo "$NAME removed!"
 }
 
 test_tool(){
-    echo "Checking for $NAME..."
-    echo "ldconfig -p | grep maptracer"
-    if ! ldconfig -p | grep maptracer | sed 's/^[ \t]*//'; then
+    echo "ldconfig -p | grep $NAME"
+    if ! ldconfig -p | grep $NAME | sed 's/^[ \t]*//'; then
         echo "Couldn't find the library."
         exit 1
     fi
@@ -56,7 +52,6 @@ test_tool(){
          echo "Couldn't find the header file."
          exit 1
     fi
-    echo "'$NAME' seems to be correctly installed!"
 }
 
 if [[ $# -eq 0 ]]; then
@@ -68,15 +63,19 @@ else
     exit 1
 fi
 
+echo
 case "$action" in
     'install')
-        install_tool
+        echo "Installing $NAME..."
+        install_tool && echo "$NAME installed!"
         ;;
     'remove')
-        remove_tool
+        echo "Removing $NAME..."
+        remove_tool && echo "$NAME removed!"
         ;;
     'test')
-        test_tool
+        echo "Checking for $NAME..."
+        test_tool && echo "'$NAME' seems to be correctly installed!"
         ;;
     *)
         echo "Unknown action '$action'."

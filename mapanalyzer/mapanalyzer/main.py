@@ -164,7 +164,8 @@ def main():
         st.init_map_derived()
         map_reader = MapFileReader()
         st.map.describe(ind='    ')
-
+        print('[!] hardcode forcing all plotcodes')
+        args.plotcodes = 'all'
         file_prefix = os.path.basename(os.path.splitext(map_filename)[0])
         plot_metadata = PlotSpecs(width=args.plot_width, height=args.plot_height,
                                   res=args.resolution, dpi=args.dpi,

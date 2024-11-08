@@ -1,7 +1,7 @@
 VERSION := 3.30-98830-g1d7b601b3-gcc-linux
 PIN_WEBSITE := https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-binary-instrumentation-tool-downloads.html
 DL_LINK := https://software.intel.com/sites/landingpage/pintool/downloads/pin-$(VERSION).tar.gz
-
+PIN_ENV_FILE := /etc/profile.d/pin_env_var.sh
 .PHONY: help install remove
 
 help:
@@ -22,7 +22,7 @@ help:
 	@echo "VARIABLES:"
 	@echo "    VERSION : ($(VERSION)) Pin version to install."
 
-install: remove
+install: quiet-remove
 	@if [[ ! -f ./versions/pin-$(VERSION).tar.gz ]]; then \
 		echo "Error: file './versions/pin-$(VERSION).tar.gz' does not exist." >&2 ;\
 		exit 1 ;\
@@ -32,14 +32,20 @@ install: remove
 	sudo ln -s /opt/intel/pin-$(VERSION) /opt/intel/pin
 	sudo chown -R root:root /opt/intel/pin/
 	sudo chmod -R a+rx /opt/intel/pin/
-	export PIN_ROOT=/opt/intel/pin
+	echo "export PIN_ROOT=/opt/intel/pin" | sudo tee $(PIN_ENV_FILE) >/dev/null
+	sudo chmod +x $(PIN_ENV_FILE)
 	sudo ln -s /opt/intel/pin/pin /usr/local/bin/pin
+	@echo -e "\033[31mRun 'source $(PIN_ENV_FILE)' in your terminal to set the environment variable PIN_ROOT\033[0m"
 
-remove:
+quiet-remove:
 	sudo rm -rf /opt/intel/pin-$(VERSION)
 	sudo rm -f /opt/intel/pin
 	sudo rm -f /usr/local/bin/pin
+	sudo rm -f $(PIN_ENV_FILE)
 	sudo rmdir /opt/intel || true
+
+remove: quiet-remove
+	@echo -e "\033[31mRun 'unset PIN_ROOT' in your terminal to unset the environment variable PIN_ROOT\033[0m"
 
 test:
 	pin -version

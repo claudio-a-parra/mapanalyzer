@@ -78,7 +78,7 @@ std::stringstream data;
 std::stringstream error;
 std::stringstream warning;
 enum event_t{OTHER=0, Tc, Td, R, W};
-enum write_only{ONLY_ERROR=0, WRITE_ALL};
+enum write_only{ONLY_ERROR=0, ERROR_AND_META, WRITE_ALL};
 const char* events_n[] = {"?","Tc","Td","R","W"};
 typedef struct {        // 192 bytes
     UINT32 time;        // time in nanoseconds
@@ -162,6 +162,8 @@ VOID write_file(enum write_only writing){
     if(metadata.tellp() != 0)
         out_file << "# METADATA" << std::endl
                  << metadata.rdbuf() << std::endl;
+    if(writing == ERROR_AND_META)
+        return;
 
     // write data section
     out_file << "# DATA" << std::endl
@@ -222,7 +224,7 @@ VOID merge_traces(void){
     if(! merged_trace.list_len){
         error << "ERROR: No thread registered any event. "
               << "merged_trace.list_len == 0." << std::endl;
-        write_file(ONLY_ERROR);
+        write_file(ERROR_AND_META);
         exit(1);
     }
     merged_trace.list = (Event**)malloc(merged_trace.list_len * sizeof(Event*));
@@ -601,7 +603,7 @@ VOID Fini(INT32 code, VOID* v) {
              << "event-count  : " << merged_trace.list_len << std::endl
              << "max-time     : " << last_event->coarse_time << std::endl;
 
-    // and now, wrap it all and put a bow on it :D
+    // and now, wrap it all up and put a bow on it :D
     write_file(WRITE_ALL);
 }
 

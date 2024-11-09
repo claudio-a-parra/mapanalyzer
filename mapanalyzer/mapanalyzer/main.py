@@ -131,22 +131,22 @@ def command_line_args_parser():
               "Format: 'pdf' | 'png'")
     )
     
-    def check_res(val):
-        min_res = 4
-        max_res = 2048
-        def_res = 512
-        val = int(val)
-        if min_res < val < max_res:
-            return val
-        else:
-            print(f'[!] Warning: resolution value must be between {min_res} and '
-                  f'{max_res}. Using default value {def_res}.')
-            return def_res
-    parser.add_argument(
-        '-r', '--res', dest='resolution', type=check_res, default=512,
-        help=('Maximum resolution of the Memory Access Pattern grid (value '
-              'between 4 and 2048).')
-    )
+    # def check_res(val):
+    #     min_res = 4
+    #     max_res = 2048
+    #     def_res = 512
+    #     val = int(val)
+    #     if min_res < val < max_res:
+    #         return val
+    #     else:
+    #         print(f'[!] Warning: resolution value must be between {min_res} and '
+    #               f'{max_res}. Using default value {def_res}.')
+    #         return def_res
+    # parser.add_argument(
+    #     '-r', '--res', dest='resolution', type=check_res, default=512,
+    #     help=('Maximum resolution of the Memory Access Pattern grid (value '
+    #           'between 4 and 2048).')
+    # )
 
     args = parser.parse_args()
     return args
@@ -164,11 +164,10 @@ def main():
         st.init_map_derived()
         map_reader = MapFileReader()
         st.map.describe(ind='    ')
-        print('[!] hardcode forcing all plotcodes')
-        args.plotcodes = 'all'
         file_prefix = os.path.basename(os.path.splitext(map_filename)[0])
         plot_metadata = PlotSpecs(width=args.plot_width, height=args.plot_height,
-                                  res=args.resolution, dpi=args.dpi,
+                                  #res=args.resolution,
+                                  dpi=args.dpi,
                                   format=args.format, prefix=file_prefix,
                                   include_plots=args.plotcodes, x_orient=args.x_orient,
                                   y_ranges=args.y_ranges)

@@ -1,5 +1,7 @@
 import colorsys
 import matplotlib.pyplot as plt
+from itertools import chain, combinations
+from math import prod
 
 from mapanalyzer.settings import Settings as st
 
@@ -240,3 +242,39 @@ class Palette:
 
     def __len__(self):
         return len(self.col)
+
+# Helper function to get prime factors
+def prime_factors(n):
+    factors = []
+    while n % 2 == 0:
+        factors.append(2)
+        n //= 2
+    for i in range(3, int(n**0.5) + 1, 2):
+        while n % i == 0:
+            factors.append(i)
+            n //= i
+    if n > 2:
+        factors.append(n)
+    return factors
+
+# find a lower resolution
+def sub_resolution_between(native, min_res, max_res):
+    if native < max_res:
+        return native
+
+    # Get the prime factors of the native resolution
+    factors = prime_factors(native)
+
+    # Generate all products of combinations of factors in descending order
+    power_set = sorted(
+        (prod(ps) for r in range(1, len(factors) + 1) for ps in combinations(factors, r)),
+        reverse=True
+    )
+
+    # Find the largest valid resolution within the range
+    for r in power_set:
+        if min_res <= r < max_res:
+            return r
+
+    # If no suitable resolution is found, return max_res as a fallback
+    return max_res

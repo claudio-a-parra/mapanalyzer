@@ -6,6 +6,7 @@ from matplotlib.colors import ListedColormap
 
 from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette, Dbg
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import sub_resolution_between
 
 class Map:
     def __init__(self, hue=120):
@@ -13,20 +14,17 @@ class Map:
         self.X = [i for i in range(st.map.time_size)]
         self.axes = None
 
-        # memory size considering padding for cache alignment
-        padded_bytes = st.map.num_padded_bytes
-        # set the matrix size of at most res^2.
-        ap_matrix_height = padded_bytes if padded_bytes <= st.plot.res \
-            else st.plot.res
-        ap_matrix_width = st.map.time_size if st.map.time_size <= st.plot.res \
-            else st.plot.res
-
+        # select the resolution of the map grid. If too large, pick a value
+        # under max_res
+        map_mat_rows = sub_resolution_between(st.map.num_padded_bytes,
+                                              st.plot.min_res, st.plot.max_res)
+        map_mat_cols = sub_resolution_between(st.map.time_size,
+                                              st.plot.min_res, st.plot.max_res)
         # cols: whole memory snapshot at a given instruction
         # rows: byte state across all instructions
-        self.access_matrix = [[0] * ap_matrix_width
-                              for _ in range(ap_matrix_height)]
+        self.access_matrix = [[0] * map_mat_cols for _ in range(map_mat_rows)]
 
-        self.name = 'Mem. Acc. Patt.'
+        self.name = 'M. A. Pattern'
         self.plotcode = 'MAP'
         self.about = 'Visual representation of the Memory Access Pattern.'
         self.ps = PlotStrings(

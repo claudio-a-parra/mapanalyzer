@@ -137,17 +137,17 @@ class MapSpecs:
         self.ui_mapparam_hpad = HPAD
 
         # Derived values
-        # the closest beginning of block at the left of start_addr
+        # address <= start_addr that is aligned at the beginning of a block
         self.aligned_start_addr = None
-        # the distance between aligned_start_addr and start_addr
+        # the distance (in bytes) between aligned_start_addr and start_addr
         self.left_pad = None
-        # the distance between end_addr and aligned_end_addr
+        # the distance (in bytes) between end_addr and aligned_end_addr
         self.right_pad = None
-        # the closest end of block at the right of end_addr
+        # address >= end_addr that is aligned at the end of a block
         self.aligned_end_addr = None
-        # number of bytes included the ones used to complete the blocks at start and end.
+        # total number of bytes. Including padding.
         self.num_padded_bytes = None
-        # number of blocks used by num_padded_bytes
+        # total number of block used by num_padded_bytes.
         self.num_blocks = None
 
         try:
@@ -270,7 +270,7 @@ class PlotSpecs:
         self.pal_sat=[50,75]
         self.pal_alp=[80,50]
 
-        # Plot Grids
+        # Plot grids (matplotlib grids)
         self.grid_main_width = 0.5
         self.grid_main_style = '-'
         self.grid_main_alpha = 0.2
@@ -288,7 +288,8 @@ class PlotSpecs:
 
 
         # Specific to MAP plot
-        self.res = res # grid resolution
+        self.min_res = 210
+        self.max_res = 2310
         self.fade_bytes_alpha=0.1 # fading of bytes out-of-range to complete the block
 
         return
@@ -363,7 +364,7 @@ class Settings:
 
     @classmethod
     def init_map_derived(cls):
-        # compute the shift of addresses to align to blocks.
+        # compute padding bytes to make the memory chunk block-aligned.
         cls.map.left_pad  = cls.map.start_addr & (cls.cache.line_size-1)
         cls.map.aligned_start_addr = cls.map.start_addr - cls.map.left_pad
         cls.map.right_pad = (cls.cache.line_size-1) - \

@@ -116,8 +116,6 @@ class SIUEviction:
         # save image
         save_fig(fig, f'{self.plotcode} all', f'{self.ps.suffix}_all')
 
-
-
         # draw one plot for each set
         for s in range(st.cache.num_sets):
             # create figure and tool axes
@@ -214,7 +212,7 @@ class SIUEviction:
         max_lines = st.plot.grid_max_blocks
         if st.map.num_blocks > max_lines:
             return
-        lw = 2*(1 - ((st.map.num_blocks-1) / max_lines))
+        lw = 1.5*(1 - ((st.map.num_blocks-1) / max_lines))
         xmin,xmax = self.X[0]-0.5,self.X[-1]+0.5
         block_sep_lines = [i-0.5
                            for i in range(st.map.num_blocks)]

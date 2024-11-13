@@ -180,7 +180,7 @@ class Cache:
             tag_out = None if evicted_block is None else evicted_block.tag
             while evicted_block is not None:
                 tag_out = evicted_block.tag
-                self.tools.siu.update(st.map.time_size-1, set_idx, None, tag_out)
+                self.tools.siu.update(st.map.time_size, set_idx, None, tag_out)
                 #self.tools.usage.update()
                 if evicted_block.dirty:
                     self.tools.cost.add_access('w')

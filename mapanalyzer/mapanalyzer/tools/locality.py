@@ -161,10 +161,11 @@ class Locality:
 
         # Axis details: label, ticks and grid
         self.axes.set_xlabel(self.psLs.xlab)
+        rot = -90 if st.plot.x_orient == 'v' else 0
         self.axes.tick_params(axis='x',
                               top=False, bottom=True,
                               labeltop=False, labelbottom=True,
-                              rotation=-90, width=st.plot.grid_other_width)
+                              rotation=rot, width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
         # self.axes.grid(axis='x', which='both',
@@ -307,10 +308,11 @@ class Locality:
         # Axis details: spine, label, ticks, and grid
         #self.axes.spines['bottom'].set_edgecolor(self.tool_palette.fg)
         self.axes.set_xlabel(self.psLt.xlab)
+        rot = -90 if st.plot.x_orient == 'v' else 0
         self.axes.tick_params(axis='x',
                               bottom=True, top=False,
                               labelbottom=True, labeltop=False,
-                              rotation=-90, width=st.plot.grid_main_width)
+                              rotation=rot, width=st.plot.grid_main_width)
         range_floats = [x/1000 for x in range(int(1000*X_min), int(1000*X_max)+1)]
         x_ticks = create_up_to_n_ticks(range_floats, base=10, n=11)
         self.axes.set_xticks(x_ticks)

@@ -67,14 +67,16 @@ class Cost:
 
         # Axis details: label, ticks and grid
         self.axes.set_xlabel(self.ps.xlab)
+        rot = -90 if st.plot.x_orient == 'v' else 0
         self.axes.tick_params(axis='x',
                               top=False, bottom=True,
                               labeltop=False, labelbottom=True,
-                              rotation=-90, width=st.plot.grid_other_width)
+                              rotation=rot, width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
         # self.axes.grid(axis='x', which='both',
-        #           alpha=0.1, color='k', zorder=1,
+        #           zorder=1,
+        #           alpha=st.plot.grid_main_alpha,
         #           linestyle=st.plot.grid_other_style,
         #           linewidth=st.plot.grid_other_width)
         return X

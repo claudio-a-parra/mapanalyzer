@@ -188,8 +188,24 @@ def hsl2rgb(h, s, l, a):
 
 
 class Palette:
-    def __init__(self, hue=0, hue_count=1, saturation=[50], lightness=[50],
-                 alpha=[80]):
+    # create hsl palettes.
+    # Palette(hue=<val>)
+    # creates a single color at hue val.
+    # - fg, bg, col
+    #
+    # Palette(hue=[])
+    # creates again a fg and bg based on hue[0], but an array of colors
+    # - fg(hue[0]), bg(hue[0]), col[]
+    #
+    # Palette(hue_count=n)
+    # creates n colors
+    # - fg(hue[0]), bg(hue[0]), col[n]
+    def __init__(self, hue=0, hue_count=1,
+                 saturation=[50], sat_count=1,
+                 lightness=[50], lig_count=1,
+                 alpha=[80], alp_count=1):
+        # if hue is an array, then get its values. Otherwise, create an array
+        # with hue_count evenly distributed values across the spectrum.
         if hasattr(hue, '__getitem__'):
             hues = [i%360 for i in hue]
         else:
@@ -197,6 +213,7 @@ class Palette:
             step = 360/hue_count
             hues = [(round(i*step)+base)%360 for i in range(hue_count)]
 
+        # if saturation is an array, get its values.
         if hasattr(saturation, '__getitem__'):
             sats = saturation
         else:

@@ -8,8 +8,6 @@ class CacheSpecs:
         'cache_size_bytes': 'cache_size',
         'line_size_bytes' : 'line_size',
         'associativity'   : 'asso',
-        'fetch_cost'      : 'fetch',
-        'writeback_cost'  : 'write',
     }
 
     def __init__(self, filename=None):
@@ -18,8 +16,6 @@ class CacheSpecs:
         self.cache_size=32768
         self.line_size=64
         self.asso=8
-        self.fetch=1
-        self.write=2
         self.num_sets = None
         self.bits_set = None
         self.bits_off = None
@@ -137,18 +133,22 @@ class MapSpecs:
         self.ui_mapparam_hpad = HPAD
 
         # Derived values
-        # address <= start_addr that is aligned at the beginning of a block
+        # aligned_start_addr <= start_addr.
+        # This value is aligned to the beginning of a block
         self.aligned_start_addr = None
         # the distance (in bytes) between aligned_start_addr and start_addr
         self.left_pad = None
         # the distance (in bytes) between end_addr and aligned_end_addr
         self.right_pad = None
-        # address >= end_addr that is aligned at the end of a block
+        # end_addr <= aligned_end_addr.
+        # This value is aligned to the end of a block
         self.aligned_end_addr = None
         # total number of bytes. Including padding.
         self.num_padded_bytes = None
         # total number of block used by num_padded_bytes.
         self.num_blocks = None
+        # the value of the first real tag in the range
+        self.first_real_tag = None
 
         try:
             file = open(self.file_path, 'r')
@@ -239,8 +239,8 @@ class MapSpecs:
 
 
 class PlotSpecs:
-    def __init__(self, width=8, height=4, res=1000, dpi=200, format='png', prefix='exp',
-                 include_plots='', x_orient='', y_ranges=''):
+    def __init__(self, width, height, dpi, max_res, format, prefix, include_plots,
+                 x_orient, y_ranges, data_X_size, data_Y_size):
         # Image to export
         self.width = width # image width
         self.height = height # image height
@@ -270,13 +270,17 @@ class PlotSpecs:
         self.pal_sat=[50,75]
         self.pal_alp=[80,50]
 
-        # Plot grids (matplotlib grids)
+        # Plot grids (matplotlib grids). Used in ticks and plot grids
+        # Main axis (either X or Y)
         self.grid_main_width = 0.5
         self.grid_main_style = '-'
         self.grid_main_alpha = 0.2
+        # Other axis (either Y or X)
         self.grid_other_width = 0.5
         self.grid_other_style = '--'
-        self.grid_other_alpha = 0
+        self.grid_other_alpha = 0.2
+
+        # maximum number of bytes or blocks to print the grids in MAP
         self.grid_max_bytes = 128
         self.grid_max_blocks = 48
 
@@ -288,11 +292,25 @@ class PlotSpecs:
 
 
         # Specific to MAP plot
-        self.min_res = 210
-        self.max_res = 2310
+        self.min_res,self.max_res = self.init_map_resolution(width, height, dpi, max_res)
         self.fade_bytes_alpha=0.1 # fading of bytes out-of-range to complete the block
 
+        # Specific of SIUE
+        self.jump_line_width = max(0.2,min(3,12*(width/data_X_size)))
+
         return
+
+    def init_map_resolution(self, width, height, dpi, max_res):
+        min_res = round(min(0.9*min(width,height)*dpi,210))
+        if max_res == 'auto':
+            max_res = round(min(0.9*min(width,height)*dpi,2310))
+        else:
+            try:
+                max_res = int(max_res)
+            except:
+                print(f'Error: max-res must be an integer or \'auto\'')
+                exit(1)
+        return (min_res,max_res)
 
     def init_include_plots(self, user_plotcodes_str):
         user_plotcodes = [x.strip() for x in user_plotcodes_str.upper().split(',')]
@@ -360,10 +378,7 @@ class Settings:
     @classmethod
     def init_map(cls, map_file):
         cls.map = MapSpecs(map_file)
-        return
 
-    @classmethod
-    def init_map_derived(cls):
         # compute padding bytes to make the memory chunk block-aligned.
         cls.map.left_pad  = cls.map.start_addr & (cls.cache.line_size-1)
         cls.map.aligned_start_addr = cls.map.start_addr - cls.map.left_pad
@@ -373,11 +388,16 @@ class Settings:
         cls.map.num_padded_bytes = ((cls.map.end_addr+cls.map.right_pad) -
                                     (cls.map.start_addr-cls.map.left_pad) + 1)
         cls.map.num_blocks = cls.map.num_padded_bytes // cls.cache.line_size
+
+        cls.map.first_real_tag = cls.map.start_addr >> (cls.cache.bits_set + cls.cache.bits_off)
         return
 
     @classmethod
-    def init_plot(cls, plot_metadata):
-        cls.plot = plot_metadata
+    def init_plot(cls, width, height, dpi, max_res, format, prefix, include_plots,
+                  x_orient, y_ranges, data_X_size, data_Y_size):
+        cls.plot = PlotSpecs(width, height, dpi, max_res, format, prefix, include_plots,
+                             x_orient, y_ranges, data_X_size, data_Y_size)
+
         return
 
     @classmethod

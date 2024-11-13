@@ -52,10 +52,11 @@ class CacheUsage:
 
         # Axis details: label, ticks and grid
         self.axes.set_xlabel(self.ps.xlab)
+        rot = -90 if st.plot.x_orient == 'v' else 0
         self.axes.tick_params(axis='x',
                               top=False, bottom=True,
                               labeltop=False, labelbottom=True,
-                              rotation=-90, width=st.plot.grid_other_width)
+                              rotation=rot, width=st.plot.grid_other_width)
         x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
         # self.axes.grid(axis='x', which='both',
@@ -76,8 +77,7 @@ class CacheUsage:
         # add tails at start/end of Y for cosmetic purposes.
         Y_usage = [self.usage_ratio[0]] + self.usage_ratio + [self.usage_ratio[-1]]
 
-        # Axis details: spine, label, ticks, and grid
-        #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
+        # Axis details: label, ticks, and grid
         self.axes.set_ylabel(self.ps.ylab)
         self.axes.tick_params(axis='y',
                               left=True, right=False,

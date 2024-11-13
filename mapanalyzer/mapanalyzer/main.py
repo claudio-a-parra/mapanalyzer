@@ -104,6 +104,11 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
+        '-mr', '--max-res', metavar='MR', dest='max_res', type=str, default='auto',
+        help='The maximum resolution at which to show MAP.'
+    )
+
+    parser.add_argument(
         '-pl', '--plots', metavar='PLOTCODES', dest='plotcodes', type=str, default='all',
         help=("Plots to obtain:\n"+
               "\n".join(f"    {code:4} : {defin}" for code, defin in st.PLOTCODES.items())+"\n"+
@@ -130,23 +135,6 @@ def command_line_args_parser():
         help=("Choose the output format of the plots.\n"
               "Format: 'pdf' | 'png'")
     )
-    
-    # def check_res(val):
-    #     min_res = 4
-    #     max_res = 2048
-    #     def_res = 512
-    #     val = int(val)
-    #     if min_res < val < max_res:
-    #         return val
-    #     else:
-    #         print(f'[!] Warning: resolution value must be between {min_res} and '
-    #               f'{max_res}. Using default value {def_res}.')
-    #         return def_res
-    # parser.add_argument(
-    #     '-r', '--res', dest='resolution', type=check_res, default=512,
-    #     help=('Maximum resolution of the Memory Access Pattern grid (value '
-    #           'between 4 and 2048).')
-    # )
 
     args = parser.parse_args()
     return args
@@ -161,19 +149,23 @@ def main():
     for map_filename in args.input_files:
         print(f'\nMEMORY ACCESS PATTERN')
         st.init_map(map_filename)
-        st.init_map_derived()
         map_reader = MapFileReader()
         st.map.describe(ind='    ')
-        file_prefix = os.path.basename(os.path.splitext(map_filename)[0])
-        plot_metadata = PlotSpecs(width=args.plot_width, height=args.plot_height,
-                                  #res=args.resolution,
-                                  dpi=args.dpi,
-                                  format=args.format, prefix=file_prefix,
-                                  include_plots=args.plotcodes, x_orient=args.x_orient,
-                                  y_ranges=args.y_ranges)
-        st.init_plot(plot_metadata=plot_metadata)
 
         print(f'\nCREATING TOOLS AND MEMORY SYSTEM')
+        st.init_plot(
+            width = args.plot_width,
+            height = args.plot_height,
+            dpi = args.dpi,
+            max_res = args.max_res,
+            format = args.format,
+            prefix = os.path.basename(os.path.splitext(map_filename)[0]),
+            include_plots = args.plotcodes,
+            x_orient = args.x_orient,
+            y_ranges = args.y_ranges,
+            data_X_size = st.map.time_size,
+            data_Y_size = st.map.num_padded_bytes
+        )
         tools = Tools()
         tools.describe()
         cache = Cache(tools=tools)

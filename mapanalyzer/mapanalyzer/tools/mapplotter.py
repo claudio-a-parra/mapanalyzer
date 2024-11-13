@@ -76,9 +76,6 @@ class Map:
             mapped_addr = round(propor_addr * max_mapped_addr)
             mapped_time = round(propor_time * max_mapped_time)
 
-            # just show the first byte of the block
-            if offset == 0:
-                Dbg.p(f'map: [{addr},{time}] -> [{mapped_time},{mapped_addr}]')
             # store the access in space-time matrix
             self.access_matrix[mapped_addr][mapped_time] = access_code
         return
@@ -89,7 +86,7 @@ class Map:
         return
 
 
-    def plot(self, bottom_tool=None, axes=None):
+    def plot(self, bottom_tool=None, axes=None, draw_X_grid=False, draw_Y_grid=False):
         # define values for standalone and auxiliary-plot cases
         if axes is None:
             # only plot if requested
@@ -117,9 +114,9 @@ class Map:
         thr_count = st.map.thread_count
         thr_palette = Palette(hue_count=thr_count, lightness=lig_val,
                               saturation=sat_val, alpha=alp_val)
-        rcol = list(reversed([thr_palette[i][0] for i in range(thr_count)]))
-        wcol = [thr_palette[i][1] for i in range(thr_count)]
-        cmap = ListedColormap(rcol + ['#FFFFFF00'] + wcol)
+        read_color = list(reversed([thr_palette[i][0] for i in range(thr_count)]))
+        write_color = [thr_palette[i][1] for i in range(thr_count)]
+        cmap = ListedColormap(read_color + ['#FFFFFF00'] + write_color)
 
         # set plot limits and draw the MAP
         ymin,ymax = 0-0.5,st.map.num_padded_bytes-0.5
@@ -134,15 +131,17 @@ class Map:
             self.plot_fade_padding_bytes()
             self.plot_setup_general()
             self.plot_setup_X_axis()
-            self.plot_draw_X_grid()
+            self.plot_draw_X_grid(draw_X_grid)
             self.plot_setup_Y_axis()
-            self.plot_draw_Y_grid()
+            self.plot_draw_Y_grid(draw_Y_grid)
             save_fig(fig, self.plotcode , self.ps.suffix)
         else:
             self.axes.set_xticks([])
             self.axes.set_yticks([])
             self.axes.patch.set_facecolor('white')
             self.plot_fade_padding_bytes()
+            self.plot_draw_X_grid(draw_X_grid)
+            self.plot_draw_Y_grid(draw_Y_grid)
         return
 
     def plot_setup_general(self):
@@ -190,8 +189,10 @@ class Map:
         self.plot_draw_Y_grid()
         return
 
-    def plot_draw_X_grid(self):
-        if len(self.X) < 100:
+    def plot_draw_X_grid(self, draw='auto'):
+        if draw is False:
+            return
+        if draw is True or len(self.X)<100:
             ymin,ymax = 0-0.5,st.map.num_padded_bytes-0.5
             time_sep_lines = [i-0.5 for i in
                               range(self.X[0],self.X[-1]+1)]
@@ -200,18 +201,27 @@ class Map:
                              color='k', linewidth=0.33, alpha=0.2, zorder=1)
         return
 
-    def plot_draw_Y_grid(self, byte_sep='auto', block_sep='auto'):
+    def plot_draw_Y_grid(self, draw='auto', byte_sep='auto', block_sep='auto'):
+        if draw is False:
+            return
         max_bytes = st.plot.grid_max_bytes
         max_blocks = st.plot.grid_max_blocks
-        if byte_sep == 'auto':
-            if st.map.num_padded_bytes < max_bytes:
-                byte_sep = True
+        if draw is True:
+            byte_sep = True
+            block_sep = True
+        else:
+            if byte_sep == 'auto':
+                if st.map.num_padded_bytes < max_bytes:
+                    byte_sep = True
+                else:
+                    byte_sep = False
             else:
                 byte_sep = False
-
-        if block_sep == 'auto':
-            if st.map.num_blocks < max_blocks:
-                block_sep = True
+            if block_sep == 'auto':
+                if st.map.num_blocks < max_blocks:
+                    block_sep = True
+                else:
+                    block_sep = False
             else:
                 block_sep = False
 

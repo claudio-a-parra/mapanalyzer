@@ -295,7 +295,10 @@ class PlotSpecs:
         self.min_res,self.max_res = self.init_map_resolution(width, height, dpi, max_res)
         self.fade_bytes_alpha=0.1 # fading of bytes out-of-range to complete the block
 
-        # Specific of SIUE
+        # Specific of SIU
+        self.dead_line_width = max(0.3,min(3,400*(height/data_Y_size)))
+
+        # Specific of Personality
         self.jump_line_width = max(0.2,min(3,12*(width/data_X_size)))
 
         return
@@ -365,7 +368,8 @@ class Settings:
         'CMMA': 'Cumulative Main Memory Access',
         'CUR': 'Cache Usage Ratio',
         'AD': 'Aliasing Density',
-        'SIU': 'Still-in-Use Evictions'
+        'SIU': 'Still-in-Use Evictions',
+        'BPA': 'Block Personality Adoption'
     }
     verb = False
 

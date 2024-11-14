@@ -161,9 +161,11 @@ class Map:
         # label
         self.axes.set_xlabel(self.ps.xlab, color='k')
         # ticks
-        self.axes.tick_params(axis='x', colors='k',rotation=-90,
-                         bottom=True, labelbottom=True,
-                         top=False, labeltop=False)
+        rot = -90 if st.plot.x_orient == 'v' else 0
+        self.axes.tick_params(axis='x', colors='k',
+                              rotation=rot,
+                              bottom=True, labelbottom=True,
+                              top=False, labeltop=False)
         x_ticks = create_up_to_n_ticks(self.X, base=10,
                                        n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)

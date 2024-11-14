@@ -7,7 +7,7 @@ from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, P
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import sub_resolution_between
 
-class SIUEviction:
+class Personality:
     def __init__(self, shared_X=None, hue=220):
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
@@ -15,25 +15,15 @@ class SIUEviction:
                                     hue_count=st.cache.num_sets,
                                     lightness=st.plot.pal_lig,
                                     saturation=st.plot.pal_sat,
-                                    alpha=[100,20])#st.plot.pal_alp)
+                                    alpha=[85,75])#st.plot.pal_alp)
 
         # map with the currently cached blocks and the time they were cached.
-        # Used to recollect time_in when a block is evicted, so the interval of time it
-        # spent in cache can be reconstructed.
         # tag -> time_in
         self.cached_blocks = {}
 
-        # This map-of-maps stores the in-RAM time of each block.
-        # Take this map of maps as a compressed table where the block_id is the concatenation of
-        # the block-tag and the set-id:
-        # so:
-        #                   ,------ set id
-        #                   |   ,-- block tag
-        #                   |   |
-        #    dead_intervals[3][47] -> [(time_out,time_in), (time_out,time_in), ...]
-        #
-        # In the example, block_id = '47 concat 3'
-        self.dead_intervals = {}
+        # list of S list. Each list corresponds to the jumps history of one set. Each element
+        # is a tuple (time_out, block_id_out, block_id_in)
+        self.sets_personalities = [[] for _ in range(st.cache.num_sets)]
 
         # block access matrix. rows: blocks. cols: time.
         map_mat_rows = sub_resolution_between(st.map.num_padded_bytes,
@@ -51,16 +41,16 @@ class SIUEviction:
         # to setup the size of the matrix on the plot
         self.mat_extent = [0,0,0,0]
 
-        self.name = 'SIU Evictions'
-        self.plotcode = 'SIU'
-        self.about = ('Detects blocks that are evicted and fetched back in a short time.')
+        self.name = 'Blk Pers. Adopt.'
+        self.plotcode = 'BPA'
+        self.about = ('Trace of Block Personality Adoption by the lines of each set.')
 
         self.ps = PlotStrings(
-            title  = 'SIU',
+            title  = 'BPA',
             xlab   = 'Time [access instr.]',
             ylab   = 'Memory Blocks',
-            suffix = '_plot-07-siu-evictions',
-            subtit = 'longer is better')
+            suffix = '_plot-08-personality',
+            subtit = '')
         return
 
 
@@ -97,32 +87,19 @@ class SIUEviction:
             time_out = time - 1
             self.update_bam(set_idx, tag_out, time_in, time_out)
 
-            # A block is dying! register the beginning of its in-RAM time.
-            # If this set has not been involved so far, create a map for it
-            if set_idx not in self.dead_intervals:
-                self.dead_intervals[set_idx] = {}
-            # If this block (within the aforementioned set) has never been evicted before, then
-            # create a list for its dead-history
-            if tag_out not in self.dead_intervals[set_idx]:
-                self.dead_intervals[set_idx][tag_out] = []
-            # now register this block's  time of death (with a -1 placeholder for its future rebirth
-            # on a potential upcoming fetch)
-            self.dead_intervals[set_idx][tag_out].append((time_out,-1))
-
         # if a block is being fetched...
         if tag_in is not None:
             # register its time_in in the cached_blocks.
             self.cached_blocks[(tag_in,set_idx)] = time
 
-            # a block is coming to life! this may be the revival of a dead block, if so,
-            # update its rebirth time
-            if set_idx in self.dead_intervals:
-                if tag_in in self.dead_intervals[set_idx]:
-                    block_death_time = self.dead_intervals[set_idx][tag_in][-1][0]
-                    block_rebirth_time = time-1
-                    self.dead_intervals[set_idx][tag_in][-1] = (block_death_time, block_rebirth_time)
-            # else:
-            #     the block has never been evicted before, this is just its first fetch.
+        # if a block is evicted while the other is fetched...
+        if tag_in is not None and tag_out is not None:
+            # then the cache-set is "changing personality"
+            block_in_id = (tag_in  << st.cache.bits_set) | set_idx
+            block_out_id = (tag_out  << st.cache.bits_set) | set_idx
+            self.sets_personalities[set_idx].append((time-1,block_out_id,block_in_id))
+
+
         return
 
     def commit(self, time):
@@ -224,33 +201,30 @@ class SIUEviction:
         #         [n] : Set-(n-1) makes block alive.
         color_map_list = ['#FFFFFF00'] + [self.tool_palette[i][1] for i in range(st.cache.num_sets)]
 
-        # collect the parameters to plot the dead_intervals of each block.
-        dead_intervals_per_set = {} # set_idx -> plot parameters for all the dead intervals of blocks in this set.
+        # collect the parameters to plot the jumps of each set.
+        personalities_per_set = {} # set_idx -> plot parameters for all the jumps made by that set on its blocks
         for s in range(st.cache.num_sets):
-            if s in self.dead_intervals:
-                s_color = self.tool_palette[s][0]
-                s_dead_intervals = self.dead_intervals[s]
-                s_all_block_ids = []
-                s_all_evictions = []
-                s_all_fetches = []
-                s_all_idx = 0
+            set_color = self.tool_palette[s][0]
+            set_personalities = self.sets_personalities[s]
+            set_times = [0 for _ in range(len(set_personalities)*3)]
+            set_blocks = [0 for _ in range(len(set_personalities)*3)]
+            # set_times_from = [0 for _ in set_personalities]
+            # set_times_to = [0 for _ in set_personalities]
+            # set_block_from = [0 for _ in set_personalities]
+            # set_block_to = [0 for _ in set_personalities]
+            for i,p in enumerate(set_personalities):
+                # p[0] change time
+                # p[1] from-block
+                # p[2] to-block
+                ii = 3*i
+                set_times[ii], set_times[ii+1], set_times[ii+2] = p[0], p[0]+1, None
+                set_blocks[ii], set_blocks[ii+1], set_blocks[ii+2] = p[1], p[2], None
+            personalities_per_set[s] = {
+                't': set_times,
+                'b': set_blocks,
+                'col': set_color
+            }
 
-                # iterate over all the (tag,history) pairs under this set.
-                for s_tag, s_tag_history in sorted(s_dead_intervals.items()):
-                    # iterate over every (out,in) pair in the history of a single tag
-                    for (s_t_evict_time,s_t_fetch_time) in s_tag_history:
-                        if s_t_fetch_time == -1:
-                            continue
-                        s_all_block_ids.append((s_tag << st.cache.bits_set) | s)
-                        s_all_evictions.append(s_t_evict_time+0.5)
-                        s_all_fetches.append(s_t_fetch_time+0.5)
-
-                dead_intervals_per_set[s] = {
-                    'y': s_all_block_ids,
-                    'x0': s_all_evictions,
-                    'x1': s_all_fetches,
-                    'col': s_color
-                }
 
         # Plot all sets together in one image:
         cmap = ListedColormap(color_map_list) # define color map
@@ -258,13 +232,13 @@ class SIUEviction:
         self.axes.imshow(self.block_access_matrix, cmap=cmap, origin='lower',
                          aspect='auto', zorder=2, extent=self.mat_extent,
                          vmin=-1, vmax=st.cache.num_sets-1)
-        # draw all dead_intervals
-        for s,di in sorted(dead_intervals_per_set.items()):
-            self.axes.hlines(y=di['y'], color=di['col'],
-                             xmin=di['x0'], xmax=di['x1'],
-                             linewidth=st.plot.dead_line_width,
+        # draw time jumps
+        for s,ps in sorted(personalities_per_set.items()):
+            self.axes.plot(ps['t'], ps['b'],
+                             color=ps['col'],
+                             linewidth=st.plot.jump_line_width,
                              alpha=1, zorder=2, linestyle='-')
-        # save image
+            # save image
         save_fig(fig, f'{self.plotcode} all', f'{self.ps.suffix}-all')
 
         # Plot one set in a different image
@@ -280,7 +254,6 @@ class SIUEviction:
             # setup axes
             self.plot_setup_X()
             self.plot_setup_Y()
-
             self.plot_setup_general(variant=f'S{s} {st.cache.asso}-way')
 
             # set all colors white but this set (which is s+1, coz 0 is blank)
@@ -291,15 +264,14 @@ class SIUEviction:
 
             # draw blocks
             self.axes.imshow(self.block_access_matrix, cmap=cmap, origin='lower',
-                         aspect='auto', zorder=2, extent=self.mat_extent,
-                         vmin=-1, vmax=st.cache.num_sets-1)
-            # draw dead intervals
-            if s in dead_intervals_per_set:
-                di = dead_intervals_per_set[s]
-                self.axes.hlines(y=di['y'], color=di['col'],
-                                 xmin=di['x0'], xmax=di['x1'],
-                                 linewidth=st.plot.dead_line_width,
-                                 alpha=1, zorder=2, linestyle='-')
+                             aspect='auto', zorder=2, extent=self.mat_extent,
+                             vmin=-1, vmax=st.cache.num_sets-1)
+            # draw jumps
+            ps = personalities_per_set[s]
+            self.axes.plot(ps['t'], ps['b'],
+                             color=ps['col'],
+                             linewidth=st.plot.jump_line_width,
+                             alpha=1, zorder=2, linestyle='-')
             # save image
             save_fig(fig, f'{self.plotcode} s{s:02}', f'{self.ps.suffix}-s{s:02}')
         return

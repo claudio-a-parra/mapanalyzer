@@ -8,6 +8,16 @@ from mapanalyzer.settings import Settings as st
 
 class Locality:
     def __init__(self, shared_X=None, hue=325):
+        self.name = 'Locality'
+        self.plotcodeLs = 'SLD'
+        self.plotcodeLt = 'TLD'
+        self.enabledLs = self.plotcodeLs in st.plot.include
+        self.enabledLt = self.plotcodeLt in st.plot.include
+        self.enabled = self.enabledLs or self.enabledLt
+        if not self.enabled:
+            return
+
+        self.about = ('Spacial and Temporal Locality Degree.')
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
         # line and filling colors
@@ -16,11 +26,6 @@ class Locality:
                                     saturation=st.plot.pal_sat,
                                     alpha=st.plot.pal_alp)
         self.axes = None
-        self.name = 'Locality'
-        self.plotcodeLs = 'SLD'
-        self.plotcodeLt = 'TLD'
-        self.about = ('Spacial locality across Time, and Temporal locality '
-                      'across space.')
 
         ## SPATIAL LOCALITY ACROSS TIME
         # time window chronological access: keeps the temporal order of accesses.
@@ -54,6 +59,8 @@ class Locality:
         return
 
     def add_access(self, access):
+        if not self.enabled:
+            return
         ## SPACIAL LOCALITY ACROSS TIME
         off = access.addr - st.map.start_addr
 
@@ -99,6 +106,8 @@ class Locality:
     def commit(self, time):
         """produce the a neighborhood from tw_byte_count's keys and add it
         to Ls"""
+        if not self.enabled:
+            return
 
         neig = sorted(list(self.tw_byte_count))
 
@@ -149,6 +158,8 @@ class Locality:
         return
 
     def describe(self, ind=''):
+        if not self.enabled:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
@@ -226,10 +237,6 @@ class Locality:
         return
 
     def plotLs(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcodeLs not in st.plot.include:
-            return
-
         # create two set of axes: for the map (bottom) and the tool
         fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
         self.axes = fig.add_axes(bottom_axes.get_position())
@@ -336,10 +343,6 @@ class Locality:
         return
 
     def plotLt(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcodeLt not in st.plot.include:
-            return
-
         # create two set of axes: for the map (bottom) and the tool
         fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
         self.axes = fig.add_axes(bottom_axes.get_position())
@@ -371,9 +374,14 @@ class Locality:
         return
 
     def plot(self, bottom_tool=None):
-        # finish up computations
-        self.all_space_window_to_lt()
-        # plot Spacial and Temporal locality tools
-        self.plotLs(bottom_tool)
-        self.plotLt(bottom_tool)
+        if not self.enabled:
+            return
+
+        if self.enabledLs:
+            self.plotLs(bottom_tool)
+
+        if self.enabledLt:
+            self.all_space_window_to_lt()
+            self.plotLt(bottom_tool)
+
         return

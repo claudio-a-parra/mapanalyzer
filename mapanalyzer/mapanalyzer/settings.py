@@ -240,7 +240,7 @@ class MapSpecs:
 
 class PlotSpecs:
     def __init__(self, width, height, dpi, max_res, format, prefix, include_plots,
-                 x_orient, y_ranges, data_X_size, data_Y_size):
+                 x_orient, y_ranges, data_X_size, data_Y_size, hist_bins, hist_max):
         # Image to export
         self.width = width # image width
         self.height = height # image height
@@ -297,11 +297,24 @@ class PlotSpecs:
 
         # Specific of SIU
         self.dead_line_width = max(0.3,min(3,400*(height/data_Y_size)))
+        self.hist_bins = self.init_auto_or_int(hist_bins, 'hist-bins')
+        self.hist_max = self.init_auto_or_int(hist_max, 'hist-max')
 
         # Specific of Personality
         self.jump_line_width = max(0.2,min(3,12*(width/data_X_size)))
 
         return
+
+    def init_auto_or_int(self, arg, name):
+        if arg == 'auto':
+            return arg
+        else:
+            try:
+                arg = int(arg)
+            except:
+                print(f'Error: {name} must be an integer or \'auto\'')
+                exit(1)
+        return arg
 
     def init_map_resolution(self, width, height, dpi, max_res):
         min_res = round(min(0.9*min(width,height)*dpi,210))
@@ -368,8 +381,8 @@ class Settings:
         'CMMA': 'Cumulative Main Memory Access',
         'CUR': 'Cache Usage Ratio',
         'AD': 'Aliasing Density',
-        'SIU': 'Still-in-Use Evictions',
-        'BPA': 'Block Personality Adoption'
+        'BPA': 'Block Personality Adoption',
+        'SIU': 'Still-in-Use Evictions'
     }
     verb = False
 
@@ -398,9 +411,9 @@ class Settings:
 
     @classmethod
     def init_plot(cls, width, height, dpi, max_res, format, prefix, include_plots,
-                  x_orient, y_ranges, data_X_size, data_Y_size):
+                  x_orient, y_ranges, data_X_size, data_Y_size, hist_bins, hist_max):
         cls.plot = PlotSpecs(width, height, dpi, max_res, format, prefix, include_plots,
-                             x_orient, y_ranges, data_X_size, data_Y_size)
+                             x_orient, y_ranges, data_X_size, data_Y_size, hist_bins, hist_max)
 
         return
 

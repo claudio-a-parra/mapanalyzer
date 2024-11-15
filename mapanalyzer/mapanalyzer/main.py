@@ -131,6 +131,16 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
+        '-hb', '--hist-bins', metavar='HB', dest='hist_bins', type=str, default='auto',
+        help='The number of bins to use in SIU histogram.'
+    )
+
+    parser.add_argument(
+        '-hm', '--hist-max', metavar='HM', dest='hist_max', type=str, default='auto',
+        help='Maximum X-value to show in the SIU histogram'
+    )
+
+    parser.add_argument(
         '-fr', '--format', metavar='FORMAT', dest='format', choices=['png', 'pdf'], default='png',
         help=("Choose the output format of the plots.\n"
               "Format: 'pdf' | 'png'")
@@ -164,7 +174,9 @@ def main():
             x_orient = args.x_orient,
             y_ranges = args.y_ranges,
             data_X_size = st.map.time_size,
-            data_Y_size = st.map.num_padded_bytes
+            data_Y_size = st.map.num_padded_bytes,
+            hist_bins = args.hist_bins,
+            hist_max = args.hist_max
         )
         tools = Tools()
         tools.describe()

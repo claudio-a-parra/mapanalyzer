@@ -7,19 +7,11 @@ from mapanalyzer.settings import Settings as st
 
 class CacheUsage:
     def __init__(self, shared_X=None, hue=120):
-        self.X = shared_X if shared_X is not None else \
-            [i for i in range(st.map.time_size)]
-        self.tool_palette = Palette(hue=[hue],
-                                    lightness=st.plot.pal_lig,
-                                    saturation=st.plot.pal_sat,
-                                    alpha=st.plot.pal_alp)
-
-        self.accessed_bytes = 0
-        self.valid_bytes = 0
-        self.usage_ratio = [-1] * len(self.X)
-
         self.name = 'Cache Usage Rate'
         self.plotcode = 'CUR'
+        self.enabled = self.plotcode in st.plot.include
+        if not self.enabled:
+            return
         self.about = ('Percentage of valid bytes in cache that are used before eviction.')
 
         self.ps = PlotStrings(
@@ -28,18 +20,36 @@ class CacheUsage:
             ylab   = 'Cache Usage Rate [%]',
             suffix = '_plot-05-usage',
             subtit = 'higher is better')
+
+        self.X = shared_X if shared_X is not None else \
+            [i for i in range(st.map.time_size)]
+
+        self.tool_palette = Palette(hue=[hue],
+                                    lightness=st.plot.pal_lig,
+                                    saturation=st.plot.pal_sat,
+                                    alpha=st.plot.pal_alp)
+
+        self.accessed_bytes = 0
+        self.valid_bytes = 0
+        self.usage_ratio = [-1] * len(self.X)
         return
 
     def update(self, delta_access=0, delta_valid=0):
+        if not self.enabled:
+            return
         """Update counters by deltas"""
         self.accessed_bytes += delta_access
         self.valid_bytes += delta_valid
         return
 
     def commit(self, time):
+        if not self.enabled:
+            return
         self.usage_ratio[time] = 100 * self.accessed_bytes / self.valid_bytes
 
     def describe(self, ind=''):
+        if not self.enabled:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
@@ -116,8 +126,7 @@ class CacheUsage:
         return
 
     def plot(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcode not in st.plot.include:
+        if not self.enabled:
             return
 
         # create two set of axes: for the map (bottom) and the tool

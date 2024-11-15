@@ -40,6 +40,21 @@ class ThreadHitMiss:
 
 class HitMiss:
     def __init__(self, shared_X=None, hue=0):
+        self.name = 'Miss Ratio'
+        self.plotcode = 'CMR'
+        self.enabled = self.plotcode in st.plot.include
+        if not self.enabled:
+            return
+        self.about = ('Thread-wise Cache Miss Ratio on the last memory '
+                      'accesses.')
+
+        self.ps = PlotStrings(
+            title  = 'CMR',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Cache Miss Ratio [%]',
+            suffix = '_plot-03-miss-ratio',
+            subtit = 'lower is better')
+
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
         self.axes = None
@@ -51,24 +66,14 @@ class HitMiss:
         self.time_window = deque()
         self.time_window_size = st.cache.num_sets*st.cache.asso
         self.thr_traces = {}
-
-        self.name = 'Miss Ratio'
-        self.plotcode = 'CMR'
-        self.about = ('Thread-wise Cache Miss Ratio on the last memory '
-                      'accesses.')
-
-        self.ps = PlotStrings(
-            title  = 'CMR',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Miss Ratio [%]',
-            suffix = '_plot-03-miss-ratio',
-            subtit = 'lower is better')
         return
 
     def add_hm(self, access, hm):
         """hm is a tuple with the hit and miss counters diffs.
         Cache Hit : (1,0)
         Cache Miss: (0,1)"""
+        if not self.enabled:
+            return
 
         # queue event to time_window, and increment the thread's counters
         self.time_window.append((access,hm))
@@ -84,12 +89,16 @@ class HitMiss:
         return
 
     def commit(self, time):
+        if not self.enabled:
+            return
         for t in self.thr_traces.keys():
             thr = self.thr_traces[t]
             if thr.time_last_increment == time:
                 thr.counters_to_ratio(time)
 
     def describe(self, ind=''):
+        if not self.enabled:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
@@ -190,8 +199,7 @@ class HitMiss:
         return
 
     def plot(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcode not in st.plot.include:
+        if not self.enabled:
             return
 
         # create two set of axes: for the map (bottom) and the tool

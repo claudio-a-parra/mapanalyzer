@@ -9,8 +9,23 @@ from mapanalyzer.util import sub_resolution_between
 
 class SIUEviction:
     def __init__(self, shared_X=None, hue=220):
+        self.name = 'SIU Evictions'
+        self.plotcode = 'SIU'
+        self.enabled = self.plotcode in st.plot.include
+        if not self.enabled:
+            return
+        self.about = ('Detects blocks that are evicted and fetched back in a short time.')
+
+        self.ps = PlotStrings(
+            title  = 'SIU',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Memory Blocks',
+            suffix = '_plot-07-siu-evictions',
+            subtit = 'longer is better')
+
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
+
         self.tool_palette = Palette(hue=hue,
                                     hue_count=st.cache.num_sets,
                                     lightness=st.plot.pal_lig,
@@ -36,31 +51,16 @@ class SIUEviction:
         self.dead_intervals = {}
 
         # block access matrix. rows: blocks. cols: time.
-        map_mat_rows = sub_resolution_between(st.map.num_padded_bytes,
+        map_mat_rows = sub_resolution_between(st.map.num_padded_bytes // st.cache.line_size,
                                               st.plot.min_res, st.plot.max_res)
         map_mat_cols = sub_resolution_between(st.map.time_size,
                                               st.plot.min_res, st.plot.max_res)
-        # if possible, reduce resolution to obtain one row per block. If no clean
-        # division, then the resolution was badly reduced from the original memory size.
-        # Not terrible, but if not possible, it doesn't look pretty.
-        if map_mat_rows % st.cache.line_size == 0:
-            map_mat_rows = map_mat_rows // st.cache.line_size
 
         # matrix of blocks at all times. -1 means block not alive.
         self.block_access_matrix = [[-1] * map_mat_cols for _ in range(map_mat_rows)]
         # to setup the size of the matrix on the plot
         self.mat_extent = [0,0,0,0]
 
-        self.name = 'SIU Evictions'
-        self.plotcode = 'SIU'
-        self.about = ('Detects blocks that are evicted and fetched back in a short time.')
-
-        self.ps = PlotStrings(
-            title  = 'SIU',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Memory Blocks',
-            suffix = '_plot-07-siu-evictions',
-            subtit = 'longer is better')
         return
 
 
@@ -89,6 +89,8 @@ class SIUEviction:
         return
 
     def update(self, time, set_idx, tag_in, tag_out):
+        if not self.enabled:
+            return
         # if a block is being evicted...
         if tag_out is not None:
             # recall its time_in, and register its living time in the Block Access Matrix (bam)
@@ -98,13 +100,12 @@ class SIUEviction:
             self.update_bam(set_idx, tag_out, time_in, time_out)
 
             # A block is dying! register the beginning of its in-RAM time.
-            # If this set has not been involved so far, create a map for it
+            # If this set/tag has not been involved so far, create a map/list for it
             if set_idx not in self.dead_intervals:
                 self.dead_intervals[set_idx] = {}
-            # If this block (within the aforementioned set) has never been evicted before, then
-            # create a list for its dead-history
             if tag_out not in self.dead_intervals[set_idx]:
                 self.dead_intervals[set_idx][tag_out] = []
+
             # now register this block's  time of death (with a -1 placeholder for its future rebirth
             # on a potential upcoming fetch)
             self.dead_intervals[set_idx][tag_out].append((time_out,-1))
@@ -126,13 +127,16 @@ class SIUEviction:
         return
 
     def commit(self, time):
+        if not self.enabled:
+            return
         # this tool doesn't need to do anything at the end of each time step.
         return
 
     def describe(self, ind=''):
+        if not self.enabled:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
-
 
     def plot_setup_X(self):
         # Data range based on data
@@ -189,21 +193,22 @@ class SIUEviction:
         self.axes.invert_yaxis()
         return
 
-    def plot_setup_general(self, variant=''):
+    def plot_setup_general(self, variant='', subtit=None):
         # background color
         self.axes.patch.set_facecolor(self.tool_palette.bg)
         # setup title
         if variant != '':
             variant = f'. {variant}'
         title_string = f'{self.ps.title}{variant}: {st.plot.prefix}'
-        if self.ps.subtit:
+        if subtit:
+            title_string += f'. ({subtit})'
+        elif self.ps.subtit:
             title_string += f'. ({self.ps.subtit})'
         self.axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
         return
 
     def plot(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcode not in st.plot.include:
+        if not self.enabled:
             return
 
         # create two set of axes: for the map (bottom) and the tool
@@ -219,13 +224,10 @@ class SIUEviction:
         self.plot_setup_Y()
         self.plot_setup_general(variant=f'All Sets {st.cache.asso}-way')
 
-
-        # colors: [0] : block not alive
-        #         [n] : Set-(n-1) makes block alive.
-        color_map_list = ['#FFFFFF00'] + [self.tool_palette[i][1] for i in range(st.cache.num_sets)]
+        # set_idx -> plot parameters for all the dead intervals of blocks in this set.
+        dead_intervals_per_set = {}
 
         # collect the parameters to plot the dead_intervals of each block.
-        dead_intervals_per_set = {} # set_idx -> plot parameters for all the dead intervals of blocks in this set.
         for s in range(st.cache.num_sets):
             if s in self.dead_intervals:
                 s_color = self.tool_palette[s][0]
@@ -235,10 +237,10 @@ class SIUEviction:
                 s_all_fetches = []
                 s_all_idx = 0
 
-                # iterate over all the (tag,history) pairs under this set.
-                for s_tag, s_tag_history in sorted(s_dead_intervals.items()):
+                # iterate over all the (tag,t_dead_in_out) pairs under this set.
+                for s_tag, s_tag_evictfetch_list in sorted(s_dead_intervals.items()):
                     # iterate over every (out,in) pair in the history of a single tag
-                    for (s_t_evict_time,s_t_fetch_time) in s_tag_history:
+                    for (s_t_evict_time,s_t_fetch_time) in s_tag_evictfetch_list:
                         if s_t_fetch_time == -1:
                             continue
                         s_all_block_ids.append((s_tag << st.cache.bits_set) | s)
@@ -252,10 +254,17 @@ class SIUEviction:
                     'col': s_color
                 }
 
-        # Plot all sets together in one image:
-        cmap = ListedColormap(color_map_list) # define color map
-        # draw blocks
+
+        # PLOT SIU EVICTIONS OF ALL SETS IN ONE IMAGE
+        # [0] : block not alive
+        # [n] : Set-(n-1) makes block alive.
+        color_map_list = ['#FFFFFF00'] + [self.tool_palette[i][1] for i in range(st.cache.num_sets)]
+        # define color map
+        cmap = ListedColormap(color_map_list)
+
+        # draw all blocks
         self.axes.imshow(self.block_access_matrix, cmap=cmap, origin='lower',
+                         interpolation='none',
                          aspect='auto', zorder=2, extent=self.mat_extent,
                          vmin=-1, vmax=st.cache.num_sets-1)
         # draw all dead_intervals
@@ -267,7 +276,13 @@ class SIUEviction:
         # save image
         save_fig(fig, f'{self.plotcode} all', f'{self.ps.suffix}-all')
 
-        # Plot one set in a different image
+        # list with S sub-lists.
+        # Each sub-list is all the intervals of dead blocks that corresponds to that set.
+        # This list is used for the histogram.
+        all_dead_intervals = [[] for _ in range(st.cache.num_sets)]
+
+
+        # PLOT SIU EVICTIONS OF EACH SET IN A DIFFERENT IMAGE
         for s in range(st.cache.num_sets):
             # create two set of axes: for the map (bottom) and the tool
             fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
@@ -280,7 +295,6 @@ class SIUEviction:
             # setup axes
             self.plot_setup_X()
             self.plot_setup_Y()
-
             self.plot_setup_general(variant=f'S{s} {st.cache.asso}-way')
 
             # set all colors white but this set (which is s+1, coz 0 is blank)
@@ -291,8 +305,10 @@ class SIUEviction:
 
             # draw blocks
             self.axes.imshow(self.block_access_matrix, cmap=cmap, origin='lower',
-                         aspect='auto', zorder=2, extent=self.mat_extent,
-                         vmin=-1, vmax=st.cache.num_sets-1)
+                             interpolation='none',
+                             aspect='auto', zorder=2, extent=self.mat_extent,
+                             vmin=-1, vmax=st.cache.num_sets-1)
+
             # draw dead intervals
             if s in dead_intervals_per_set:
                 di = dead_intervals_per_set[s]
@@ -300,6 +316,69 @@ class SIUEviction:
                                  xmin=di['x0'], xmax=di['x1'],
                                  linewidth=st.plot.dead_line_width,
                                  alpha=1, zorder=2, linestyle='-')
+                # compute intervals for histogram
+                all_dead_intervals[s].extend([f-e for e,f in zip(di['x0'], di['x1'])])
+
             # save image
             save_fig(fig, f'{self.plotcode} s{s:02}', f'{self.ps.suffix}-s{s:02}')
+
+
+        # PLOT HISTOGRAM OF SIU EVICTIONS OF ALL SETS IN ONE IMAGE
+        # create a set of axes for the histogram
+        fig,self.axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+        hist_labels = [str(s) for s in range(st.cache.num_sets)]
+        hist_colors = [self.tool_palette[i][0] for i in range(st.cache.num_sets)]
+        counts, bin_edges, patches = self.axes.hist(all_dead_intervals,
+                                                    stacked=True, zorder=3,
+                                                    bins=st.plot.hist_bins,
+                                                    label=hist_labels, color=hist_colors)
+        # configure axes
+        max_count = max(sum(counts))
+        self.plot_setup_axes_for_hist(max_count, bin_edges[-1])
+        self.plot_setup_general(variant=f'Time to re-fetch', subtit='Right-skewed is better')
+
+        # save image
+        save_fig(fig, f'{self.plotcode} hist', f'{self.ps.suffix}-hist')
+        return
+
+
+    def plot_setup_axes_for_hist(self, max_count, max_bin):
+        # X-AXIS
+        X_min = 1
+        X_max = round(max_bin+0.5)
+        if st.plot.hist_max != 'auto':
+            X_max = st.plot.hist_max
+        X_padding = 0.5
+        self.axes.set_xlim(X_min-X_padding, X_max+X_padding)
+
+        # Axis details: label, ticks, and grid
+        self.axes.set_xlabel('Time to re-fetch')
+        self.axes.tick_params(axis='x',
+                              bottom=True, top=False,
+                              labelbottom=True, labeltop=False,
+                              width=st.plot.grid_main_width)
+        x_ticks = create_up_to_n_ticks(range(X_min, X_max+1), base=10,
+                                       n=st.plot.max_xtick_count)
+        self.axes.set_xticks(x_ticks)
+
+        # Y-AXIS
+        Y_min = 0
+        Y_max = round(max_count+0.5)
+        Y_padding = 0.5
+        self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
+
+        # Axis details: label, ticks, and grid
+        self.axes.set_ylabel('Frequency')
+        self.axes.tick_params(axis='y',
+                              left=True, right=False,
+                              labelleft=True, labelright=False,
+                              width=st.plot.grid_main_width)
+        y_ticks = create_up_to_n_ticks(range(Y_min,Y_max+1), base=10,
+                                       n=st.plot.max_ytick_count)
+        self.axes.set_yticks(y_ticks)
+        self.axes.grid(axis='y', which='both',
+                       zorder=1,
+                       alpha=st.plot.grid_main_alpha,
+                       linewidth=st.plot.grid_main_width,
+                       linestyle=st.plot.grid_main_style)
         return

@@ -10,6 +10,18 @@ from mapanalyzer.util import sub_resolution_between
 
 class Map:
     def __init__(self, hue=120):
+        self.name = 'M. A. Pattern'
+        self.plotcode = 'MAP'
+        self.enabled = True # always enabled
+        self.standalone_plot = self.plotcode in st.plot.include
+        self.about = 'Visual representation of the Memory Access Pattern.'
+        self.ps = PlotStrings(
+            title = 'MAP',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Space [bytes]',
+            suffix = '_plot-00-map',
+            subtit = None)
+
         self.tool_palette = Palette(hue=hue)
         self.X = [i for i in range(st.map.time_size)]
         self.axes = None
@@ -24,24 +36,19 @@ class Map:
         # rows: byte state across all instructions
         self.access_matrix = [[0] * map_mat_cols for _ in range(map_mat_rows)]
 
-        self.name = 'M. A. Pattern'
-        self.plotcode = 'MAP'
-        self.about = 'Visual representation of the Memory Access Pattern.'
-        self.ps = PlotStrings(
-            title = 'MAP',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Space [bytes]',
-            suffix = '_plot-00-map',
-            subtit = None)
         return
 
     def describe(self, ind=''):
+        if not self.standalone_plot:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
     def add_access(self, access):
         """The idea is to take an access happening at (addr, time), and
         map it to (y,x) in self.access_matrix."""
+        if not self.enabled:
+            return
         # negative: read access, positive: write access
         # abs value: thread ID + 1 (to leave 0 for no-op)
         access_code = access.thread + 1
@@ -81,16 +88,20 @@ class Map:
         return
 
     def commit(self, time):
+        if not self.enabled:
+            return
         # this tool does not need to run anything after processing a batch
         # of concurrent accesses.
         return
 
 
     def plot(self, bottom_tool=None, axes=None, draw_X_grid=False, draw_Y_grid=False):
+        if not self.enabled:
+            return
         # define values for standalone and auxiliary-plot cases
         if axes is None:
             # only plot if requested
-            if self.plotcode not in st.plot.include:
+            if not self.standalone_plot:
                 return
             standalone = True
             lig_val = [35,70]
@@ -122,8 +133,9 @@ class Map:
         ymin,ymax = 0-0.5,st.map.num_padded_bytes-0.5
         extent = (self.X[0]-0.5, self.X[-1]+0.5, ymin, ymax)
         self.axes.imshow(self.access_matrix, cmap=cmap, origin='lower',
-                    aspect='auto', zorder=2, extent=extent,
-                    vmin=-thr_count, vmax=thr_count)
+                         interpolation='none',
+                         aspect='auto', zorder=2, extent=extent,
+                         vmin=-thr_count, vmax=thr_count)
         self.axes.invert_yaxis()
 
         # complete plot setup

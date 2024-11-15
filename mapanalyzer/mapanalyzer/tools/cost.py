@@ -7,6 +7,20 @@ from mapanalyzer.settings import Settings as st
 
 class Cost:
     def __init__(self, shared_X=None, hue=180):
+        self.name = 'Main Mem. Access'
+        self.plotcode = 'CMMA'
+        self.enabled = self.plotcode in st.plot.include
+        if not self.enabled:
+            return
+        self.about = ('Distribution of main memory read and write operations.')
+
+        self.ps = PlotStrings(
+            title  = 'CMMA',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Cumulative Main Memory Access [count]',
+            suffix = '_plot-04-access-count',
+            subtit = 'lower is better')
+
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
         self.axes = None
@@ -21,19 +35,11 @@ class Cost:
         self.write_dist = [0] * len(self.X)
         self.last_time = 0
 
-        self.name = 'Main Mem. Access'
-        self.plotcode = 'CMMA'
-        self.about = ('Distribution of main memory read and write operations.')
-
-        self.ps = PlotStrings(
-            title  = 'CMMA',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Cumulative Main Memory Access [count]',
-            suffix = '_plot-04-access-count',
-            subtit = 'lower is better')
         return
 
     def add_access(self, rw):
+        if not self.enabled:
+            return
         """Adds to read or write counter"""
         if rw == 'r':
             self.read += 1
@@ -42,6 +48,8 @@ class Cost:
         return
 
     def commit(self, time):
+        if not self.enabled:
+            return
         # fill possible empty times with previous counts.
         last_read = self.read_dist[self.last_time]
         last_write = self.write_dist[self.last_time]
@@ -55,6 +63,8 @@ class Cost:
         self.last_time = time
 
     def describe(self, ind=''):
+        if not self.enabled:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
@@ -140,8 +150,7 @@ class Cost:
         return
 
     def plot(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcode not in st.plot.include:
+        if not self.enabled:
             return
 
         # create two set of axes: for the map (bottom) and the tool

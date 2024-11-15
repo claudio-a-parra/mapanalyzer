@@ -3,23 +3,16 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors # to create shades of colors from list
 from collections import deque
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette
+from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette
 from mapanalyzer.settings import Settings as st
 
 class Aliasing:
     def __init__(self, shared_X=None, hue=220):
-        self.i = 0
-        self.X = shared_X if shared_X is not None else \
-            [i for i in range(st.map.time_size)]
-        self.hue = hue
-
-        self.time_window = deque()
-        self.time_window_max_size = st.cache.asso * st.cache.num_sets
-        self.set_counters = [0] * st.cache.num_sets
-        self.aliasing = [[0] * len(self.X) for _ in range(st.cache.num_sets)]
-
         self.name = 'Cache Aliasing'
         self.plotcode = 'AD'
+        self.enabled = self.plotcode in st.plot.include
+        if not self.enabled:
+            return
         self.about = ('Proportion in which each set fetches blocks during execution.')
 
         self.ps = PlotStrings(
@@ -28,9 +21,22 @@ class Aliasing:
             ylab   = 'Cache Sets',
             suffix = '_plot-06-aliasing',
             subtit = 'transparent is better')
+        self.i = 0
+        self.X = shared_X if shared_X is not None else \
+            [i for i in range(st.map.time_size)]
+
+        self.hue = hue
+
+        self.time_window = deque()
+        self.time_window_max_size = st.cache.asso * st.cache.num_sets
+        self.set_counters = [0] * st.cache.num_sets
+        self.aliasing = [[0] * len(self.X) for _ in range(st.cache.num_sets)]
+
         return
 
     def fetch(self, set_index, access_time):
+        if not self.enabled:
+            return
         """Update the Set counters"""
         # append access to queue
         self.time_window.append((set_index,access_time))
@@ -43,6 +49,8 @@ class Aliasing:
         return
 
     def commit(self, time):
+        if not self.enabled:
+            return
         curr_time = self.time_window[-1][1]
         tot_fetch = sum(self.set_counters)
         for i in range(st.cache.num_sets):
@@ -50,13 +58,13 @@ class Aliasing:
         return
 
     def describe(self, ind=''):
+        if not self.enabled:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
-
     def plot(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcode not in st.plot.include:
+        if not self.enabled:
             return
 
         # create two set of axes: for the map (bottom) and the tool

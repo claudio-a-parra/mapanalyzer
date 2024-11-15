@@ -3,14 +3,29 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette, AddrFmt
+from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette, AddrFmt
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import sub_resolution_between
 
 class Personality:
     def __init__(self, shared_X=None, hue=220):
+        self.name = 'Block Pers Adopt'
+        self.plotcode = 'BPA'
+        self.enabled = self.plotcode in st.plot.include
+        if not self.enabled:
+            return
+        self.about = ('Trace of Block Personality Adoption by the lines of each set.')
+
+        self.ps = PlotStrings(
+            title  = 'BPA',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Memory Blocks',
+            suffix = '_plot-08-personality',
+            subtit = '')
+
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
+
         self.tool_palette = Palette(hue=hue,
                                     hue_count=st.cache.num_sets,
                                     lightness=st.plot.pal_lig,
@@ -41,16 +56,6 @@ class Personality:
         # to setup the size of the matrix on the plot
         self.mat_extent = [0,0,0,0]
 
-        self.name = 'Blk Pers. Adopt.'
-        self.plotcode = 'BPA'
-        self.about = ('Trace of Block Personality Adoption by the lines of each set.')
-
-        self.ps = PlotStrings(
-            title  = 'BPA',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Memory Blocks',
-            suffix = '_plot-08-personality',
-            subtit = '')
         return
 
 
@@ -79,6 +84,8 @@ class Personality:
         return
 
     def update(self, time, set_idx, tag_in, tag_out):
+        if not self.enabled:
+            return
         # if a block is being evicted...
         if tag_out is not None:
             # recall its time_in, and register its living time in the Block Access Matrix (bam)
@@ -103,10 +110,14 @@ class Personality:
         return
 
     def commit(self, time):
+        if not self.enabled:
+            return
         # this tool doesn't need to do anything at the end of each time step.
         return
 
     def describe(self, ind=''):
+        if not self.enabled:
+            return
         print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
         return
 
@@ -179,8 +190,7 @@ class Personality:
         return
 
     def plot(self, bottom_tool=None):
-        # only plot if requested
-        if self.plotcode not in st.plot.include:
+        if not self.enabled:
             return
 
         # create two set of axes: for the map (bottom) and the tool
@@ -208,14 +218,7 @@ class Personality:
             set_personalities = self.sets_personalities[s]
             set_times = [0 for _ in range(len(set_personalities)*3)]
             set_blocks = [0 for _ in range(len(set_personalities)*3)]
-            # set_times_from = [0 for _ in set_personalities]
-            # set_times_to = [0 for _ in set_personalities]
-            # set_block_from = [0 for _ in set_personalities]
-            # set_block_to = [0 for _ in set_personalities]
             for i,p in enumerate(set_personalities):
-                # p[0] change time
-                # p[1] from-block
-                # p[2] to-block
                 ii = 3*i
                 set_times[ii], set_times[ii+1], set_times[ii+2] = p[0], p[0]+1, None
                 set_blocks[ii], set_blocks[ii+1], set_blocks[ii+2] = p[1], p[2], None
@@ -230,6 +233,7 @@ class Personality:
         cmap = ListedColormap(color_map_list) # define color map
         # draw blocks
         self.axes.imshow(self.block_access_matrix, cmap=cmap, origin='lower',
+                         interpolation='none',
                          aspect='auto', zorder=2, extent=self.mat_extent,
                          vmin=-1, vmax=st.cache.num_sets-1)
         # draw time jumps
@@ -264,6 +268,7 @@ class Personality:
 
             # draw blocks
             self.axes.imshow(self.block_access_matrix, cmap=cmap, origin='lower',
+                             interpolation='none',
                              aspect='auto', zorder=2, extent=self.mat_extent,
                              vmin=-1, vmax=st.cache.num_sets-1)
             # draw jumps

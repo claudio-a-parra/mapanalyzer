@@ -20,12 +20,12 @@ class Tools:
         self.cost = Cost(shared_X=self.map.X)
         self.usage = CacheUsage(shared_X=self.map.X)
         self.aliasing = Aliasing(shared_X=self.map.X)
-        self.siu = SIUEviction(shared_X=self.map.X)
         self.perso = Personality(shared_X=self.map.X)
+        self.siu = SIUEviction(shared_X=self.map.X)
 
         # list of all tools
         self.tools_list = [self.map, self.locality, self.hitmiss,
-                           self.cost, self.usage, self.aliasing, self.siu, self.perso]
+                           self.cost, self.usage, self.aliasing, self.perso, self.siu]
 
         st.plot.ui_name_hpad = max([len(t.name)+1 for t in self.tools_list])
         return

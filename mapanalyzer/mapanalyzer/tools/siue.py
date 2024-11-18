@@ -1,6 +1,7 @@
 import sys
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+import numpy as np
 
 
 from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette, AddrFmt
@@ -10,14 +11,14 @@ from mapanalyzer.util import sub_resolution_between
 class SIUEviction:
     def __init__(self, shared_X=None, hue=220):
         self.name = 'SIU Evictions'
-        self.plotcode = 'SIU'
+        self.plotcode = 'SIUE'
         self.enabled = self.plotcode in st.plot.include
         if not self.enabled:
             return
         self.about = ('Detects blocks that are evicted and fetched back in a short time.')
 
         self.ps = PlotStrings(
-            title  = 'SIU',
+            title  = 'SIUE',
             xlab   = 'Time [access instr.]',
             ylab   = 'Memory Blocks',
             suffix = '_plot-07-siu-evictions',
@@ -28,9 +29,9 @@ class SIUEviction:
 
         self.tool_palette = Palette(hue=hue,
                                     hue_count=st.cache.num_sets,
-                                    lightness=st.plot.pal_lig,
-                                    saturation=st.plot.pal_sat,
-                                    alpha=[100,20])#st.plot.pal_alp)
+                                    lightness=st.plot.pal_lig + [70],
+                                    saturation=[50,75,100], #st.plot.pal_sat + [100],
+                                    alpha=[90,30,100]) #st.plot.pal_alp)
 
         # map with the currently cached blocks and the time they were cached.
         # Used to recollect time_in when a block is evicted, so the interval of time it
@@ -326,15 +327,90 @@ class SIUEviction:
         # PLOT HISTOGRAM OF SIU EVICTIONS OF ALL SETS IN ONE IMAGE
         # create a set of axes for the histogram
         fig,self.axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+
+        # define the labels and colors for each set in the histogram
         hist_labels = [str(s) for s in range(st.cache.num_sets)]
         hist_colors = [self.tool_palette[i][0] for i in range(st.cache.num_sets)]
-        counts, bin_edges, patches = self.axes.hist(all_dead_intervals,
-                                                    stacked=True, zorder=3,
-                                                    bins=st.plot.hist_bins,
-                                                    label=hist_labels, color=hist_colors)
+
+        # Prepare data for histogram plotting:
+        #   max_dead_interval : this value +1 is the right edge of the rightmost bin.
+        #   avg_dead_interval : array with the avg dead_interval per Set.
+        max_dead_interval = 0
+        avg_dead_intervals = [0 for _ in all_dead_intervals]
+        for i,set_d_intr in enumerate(all_dead_intervals):
+            if len(set_d_intr) > 0:
+                avg_dead_intervals[i] = sum(set_d_intr)/len(set_d_intr)
+                max_dead_this_set = max(set_d_intr)
+                if max_dead_interval < max_dead_this_set:
+                    max_dead_interval = max_dead_this_set
+
+        # Create bins for histogram plotting (bin_edges)
+        #   Create bins up to 2^b in "half" exponential fashion:
+        #   0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64....
+        b = 15
+        bin_right_edges = [1] * (2*b+1)
+        for i in range(1,b+1):
+            bin_right_edges[2*i-1] = 2**i
+            bin_right_edges[2*i] = 2**i + 2**(i-1)
+
+        #   If the max_dead_interval is greater than 2^14+2^13, then create a last
+        #   bin at the end so that all the info is contained in some bin.
+        if bin_right_edges[-1] < max_dead_interval:
+            bin_right_edges += [max_dead_interval+1]
+        bin_edges = [0] + bin_right_edges
+
+
+        # [!] Bins are of different width. So columns would be narrow on the left, and wide
+        # on the right. Normalize the histogram by creating a new dataset with a linear
+        # distribution.
+        # Map real dead_time values (from bins of different sizes) to linear values (to bins
+        # of same width)
+        for s in all_dead_intervals:
+            s.sort()
+        lin_all_dead_intervals = [[0] * len(sdi) for sdi in all_dead_intervals]
+        max_bin_idx_used = 0
+        for s,sdi in enumerate(all_dead_intervals):
+            bin_idx = 0
+            for sdi_idx,d in enumerate(sdi):
+                while d >= bin_edges[bin_idx]:
+                    bin_idx += 1
+                lin_all_dead_intervals[s][sdi_idx] = bin_idx-1
+            # determine the last used bin to trim the right side of the histogram
+            if bin_idx > max_bin_idx_used:
+                max_bin_idx_used = bin_idx
+
+        # Define the linear edges used by the histogram
+        lin_bin_edges = list(range(max_bin_idx_used+1))
+
+        # Plot histogram
+        counts, _, _ = self.axes.hist(lin_all_dead_intervals, stacked=True, zorder=3,
+                                      width=0.95,
+                                      bins=lin_bin_edges,
+                                      label=hist_labels,
+                                      color=hist_colors)
+
+        # map averages to linear values within each bin.
+        lin_avg_dead_intervals = [0 for _ in avg_dead_intervals]
+        for s,s_avg_di in enumerate(avg_dead_intervals):
+            be_idx = 0
+            while bin_edges[be_idx] < s_avg_di:
+                be_idx += 1
+            s_lin_avg_int = be_idx - 1
+            s_lin_ang_frac = (s_avg_di - bin_edges[be_idx-1])/(bin_edges[be_idx] - bin_edges[be_idx-1])
+            lin_avg_dead_intervals[s] = s_lin_avg_int + s_lin_ang_frac
+
+        # Plot averages
+        avg_hist_colors = [self.tool_palette[i][2] for i in range(st.cache.num_sets)]
+        for l_s_avg,s_avg_col in zip(lin_avg_dead_intervals, avg_hist_colors):
+            self.axes.axvline(x=l_s_avg, color='#000000CC', linestyle='solid', linewidth=4, zorder=3)
+            self.axes.axvline(x=l_s_avg, color=s_avg_col, linestyle='solid', linewidth=3, zorder=3)
+
         # configure axes
-        max_count = max(sum(counts))
-        self.plot_setup_axes_for_hist(max_count, bin_edges[-1])
+        self.plot_setup_axes_for_hist(
+            max_count=max(max(i) for i in counts),
+            x_ticks=lin_bin_edges,
+            x_ticks_labels=bin_edges
+        )
         self.plot_setup_general(variant=f'Time to re-fetch', subtit='Right-skewed is better')
 
         # save image
@@ -342,29 +418,31 @@ class SIUEviction:
         return
 
 
-    def plot_setup_axes_for_hist(self, max_count, max_bin):
+    def plot_setup_axes_for_hist(self, max_count, x_ticks, x_ticks_labels):
+        # bring spines to top:
+        for spine in self.axes.spines.values():
+            spine.set_zorder(4)
+
         # X-AXIS
         X_min = 1
-        X_max = round(max_bin+0.5)
-        if st.plot.hist_max != 'auto':
-            X_max = st.plot.hist_max
-        X_padding = 0.5
+        X_max = round(x_ticks[-1])
+        X_padding = (X_max-X_min)/200
+        # set ticks and their labels
+        self.axes.set_xticks(x_ticks)
+        self.axes.set_xticklabels(x_ticks_labels[:len(x_ticks)])
         self.axes.set_xlim(X_min-X_padding, X_max+X_padding)
-
         # Axis details: label, ticks, and grid
         self.axes.set_xlabel('Time to re-fetch')
+        rot = -90 if st.plot.x_orient == 'v' else 0
         self.axes.tick_params(axis='x',
                               bottom=True, top=False,
                               labelbottom=True, labeltop=False,
-                              width=st.plot.grid_main_width)
-        x_ticks = create_up_to_n_ticks(range(X_min, X_max+1), base=10,
-                                       n=st.plot.max_xtick_count)
-        self.axes.set_xticks(x_ticks)
+                              rotation=rot, width=st.plot.grid_main_width)
 
         # Y-AXIS
         Y_min = 0
-        Y_max = round(max_count+0.5)
-        Y_padding = 0.5
+        Y_max = round(max_count)
+        Y_padding = (Y_max-Y_min)/200
         self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
 
         # Axis details: label, ticks, and grid

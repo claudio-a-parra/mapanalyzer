@@ -8,20 +8,19 @@ from mapanalyzer.settings import Settings as st
 
 class Aliasing:
     def __init__(self, shared_X=None, hue=220):
-        self.name = 'Cache Aliasing'
-        self.plotcode = 'AD'
-        self.enabled = self.plotcode in st.plot.include
-        if not self.enabled:
-            return
-        self.about = ('Proportion in which each set fetches blocks during execution.')
-
+        self.tool_name = 'Cache Aliasing'
+        self.tool_about = ('Proportion in which each set fetches blocks during execution.')
         self.ps = PlotStrings(
             title  = 'AD',
+            code   = 'AD',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Sets',
             suffix = '_plot-06-aliasing',
-            subtit = 'transparent is better')
-        self.i = 0
+            subtit = 'transparent is better'
+        )
+        self.enabled = self.ps.code in st.plot.include
+        if not self.enabled:
+            return
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
 
@@ -60,7 +59,7 @@ class Aliasing:
     def describe(self, ind=''):
         if not self.enabled:
             return
-        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
+        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
         return
 
     def plot(self, bottom_tool=None):
@@ -103,7 +102,7 @@ class Aliasing:
         self.plot_setup_Y()
 
         # save image
-        save_fig(fig, self.plotcode, self.ps.suffix)
+        save_fig(fig, self.ps.code, self.ps.suffix)
         return
 
     def plot_setup_Y(self):

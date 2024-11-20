@@ -40,20 +40,20 @@ class ThreadHitMiss:
 
 class HitMiss:
     def __init__(self, shared_X=None, hue=0):
-        self.name = 'Miss Ratio'
-        self.plotcode = 'CMR'
-        self.enabled = self.plotcode in st.plot.include
-        if not self.enabled:
-            return
-        self.about = ('Thread-wise Cache Miss Ratio on the last memory '
+        self.tool_name = 'Miss Ratio'
+        self.tool_about = ('Thread-wise Cache Miss Ratio on the last memory '
                       'accesses.')
-
         self.ps = PlotStrings(
             title  = 'CMR',
+            code   = 'CMR',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Miss Ratio [%]',
             suffix = '_plot-03-miss-ratio',
-            subtit = 'lower is better')
+            subtit = 'lower is better'
+        )
+        self.enabled = self.ps.code in st.plot.include
+        if not self.enabled:
+            return
 
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
@@ -99,7 +99,7 @@ class HitMiss:
     def describe(self, ind=''):
         if not self.enabled:
             return
-        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
+        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
         return
 
     def plot_setup_X(self):
@@ -128,9 +128,9 @@ class HitMiss:
         # define Y-axis data range based on data and user input
         Y_min = 0
         Y_max = 100
-        if self.plotcode in st.plot.y_ranges:
-            Y_min = int(st.plot.y_ranges[self.plotcode][0])
-            Y_max = int(st.plot.y_ranges[self.plotcode][1])
+        if self.ps.code in st.plot.y_ranges:
+            Y_min = int(st.plot.y_ranges[self.ps.code][0])
+            Y_max = int(st.plot.y_ranges[self.ps.code][1])
         Y_padding = (Y_max - Y_min)/200
         self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
 
@@ -226,5 +226,5 @@ class HitMiss:
         self.plot_setup_general()
 
         # save image
-        save_fig(fig, self.plotcode, self.ps.suffix)
+        save_fig(fig, self.ps.code, self.ps.suffix)
         return

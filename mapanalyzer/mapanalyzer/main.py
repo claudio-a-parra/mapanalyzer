@@ -117,6 +117,15 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
+        '-xr', '--x-ranges', metavar='XRANGES', dest='x_ranges', type=str, default='',
+        help=("Set a manual range for the X-axis. Useful to compare several "
+              "individually produced plots.\n"
+              "Given that TLD is rotated, XRANGE actually restrict the Y axis."
+              "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
+              "Example: 'TLD:10:20,CMR:0:310,CMMA:1000:2000'")
+    )
+
+    parser.add_argument(
         '-yr', '--y-ranges', metavar='YRANGES', dest='y_ranges', type=str, default='',
         help=("Set a manual range for the Y-axis. Useful to compare several "
               "individually produced plots.\n"
@@ -153,6 +162,8 @@ def main():
         st.map.describe(ind='    ')
 
         print(f'\nCREATING TOOLS AND MEMORY SYSTEM')
+        # print('[!] forcing all plots')
+        # args.plotcodes = 'all'
         st.init_plot(
             width = args.plot_width,
             height = args.plot_height,
@@ -162,6 +173,7 @@ def main():
             prefix = os.path.basename(os.path.splitext(map_filename)[0]),
             include_plots = args.plotcodes,
             x_orient = args.x_orient,
+            x_ranges = args.x_ranges,
             y_ranges = args.y_ranges,
             data_X_size = st.map.time_size,
             data_Y_size = st.map.num_padded_bytes

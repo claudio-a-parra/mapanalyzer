@@ -108,17 +108,19 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
 
 def save_fig(fig, plotcode, plot_name_suffix):
     filename=f'{st.plot.prefix}{plot_name_suffix}.{st.plot.format}'
-    print(f'    {plotcode:{st.plot.ui_plotname_hpad}}: {filename}')
+    print(f'    {plotcode:{st.plot.ui_plotname_hpad}}: ', flush=True, end='')
     fig.savefig(filename, dpi=st.plot.dpi, bbox_inches='tight',
                 pad_inches=st.plot.img_border_pad)
+    print(f'{filename}')
     plt.close(fig)
     return
 
 
 class PlotStrings:
-    def __init__(self, title='Title', xlab='X', ylab='Y', suffix='__plot',
+    def __init__(self, title='Title', code='PLT', xlab='X', ylab='Y', suffix='__plot',
                  subtit='Subtitle'):
         self.title = title
+        self.code = code
         self.xlab  = xlab
         self.ylab  = ylab
         self.suffix= suffix

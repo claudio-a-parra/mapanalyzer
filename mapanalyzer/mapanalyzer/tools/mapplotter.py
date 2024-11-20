@@ -10,17 +10,19 @@ from mapanalyzer.util import sub_resolution_between
 
 class Map:
     def __init__(self, hue=120):
-        self.name = 'M. A. Pattern'
-        self.plotcode = 'MAP'
-        self.enabled = True # always enabled
-        self.standalone_plot = self.plotcode in st.plot.include
-        self.about = 'Visual representation of the Memory Access Pattern.'
+        self.tool_name = 'M. A. Pattern'
+        self.tool_about = 'Visual representation of the Memory Access Pattern.'
         self.ps = PlotStrings(
             title = 'MAP',
+            code = 'MAP',
             xlab   = 'Time [access instr.]',
             ylab   = 'Space [bytes]',
             suffix = '_plot-00-map',
-            subtit = None)
+            subtit = None
+        )
+
+        self.enabled = True # always enabled
+        self.standalone_plot = self.ps.code in st.plot.include
 
         self.tool_palette = Palette(hue=hue)
         self.X = [i for i in range(st.map.time_size)]
@@ -41,7 +43,7 @@ class Map:
     def describe(self, ind=''):
         if not self.standalone_plot:
             return
-        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
+        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
         return
 
     def add_access(self, access):
@@ -146,7 +148,7 @@ class Map:
             self.plot_draw_X_grid(draw_X_grid)
             self.plot_setup_Y_axis()
             self.plot_draw_Y_grid(draw_Y_grid)
-            save_fig(fig, self.plotcode , self.ps.suffix)
+            save_fig(fig, self.ps.code , self.ps.suffix)
         else:
             self.axes.set_xticks([])
             self.axes.set_yticks([])

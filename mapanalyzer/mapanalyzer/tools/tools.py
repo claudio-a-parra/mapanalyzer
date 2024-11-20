@@ -27,7 +27,7 @@ class Tools:
         self.tools_list = [self.map, self.locality, self.hitmiss,
                            self.cost, self.usage, self.aliasing, self.perso, self.siu]
 
-        st.plot.ui_name_hpad = max([len(t.name)+1 for t in self.tools_list])
+        st.plot.ui_name_hpad = max([len(t.tool_name)+1 for t in self.tools_list])
         return
 
     def describe(self, ind='    '):

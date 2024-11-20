@@ -240,7 +240,7 @@ class MapSpecs:
 
 class PlotSpecs:
     def __init__(self, width, height, dpi, max_res, format, prefix, include_plots,
-                 x_orient, y_ranges, data_X_size, data_Y_size):
+                 x_orient, x_ranges, y_ranges, data_X_size, data_Y_size):
         # Image to export
         self.width = width # image width
         self.height = height # image height
@@ -258,7 +258,8 @@ class PlotSpecs:
         self.include = self.init_include_plots(include_plots)
 
         # Plots Axes
-        self.y_ranges = self.init_y_ranges(y_ranges)
+        self.x_ranges = self.init_ranges(x_ranges)
+        self.y_ranges = self.init_ranges(y_ranges)
         self.max_xtick_count = 11
         self.max_ytick_count = 11
         self.max_map_ytick_count = 11
@@ -338,19 +339,22 @@ class PlotSpecs:
                     print(f'Warning: Unknown plotcode "{up}".')
         return including
 
-    def init_y_ranges(self, y_ranges_str):
-        user_ranges = [r.strip() for r in y_ranges_str.upper().split(',')]
+    def init_ranges(self, ranges_str):
+        user_ranges = [r.strip() for r in ranges_str.upper().split(',')]
         ranges = dict()
         if user_ranges and 'FULL' not in user_ranges:
             for ran in user_ranges:
                 try:
-                    plcod, min_val, max_val = ran.split(':')
+                    plcode, min_val, max_val = ran.split(':')
                     min_val = float(min_val)
                     max_val = float(max_val)
                 except ValueError:
-                    print(f'Error: Y-Range with wrong format "{ran}".')
+                    print(f'Error: Range with wrong format "{ran}".')
                     exit(1)
-                ranges[plcod] = (min_val, max_val)
+                if min_val >= max_val:
+                    print(f'Error: Range min:{min_val} >= max:{max_val}.')
+                    exit(1)
+                ranges[plcode] = (min_val, max_val)
         return ranges
 
     def __str__(self):
@@ -380,7 +384,8 @@ class Settings:
         'CUR': 'Cache Usage Ratio',
         'AD': 'Aliasing Density',
         'BPA': 'Block Personality Adoption',
-        'SIUE': 'Still-in-Use Evictions'
+        'SIUE': 'Still-in-Use Evictions',
+        'SIUE-H': 'Still-in-Use Evictions (Histogram)'
     }
     verb = False
 
@@ -409,9 +414,9 @@ class Settings:
 
     @classmethod
     def init_plot(cls, width, height, dpi, max_res, format, prefix, include_plots,
-                  x_orient, y_ranges, data_X_size, data_Y_size):
+                  x_orient, x_ranges, y_ranges, data_X_size, data_Y_size):
         cls.plot = PlotSpecs(width, height, dpi, max_res, format, prefix, include_plots,
-                             x_orient, y_ranges, data_X_size, data_Y_size)
+                             x_orient, x_ranges, y_ranges, data_X_size, data_Y_size)
 
         return
 

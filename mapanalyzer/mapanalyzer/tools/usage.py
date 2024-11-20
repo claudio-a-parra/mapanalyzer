@@ -7,19 +7,19 @@ from mapanalyzer.settings import Settings as st
 
 class CacheUsage:
     def __init__(self, shared_X=None, hue=120):
-        self.name = 'Cache Usage Rate'
-        self.plotcode = 'CUR'
-        self.enabled = self.plotcode in st.plot.include
-        if not self.enabled:
-            return
-        self.about = ('Percentage of valid bytes in cache that are used before eviction.')
-
+        self.tool_name = 'Cache Usage Rate'
+        self.tool_about = ('Percentage of valid bytes in cache that are used before eviction.')
         self.ps = PlotStrings(
             title  = 'CUR',
+            code   = 'CUR',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Usage Rate [%]',
             suffix = '_plot-05-usage',
-            subtit = 'higher is better')
+            subtit = 'higher is better'
+        )
+        self.enabled = self.ps.code in st.plot.include
+        if not self.enabled:
+            return
 
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
@@ -50,7 +50,7 @@ class CacheUsage:
     def describe(self, ind=''):
         if not self.enabled:
             return
-        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
+        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
         return
 
     def plot_setup_X(self):
@@ -79,9 +79,9 @@ class CacheUsage:
         # define Y-axis data range based on data and user input
         Y_min = 0
         Y_max = 100
-        if self.plotcode in st.plot.y_ranges:
-            Y_min = int(st.plot.y_ranges[self.plotcode][0])
-            Y_max = int(st.plot.y_ranges[self.plotcode][1])
+        if self.ps.code in st.plot.y_ranges:
+            Y_min = int(st.plot.y_ranges[self.ps.code][0])
+            Y_max = int(st.plot.y_ranges[self.ps.code][1])
         Y_padding = (Y_max - Y_min)/200
         self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
         # add tails at start/end of Y for cosmetic purposes.
@@ -151,5 +151,5 @@ class CacheUsage:
         self.plot_setup_general()
 
         # save image
-        save_fig(fig, self.plotcode, self.ps.suffix)
+        save_fig(fig, self.ps.code, self.ps.suffix)
         return

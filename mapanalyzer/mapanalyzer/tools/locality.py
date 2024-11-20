@@ -8,16 +8,30 @@ from mapanalyzer.settings import Settings as st
 
 class Locality:
     def __init__(self, shared_X=None, hue=325):
-        self.name = 'Locality'
-        self.plotcodeLs = 'SLD'
-        self.plotcodeLt = 'TLD'
-        self.enabledLs = self.plotcodeLs in st.plot.include
-        self.enabledLt = self.plotcodeLt in st.plot.include
+        self.tool_name = 'Locality'
+        self.tool_about = ('Spacial and Temporal Locality Degree.')
+        self.psLs = PlotStrings(
+            title  = 'SLD',
+            code   = 'SLD',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Spacial Locality Degree',
+            suffix = '_plot-01-locality-Ls',
+            subtit = ''
+        )
+        self.psLt = PlotStrings(
+            title  = 'TLD',
+            code   = 'TLD',
+            xlab   = 'Temporal Locality Degree',
+            ylab   = 'Space [blocks]',
+            suffix = '_plot-02-locality-Lt',
+            subtit = ''
+        )
+        self.enabledLs = self.psLs.code in st.plot.include
+        self.enabledLt = self.psLt.code in st.plot.include
         self.enabled = self.enabledLs or self.enabledLt
         if not self.enabled:
             return
 
-        self.about = ('Spacial and Temporal Locality Degree.')
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
         # line and filling colors
@@ -38,24 +52,10 @@ class Locality:
         self.tw_byte_count_max = st.cache.cache_size
         # Spatial Locality vector
         self.Ls = [0] * st.map.time_size
-        self.psLs = PlotStrings(
-            title  = 'SLD',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Spacial Locality Degree',
-            suffix = '_plot-01-locality-Ls',
-            subtit = '')
-            # subtit = 'higher is better')
 
         ## TEMPORAL LOCALITY ACROSS SPACE
         self.space_by_blocks = {} #block->list of block access times
         self.Lt = [0] * st.map.num_blocks
-        self.psLt = PlotStrings(
-            title  = 'TLD',
-            xlab   = 'Temporal Locality Degree',
-            ylab   = 'Space [blocks]',
-            suffix = '_plot-02-locality-Lt',
-            subtit = '')
-            # subtit = 'higher is better')
         return
 
     def add_access(self, access):
@@ -160,7 +160,7 @@ class Locality:
     def describe(self, ind=''):
         if not self.enabled:
             return
-        print(f'{ind}{self.name:{st.plot.ui_toolname_hpad}}: {self.about}')
+        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
         return
 
     def plotLs_setup_X(self):
@@ -189,9 +189,9 @@ class Locality:
         # define Y-axis data range based on data and user input
         Y_min = 0
         Y_max = 1
-        if self.plotcodeLs in st.plot.y_ranges:
-            Y_min = st.plot.y_ranges[self.plotcodeLs][0]
-            Y_max = st.plot.y_ranges[self.plotcodeLs][1]
+        if self.psLs.code in st.plot.y_ranges:
+            Y_min = st.plot.y_ranges[self.psLs.code][0]
+            Y_max = st.plot.y_ranges[self.psLs.code][1]
         Y_padding = (Y_max - Y_min)/200
         self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
         # add tails at start/end of Y for cosmetic purposes.
@@ -259,7 +259,7 @@ class Locality:
         self.plot_setup_general(self.psLs)
 
         # save image
-        save_fig(fig, self.plotcodeLs, self.psLs.suffix)
+        save_fig(fig, self.psLs.code, self.psLs.suffix)
         return
 
     def plotLt_setup_Y(self, block_sep_color=None):
@@ -304,9 +304,9 @@ class Locality:
         # define Y-axis data range based on data and user input
         X_min = 0
         X_max = 1
-        if self.plotcodeLt in st.plot.y_ranges:
-            X_min = st.plot.y_ranges[self.plotcodeLt][0]
-            X_max = st.plot.y_ranges[self.plotcodeLt][1]
+        if self.psLt.code in st.plot.y_ranges:
+            X_min = st.plot.y_ranges[self.psLt.code][0]
+            X_max = st.plot.y_ranges[self.psLt.code][1]
         X_padding = (X_max - X_min)/200
         self.axes.set_xlim(X_min-X_padding, X_max+X_padding)
         # add tails at start/end of X for cosmetic purposes.
@@ -370,7 +370,7 @@ class Locality:
         self.plot_setup_general(self.psLt)
 
         # save image
-        save_fig(fig, self.plotcodeLt, self.psLt.suffix)
+        save_fig(fig, self.psLt.code, self.psLt.suffix)
         return
 
     def plot(self, bottom_tool=None):

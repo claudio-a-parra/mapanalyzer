@@ -296,8 +296,9 @@ class PlotSpecs:
         self.min_res,self.max_res = self.init_map_resolution(width, height, dpi, max_res)
         self.fade_bytes_alpha=0.1 # fading of bytes out-of-range to complete the block
 
-        # Specific of SIU
-        self.dead_line_width = max(0.3,min(3,400*(height/data_Y_size)))
+        # Specific of Eviction Duration
+        self.dead_line_width = 2  #max(0.3,min(3,400*(height/data_Y_size)))
+        self.alive_line_width = 5 #max(0.3,min(3,400*(height/data_Y_size)))
 
         # Specific of Personality
         self.jump_line_width = max(0.2,min(3,12*(width/data_X_size)))
@@ -333,6 +334,7 @@ class PlotSpecs:
         if user_plotcodes and 'ALL' not in user_plotcodes:
             including = set()
             for up in user_plotcodes:
+                print(f'user_plotcode:{up}')
                 if up in Settings.PLOTCODES:
                     including.add(up)
                 else:
@@ -383,9 +385,9 @@ class Settings:
         'CMMA': 'Cumulative Main Memory Access',
         'CUR': 'Cache Usage Ratio',
         'AD': 'Aliasing Density',
+        'ED': 'Eviction Duration',
         'BPA': 'Block Personality Adoption',
-        'SIUE': 'Still-in-Use Evictions',
-        'SIUE-H': 'Still-in-Use Evictions (Histogram)'
+        'EDH': 'Eviction Duration Histogram',
     }
     verb = False
 

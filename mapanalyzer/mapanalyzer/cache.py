@@ -141,8 +141,7 @@ class Cache:
                 # handle potentially evicted block
                 evicted_block = self.sets[set_index].push_block(fetched_block)
                 tag_out = None if evicted_block is None else evicted_block.tag
-                self.tools.siu.update(access.time, set_index, p_tag, tag_out)
-                self.tools.perso.update(access.time, set_index, p_tag, tag_out)
+                self.tools.evicd.update(access.time, set_index, p_tag, tag_out)
                 if evicted_block is not None:
                     # EVICTION
                     del self.blocks_in_cache[(evicted_block.tag,set_index)]
@@ -181,8 +180,7 @@ class Cache:
             tag_out = None if evicted_block is None else evicted_block.tag
             while evicted_block is not None:
                 tag_out = evicted_block.tag
-                self.tools.siu.update(st.map.time_size, set_idx, None, tag_out)
-                self.tools.perso.update(st.map.time_size, set_idx, None, tag_out)
+                self.tools.evicd.update(st.map.time_size, set_idx, None, tag_out)
                 #self.tools.usage.update()
                 if evicted_block.dirty:
                     self.tools.cost.add_access('w')

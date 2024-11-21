@@ -72,8 +72,8 @@ class Map:
                       f'{access.size},{addr-st.map.left_pad}')
                 exit(1)
             # get percentage (from first to last possible address or time)
-            max_real_addr = st.map.num_padded_bytes - 1
-            max_real_time = st.map.time_size - 1
+            max_real_addr = max(1, st.map.num_padded_bytes - 1)
+            max_real_time = max(1, st.map.time_size - 1)
             propor_addr = addr / max_real_addr
             propor_time = time / max_real_time
 

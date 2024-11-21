@@ -8,8 +8,8 @@ from mapanalyzer.tools.hitmiss import HitMiss
 from mapanalyzer.tools.cost import Cost
 from mapanalyzer.tools.usage import CacheUsage
 from mapanalyzer.tools.alias import Aliasing
-from mapanalyzer.tools.siue import SIUEviction
-from mapanalyzer.tools.personality import Personality
+from mapanalyzer.tools.eviction import EvictionDuration
+#from mapanalyzer.tools.person import Personality
 
 class Tools:
     def __init__(self):
@@ -20,12 +20,11 @@ class Tools:
         self.cost = Cost(shared_X=self.map.X)
         self.usage = CacheUsage(shared_X=self.map.X)
         self.aliasing = Aliasing(shared_X=self.map.X)
-        self.perso = Personality(shared_X=self.map.X)
-        self.siu = SIUEviction(shared_X=self.map.X)
+        self.evicd = EvictionDuration(shared_X=self.map.X)
 
         # list of all tools
         self.tools_list = [self.map, self.locality, self.hitmiss,
-                           self.cost, self.usage, self.aliasing, self.perso, self.siu]
+                           self.cost, self.usage, self.aliasing, self.evicd]
 
         st.plot.ui_name_hpad = max([len(t.tool_name)+1 for t in self.tools_list])
         return

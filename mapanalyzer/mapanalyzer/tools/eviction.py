@@ -201,20 +201,6 @@ class EvictionDuration:
         if not self.enabled:
             return
 
-        # create two set of axes: for the map (bottom) and the tool
-        fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        self.axes = fig.add_axes(bottom_axes.get_position())
-
-        # plot map
-        if bottom_tool is not None:
-            bottom_tool.plot(axes=bottom_axes)
-
-        # setup axes
-        self.plot_setup_X(self.ps_e)
-        self.plot_setup_Y(self.ps_e)
-        self.plot_setup_general(title=self.ps_e.title, variant=f'All Sets {st.cache.asso}-way',
-                                subtit=self.ps_e.subtit)
-
         # collect the parameters to plot the dead_intervals of each block.
         dead_intervals_per_set = {}
         dead_palette = Palette(hue=self.hue, hue_count=st.cache.num_sets,
@@ -274,7 +260,8 @@ class EvictionDuration:
         # collect the parameters to plot the jumps of each set.
         personalities_per_set = {} # set_idx -> plot parameters for all the jumps made by that set on its blocks
         perso_palette = Palette(hue=self.hue, hue_count=st.cache.num_sets,
-                                lightness=[80], saturation=[75], alpha=[30])
+                                #lightness=[80], saturation=[75], alpha=[30])
+                                lightness=[60], saturation=[50], alpha=[90])
         for s in range(st.cache.num_sets):
             set_color = perso_palette[s][0]
             set_personalities = self.sets_personalities[s]
@@ -305,9 +292,23 @@ class EvictionDuration:
         if self.ps_e.code in st.plot.include:
             ##############################################################
             # PLOT THE EVICTION DURATION OF ALL SETS IN ONE IMAGE
-            plt_w,plt_h = self.get_plot_xy_size(fig)
+            # create two set of axes: for the map (bottom) and the tool
+            fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
+            self.axes = fig.add_axes(bottom_axes.get_position())
+
+            # plot map
+            if bottom_tool is not None:
+                bottom_tool.plot(axes=bottom_axes)
+
+            # setup axes
+            self.plot_setup_X(self.ps_e)
+            self.plot_setup_Y(self.ps_e)
+            self.plot_setup_general(title=self.ps_e.title,
+                                    variant=f'All Sets',
+                                    subtit=self.ps_e.subtit)
 
             # draw all alive_intervals
+            plt_w,plt_h = self.get_plot_xy_size(fig)
             alive_linewidth = round(plt_h / st.map.num_blocks, 4)
             for s,ai in sorted(alive_intervals_per_set.items()):
                 self.axes.hlines(y=ai['y'], color=ai['col'],
@@ -343,7 +344,7 @@ class EvictionDuration:
                 self.plot_setup_X(self.ps_e)
                 self.plot_setup_Y(self.ps_e)
                 self.plot_setup_general(title=self.ps_e.title,
-                                        variant=f'S{s} {st.cache.asso}-way',
+                                        variant=f'S{s}',
                                         subtit=self.ps_e.subtit)
 
                 # draw dead intervals
@@ -383,14 +384,16 @@ class EvictionDuration:
             # setup axes
             self.plot_setup_X(self.ps_p)
             self.plot_setup_Y(self.ps_p)
-            self.plot_setup_general(title=self.ps_p.title, variant=f'All Sets {st.cache.asso}-way',
+            self.plot_setup_general(title=self.ps_p.title,
+                                    variant=f'All Sets {st.cache.asso}-way',
                                     subtit=self.ps_p.subtit)
 
             # set lines width based on plot height
             plt_w,plt_h = self.get_plot_xy_size(fig)
             alive_linewidth = round(plt_h / st.map.num_blocks, 4)
-            jump_linewidth = round(max(0.5, plt_w / (st.map.time_size)), 4)
-            jump_linewidth = min(alive_linewidth/4, jump_linewidth)
+            # 0.5 <= jump_linewidth <= alive_lw/6
+            jump_linewidth = round(max(0.5, plt_w / (st.map.time_size)),4)
+            jump_linewidth = min(alive_linewidth/6, jump_linewidth)
 
             # draw all alive_intervals
             for s,ai in sorted(alive_intervals_per_set.items()):
@@ -542,9 +545,12 @@ class EvictionDuration:
             avg_hist_palette = Palette(self.hue, hue_count=st.cache.num_sets,
                                    lightness=[50], saturation=[90], alpha=[100])
             avg_hist_colors = [s_col[0] for s_col in avg_hist_palette]
+            avg_linewidth = max(1.5,self.get_plot_xy_size(fig)[0]/(20*(max_bin_idx_used+1)))
             for l_s_avg,s_avg_col in zip(lin_avg_dead_intervals, avg_hist_colors):
-                self.axes.axvline(x=l_s_avg, color='#000000CC', linestyle='solid', linewidth=1.5, zorder=3)
-                self.axes.axvline(x=l_s_avg, color=s_avg_col, linestyle='solid', linewidth=1, zorder=3)
+                self.axes.axvline(x=l_s_avg, color='#000000CC', linestyle='solid',
+                                  linewidth=avg_linewidth+0.5, zorder=3)
+                self.axes.axvline(x=l_s_avg, color=s_avg_col, linestyle='solid',
+                                  linewidth=avg_linewidth, zorder=3)
 
             # configure axes
             self.plot_setup_axes_for_hist(

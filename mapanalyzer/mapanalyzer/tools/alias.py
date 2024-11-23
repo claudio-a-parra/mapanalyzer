@@ -89,7 +89,7 @@ class Aliasing:
             ext = (self.X[0]-padding, self.X[-1]+padding, s-padding, s+padding)
             this_set_aliasing = [self.aliasing[s]]
             self.axes.imshow(this_set_aliasing, cmap=shade_cmap, origin='lower',
-                             interpolation=None, aspect='auto', extent=ext,
+                             interpolation='none', aspect='auto', extent=ext,
                              zorder=1, vmin=0, vmax=1)
 
         # set plot's limits
@@ -146,10 +146,10 @@ class Aliasing:
         self.axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
         return
 
-    def plot_draw_Y_grid(self, color='#40BF40'):
+    def plot_draw_Y_grid(self, color='#40BF40CC'):
         xmin,xmax = 0-0.5,st.map.time_size-0.5
         max_sets = st.plot.grid_max_blocks
-        block_lw = 1.5*(1 - ((st.cache.num_sets-1) / max_sets))
+        block_lw = 0.5 #1.5*(1 - ((st.cache.num_sets-1) / max_sets))
         block_sep_lines = [i-0.5 for i in range(st.cache.num_sets+1)]
         self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
                          color=color,

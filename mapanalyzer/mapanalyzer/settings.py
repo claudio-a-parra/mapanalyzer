@@ -334,7 +334,6 @@ class PlotSpecs:
         if user_plotcodes and 'ALL' not in user_plotcodes:
             including = set()
             for up in user_plotcodes:
-                print(f'user_plotcode:{up}')
                 if up in Settings.PLOTCODES:
                     including.add(up)
                 else:

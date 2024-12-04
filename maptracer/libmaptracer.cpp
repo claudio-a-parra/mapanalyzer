@@ -71,8 +71,8 @@ the application). Each thread can register up to MAX_THR_EVENTS in their trace.
 The idea is to avoid dynamic allocation. Why? because we are measuring real
 time events and if we go down to the OS to request memory at runtime, well...
 we fuck up all the measurments. */
-const UINT16 MAX_THREADS = 32;
-const UINT32 MAX_THR_EVENTS = 900000000; // 900,000,000 * 192 bytes =
+UINT16 MAX_THREADS = 8;
+const UINT32 MAX_THR_EVENTS = 90000000; // 90,000,000 * 192 bytes
 std::stringstream metadata;
 std::stringstream data;
 std::stringstream error;
@@ -655,13 +655,13 @@ int main(int argc, char **argv) {
     // Use PIN_StopApplicationThreads(), so threads stop while allocating
     // memory, avoiding strange timings due to the mallocs.
     Event *e_list;
-    for(UINT32 i=0; i<MAX_THREADS; i++){
+    for(UINT32 t=0; i<MAX_THREADS; i++){
         e_list = (Event*) malloc(MAX_THR_EVENTS * sizeof(Event));
         if(!e_list){
-            error << "Could not allocate memory for "
-                      << MAX_THREADS <<" thead logs." << std::endl;
-            Fini(1, NULL);
-            exit(1);
+            warning << "Could only allocate memory for "
+                      << t-1 <<" thread logs." << std::endl;
+            MAX_THREADS = t-1;
+            break;
         }
         thr_traces[i].list = e_list;
         thr_traces[i].size = 0;

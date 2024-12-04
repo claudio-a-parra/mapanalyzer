@@ -102,7 +102,7 @@ typedef struct {
 } MergedTrace;
 
 UINT64 basetime; // to subtract from every timestamp;
-ThreadTrace thr_traces[MAX_THREADS];
+ThreadTrace *thr_traces;
 MergedTrace merged_trace={.list=NULL,
                           .list_len=0,
                           .slice_size=INT32_MAX};
@@ -654,12 +654,19 @@ int main(int argc, char **argv) {
     // out of memory.
     // Use PIN_StopApplicationThreads(), so threads stop while allocating
     // memory, avoiding strange timings due to the mallocs.
+    thr_traces = (ThreadTrace*) calloc(MAX_THREADS, sizeof(ThreadTrace));
+    if(!thr_traces){
+        error << "Could not allocate memory for thread traces array."
+              << std::endl;
+        Fini(0, NULL);
+        exit(1);
+    }
     Event *e_list;
     for(UINT32 t=0; t<MAX_THREADS; t++){
         e_list = (Event*) malloc(MAX_THR_EVENTS * sizeof(Event));
         if(!e_list){
             warning << "Could only allocate memory for "
-                      << t-1 <<" thread logs." << std::endl;
+                    << t-1 <<" thread logs." << std::endl;
             MAX_THREADS = t-1;
             break;
         }

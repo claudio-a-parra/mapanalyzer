@@ -14,6 +14,7 @@ help:
 check_python:
 	@command -v $(PYTHON) >/dev/null 2>&1 || { echo >&2 "Python is not installed. Aborting."; exit 1; }
 	@$(PYTHON) -c 'import sys; exit(1) if sys.version_info[0] < 3 else exit(0)' || { echo >&2 "Python 3 is required. Aborting."; exit 1; }
+	python3 -m pip --version || python3 -m ensurepip --upgrade
 
 install: check_python
 	@echo "Installing package..."

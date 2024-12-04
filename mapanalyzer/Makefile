@@ -22,7 +22,7 @@ install: check_python
 
 remove: check_python
 	@echo "Uninstalling package..."
-	$(PYTHON) -m pip uninstall --user --break-system-packages -y $(PROJECT)
+	$(PYTHON) -m pip uninstall --break-system-packages -y $(PROJECT)
 
 clean:
 	rm -rf ./build ./dist ./$(PROJECT).egg-info

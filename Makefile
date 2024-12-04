@@ -17,7 +17,7 @@ install:
 	@echo -e "\n\n==================================="
 	@echo -e "  MAPTRACER"
 	@echo -e "==================================="
-	$(MAKE) -C maptracer install
+	source /etc/profile.d/pin_env_var.sh && $(MAKE) -C maptracer install
 	@echo -e "\n\n==================================="
 	@echo -e "  MAPANALIZER"
 	@echo -e "==================================="

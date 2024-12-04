@@ -18,7 +18,7 @@ check_python:
 
 install: check_python
 	@echo "Installing package..."
-	$(PYTHON) -m pip install --user .
+	$(PYTHON) -m pip install --user --break-system-packages .
 
 remove: check_python
 	@echo "Uninstalling package..."

@@ -22,6 +22,8 @@ install:
 	@echo -e "  MAPANALIZER"
 	@echo -e "==================================="
 	$(MAKE) -C mapanalyzer install
+	@echo -e "\n\n"
+	@echo -e "\033[31mLOGOUT/LOGIN or REBOOT to finish installation.\033[0m"
 
 remove:
 	$(MAKE) -C mapanalyzer remove

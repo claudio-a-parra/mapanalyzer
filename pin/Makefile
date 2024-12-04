@@ -2,6 +2,9 @@ VERSION := 3.30-98830-g1d7b601b3-gcc-linux
 PIN_WEBSITE := https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-binary-instrumentation-tool-downloads.html
 DL_LINK := https://software.intel.com/sites/landingpage/pintool/downloads/pin-$(VERSION).tar.gz
 PIN_ENV_FILE := /etc/profile.d/pin_env_var.sh
+
+SHELL := /bin/bash
+
 .PHONY: help install remove quiet-remove download
 
 help:

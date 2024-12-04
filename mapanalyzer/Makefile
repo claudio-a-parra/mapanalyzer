@@ -2,6 +2,8 @@ PYTHON ?= python3
 SETUP_FILE = setup.py
 PROJECT = mapanalyzer
 
+SHELL := /bin/bash
+
 help:
 	@echo "TARGETS:"
 	@echo "    install : install $(PROJECT) in the system."

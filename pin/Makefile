@@ -2,7 +2,7 @@ VERSION := 3.30-98830-g1d7b601b3-gcc-linux
 PIN_WEBSITE := https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-binary-instrumentation-tool-downloads.html
 DL_LINK := https://software.intel.com/sites/landingpage/pintool/downloads/pin-$(VERSION).tar.gz
 PIN_ENV_FILE := /etc/profile.d/pin_env_var.sh
-.PHONY: help install remove
+.PHONY: help install remove quiet-remove download
 
 help:
 	@echo "DOWNLOAD PIN:"
@@ -22,11 +22,7 @@ help:
 	@echo "VARIABLES:"
 	@echo "    VERSION : ($(VERSION)) Pin version to install."
 
-install: quiet-remove
-	@if [[ ! -f ./versions/pin-$(VERSION).tar.gz ]]; then \
-		echo "Error: file './versions/pin-$(VERSION).tar.gz' does not exist." >&2 ;\
-		exit 1 ;\
-	fi
+install: quiet-remove ./versions/pin-$(VERSION).tar.gz
 	sudo mkdir -p /opt/intel
 	sudo tar -xzpf ./versions/pin-$(VERSION).tar.gz -C /opt/intel/
 	sudo ln -s /opt/intel/pin-$(VERSION) /opt/intel/pin
@@ -46,6 +42,13 @@ quiet-remove:
 
 remove: quiet-remove
 	@echo -e "\033[31mRun 'unset PIN_ROOT' in your terminal to unset the environment variable PIN_ROOT\033[0m"
+
+download: ./versions/pin-$(VERSION).tar.gz
+
+
+./versions/pin-$(VERSION).tar.gz:
+	@echo "Downloading PIN $(VERSION)"
+	wget -P ./versions $(DL_LINK)
 
 test:
 	pin -version

@@ -238,7 +238,7 @@ VOID merge_traces(void){
     // Now merge events from thr_trace[] in merged_trace[] such that they are
     // globally sorted by their timestamp
     UINT64 this_timestamp, earliest_timestamp;
-    UINT32 front[MAX_THREADS] = {0};
+    UINT32 *front = (UINT32*) calloc(MAX_THREADS, sizeof(UINT32));
     INT64 earliest_thread;
     for(UINT64 e=0; e<merged_trace.list_len; e++){
         // find the thread such that its front event is the earliest.
@@ -655,7 +655,7 @@ int main(int argc, char **argv) {
     // Use PIN_StopApplicationThreads(), so threads stop while allocating
     // memory, avoiding strange timings due to the mallocs.
     Event *e_list;
-    for(UINT32 t=0; i<MAX_THREADS; i++){
+    for(UINT32 t=0; t<MAX_THREADS; t++){
         e_list = (Event*) malloc(MAX_THR_EVENTS * sizeof(Event));
         if(!e_list){
             warning << "Could only allocate memory for "

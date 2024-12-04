@@ -670,9 +670,9 @@ int main(int argc, char **argv) {
             MAX_THREADS = t-1;
             break;
         }
-        thr_traces[i].list = e_list;
-        thr_traces[i].size = 0;
-        thr_traces[i].overflow = 0;
+        thr_traces[t].list = e_list;
+        thr_traces[t].size = 0;
+        thr_traces[t].overflow = 0;
     }
 
 

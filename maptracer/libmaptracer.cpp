@@ -73,6 +73,7 @@ time events and if we go down to the OS to request memory at runtime, well...
 we fuck up all the measurments. */
 UINT16 MAX_THREADS = 8;
 const UINT32 MAX_THR_EVENTS = 90000000; // 90,000,000 * 192 bytes
+static bool max_threads_warning_flag = false;
 std::stringstream metadata;
 std::stringstream data;
 std::stringstream error;
@@ -113,10 +114,12 @@ MergedTrace merged_trace={.list=NULL,
 void log_event(const THREADID thrid, const event_t event,
                 const UINT32 size, const ADDRINT offset){
     if(thrid > MAX_THREADS){
-        warning << "WARNING: Application tried to create more than "
-                << MAX_THREADS
-                << " threads. To do that, please change the MAX_THREADS"
-                << " constant in the mem_trace pintool.";
+        if(! max_threads_warning_flag){
+            warning << "WARNING: Application created more than "
+                    << MAX_THREADS << " threads. "
+                    << "Please change the MAX_THREADS value in libmaptracer.";
+            max_threads_warning_flag = true;
+        }
         return;
     }
     // get new log index (tail of the queue)
@@ -129,7 +132,7 @@ void log_event(const THREADID thrid, const event_t event,
     // get timestamp
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    UINT32 timestamp = (UINT32)((1000000000 * ts.tv_sec + ts.tv_nsec) - basetime);
+    UINT32 timestamp = (UINT32)(1000000000 * ts.tv_sec + ts.tv_nsec - basetime);
     // write access log
     thr_traces[thrid].list[new_log_idx] =
         (Event){timestamp,0,(UINT16)thrid,event,size,offset};
@@ -314,7 +317,7 @@ VOID merge_traces(void){
 // }
 
 /* Sets flag such that the next time the pintool calls malloc_before(),
-the size given to malloc is recorded */
+ * the size given to malloc is recorded */
 VOID action_select_next_block(){
     select_next_block = PRE_BEF_MALLOC;
 }

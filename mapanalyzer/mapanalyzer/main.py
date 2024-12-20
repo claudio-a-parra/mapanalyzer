@@ -30,8 +30,7 @@ def run_simulation(map_reader, cache, progress=True):
     for access in map_reader:
         eve_count += 1
         # collect all accesses happening at the same time mark
-        if len(concurrent_acc) == 0 or \
-           concurrent_acc[-1].time == access.time:
+        if len(concurrent_acc) == 0 or concurrent_acc[-1].time == access.time:
             concurrent_acc.append(access)
             continue
 
@@ -45,13 +44,15 @@ def run_simulation(map_reader, cache, progress=True):
         # add first access of time t
         concurrent_acc = [access]
 
-    # process all memory accesses at time t
+    # process all remaining memory accesses at time t
     eve_count += 1
     cache.multi_access(concurrent_acc)
     if progress:
         print_progress(eve_count, tot_eve)
         print()
 
+    # flush cache and commit for tools that care about
+    # eviction
     cache.flush()
     cache.tools.commit(st.map.time_size-1)
     return

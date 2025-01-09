@@ -91,28 +91,33 @@ def command_line_args_parser():
 
     parser.add_argument(
         '-pw', '--plot-width', metavar='WIDTH', dest='plot_width', type=float, default=8,
-        help="Width of the plots."
+        help=("Width of the plots.\n"
+              "Format: integer")
     )
     
     parser.add_argument(
         '-ph', '--plot-height', metavar='HEIGHT', dest='plot_height', type=float, default=4,
-        help="Height of the plots."
+        help=("Height of the plots.\n"
+              "Format: integer")
     )
     
     parser.add_argument(
         '-dp', '--dpi', metavar='DPI', dest='dpi', type=int, default=200,
-        help='Choose the DPI of the resulting plots.'
+        help=("Choose the DPI of the resulting plots.\n"
+              "Format: integer")
     )
 
     parser.add_argument(
         '-mr', '--max-res', metavar='MR', dest='max_res', type=str, default='auto',
-        help='The maximum resolution at which to show MAP.'
+        help=("The maximum resolution at which to show MAP.\n"
+              "Format: integer | 'auto'")
     )
 
     parser.add_argument(
         '-pl', '--plots', metavar='PLOTCODES', dest='plotcodes', type=str, default='all',
         help=("Plots to obtain:\n"+
-              "\n".join(f"    {code:4} : {defin}" for code, defin in st.PLOTCODES.items())+"\n"+
+              "\n".join(f"    {code:4} : {defin}" for code, defin in st.PLOTCODES.items())+"\n"
+              "    all  : Include all metrics\n"
               "Format: 'all' | PLOTCODE{,PLOTCODE}\n"
               "Example: 'MAP,CMR,CUR'")
     )
@@ -121,7 +126,7 @@ def command_line_args_parser():
         '-xr', '--x-ranges', metavar='XRANGES', dest='x_ranges', type=str, default='',
         help=("Set a manual range for the X-axis. Useful to compare several "
               "individually produced plots.\n"
-              "Given that TLD is rotated, XRANGE actually restrict the Y axis."
+              "Given that TLD is rotated, XRANGE actually restrict the Y axis.\n"
               "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
               "Example: 'TLD:10:20,CMR:0:310,CMMA:1000:2000'")
     )
@@ -130,14 +135,15 @@ def command_line_args_parser():
         '-yr', '--y-ranges', metavar='YRANGES', dest='y_ranges', type=str, default='',
         help=("Set a manual range for the Y-axis. Useful to compare several "
               "individually produced plots.\n"
-              "Given that TLD is rotated, YRANGE actually restrict the X axis."
+              "Given that TLD is rotated, YRANGE actually restrict the X axis.\n"
               "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
               "Example: 'TLD:0.3:0.7,CMR:20:30,CMMA:0:6000'")
     )
 
     parser.add_argument(
         '-xo', '--x-tick-ori', metavar='ORI', dest='x_orient', choices=['h', 'v'], default='v',
-        help="Orientation of the X-axis tick labels."
+        help=("Orientation of the X-axis tick labels.\n"
+              "Format: 'h' | 'v'")
     )
 
     parser.add_argument(

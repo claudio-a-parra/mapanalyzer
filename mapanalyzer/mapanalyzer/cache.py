@@ -1,6 +1,6 @@
 from collections import deque
 
-from mapanalyzer.util import AddrFmt, Dbg
+from mapanalyzer.util import AddrFmt
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.map_file_reader import MemAccess
 
@@ -72,15 +72,10 @@ class Cache:
         return
 
     def multi_access(self, concurrent_access):
-        Dbg.i()
         common_time = concurrent_access[0].time
-        Dbg.p()
-        Dbg.p(f'TIME: {common_time}')
-        Dbg.p(concurrent_access)
         for a in concurrent_access:
             self.access(a)
         self.tools.commit(common_time)
-        Dbg.o()
 
         return
 

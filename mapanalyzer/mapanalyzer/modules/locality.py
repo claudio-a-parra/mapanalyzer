@@ -2,7 +2,7 @@ import sys
 from collections import deque
 import matplotlib.pyplot as plt
 
-from mapanalyzer.util import AddrFmt, create_up_to_n_ticks, PlotStrings, save_fig, Palette, hsl2rgb, Dbg
+from mapanalyzer.util import AddrFmt, create_up_to_n_ticks, PlotStrings, save_fig, Palette, hsl2rgb
 from mapanalyzer.settings import Settings as st
 
 
@@ -58,17 +58,18 @@ class Locality:
         self.Lt = [0] * st.map.num_blocks
         return
 
-    def add_access(self, access):
+
+    def add_access(self, time, thread, event, size, addr):
         if not self.enabled:
             return
         ## SPACIAL LOCALITY ACROSS TIME
-        off = access.addr - st.map.start_addr
+        off = addr - st.map.start_addr
 
-        # Add access...
-        # ...to chronological queue
-        self.tw_chro_acc.append((off,access.size))
-        # ... to table of bytes
-        for b in range(off,off+access.size):
+        # Add access to:
+        # - the chronological queue
+        self.tw_chro_acc.append((off,size))
+        # - the table of bytes
+        for b in range(off,off+size):
             if b not in self.tw_byte_count:
                 self.tw_byte_count[b] = 1
             else:
@@ -87,21 +88,21 @@ class Locality:
 
         ## TEMPORAL LOCALITY ACROSS SPACE
         # get the block to which the address belongs
-        #block_id = access.addr >> st.cache.bits_off
-        blkid_start = access.addr >> st.cache.bits_off
+        #block_id = addr >> st.cache.bits_off
+        blkid_start = addr >> st.cache.bits_off
         if blkid_start not in self.space_by_blocks:
             self.space_by_blocks[blkid_start] = []
-        self.space_by_blocks[blkid_start].append(access.time)
+        self.space_by_blocks[blkid_start].append(time)
 
         # in case the reading fell between blocks, the last bytes will be
         # in the next block.
-        blkid_end = (access.addr + access.size -1) >> st.cache.bits_off
+        blkid_end = (addr + size -1) >> st.cache.bits_off
         if blkid_end == blkid_start:
             return
         if blkid_end not in self.space_by_blocks:
             self.space_by_blocks[blkid_end] = []
-        self.space_by_blocks[blkid_end].append(access.time)
-
+        self.space_by_blocks[blkid_end].append(time)
+        return
 
     def commit(self, time):
         """produce the a neighborhood from tw_byte_count's keys and add it
@@ -160,7 +161,8 @@ class Locality:
     def describe(self, ind=''):
         if not self.enabled:
             return
-        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
+        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: '
+              f'{self.tool_about}')
         return
 
     def plotLs_setup_X(self):

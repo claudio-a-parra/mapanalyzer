@@ -1,22 +1,26 @@
 #!/usr/bin/python3
 
 import sys # for command line arguments
-import os # for file extension removal
 import argparse # to get command line arguments
 
-from mapanalyzer.map_file_reader import MapFileReader
-from mapanalyzer.settings import Settings as st, CacheSpecs, PlotSpecs
-from mapanalyzer.util import AddrFmt
+from mapanalyzer.map_data_reader import MapDataReader
+from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import json_to_dict
 from mapanalyzer.cache import Cache
-from mapanalyzer.tools.tools import Tools
+from mapanalyzer.modules.modules import Modules
 
-def run_simulation(map_reader, cache, progress=True):
-    _,_,byte = AddrFmt.split(st.map.start_addr)
+def run_simulation(map_data_reader, cache):
+    """Run the simulation sending concurrent accesses to the cache
+    in batches. At the end, flush the cache and send a last commit
+    to the cache."""
+    # check cache alignment of the allocated memory
+    _,_,byte = st.AddrFmt.split(st.Map.start_addr)
     if byte != 0:
         print(f'    Allocated memory is not cache aligned. '
               f'First address is {byte} bytes into a cache line.')
 
     def print_progress(count, total):
+        """helper function to print the simulation progress"""
         print('\033[2K\r    '
               f'{(100*count/total):5.1f}% '
               f'{count:8d}/{total}'
@@ -24,130 +28,168 @@ def run_simulation(map_reader, cache, progress=True):
         sys.stdout.flush()
         return
 
-    tot_eve = st.map.event_count
+    # send batches with concurrent accesses to the cache.
+    tot_eve = st.Map.event_count
     eve_count = -1
     concurrent_acc = []
-    for access in map_reader:
+    for record in map_data_reader:
         eve_count += 1
         # collect all accesses happening at the same time mark
-        if len(concurrent_acc) == 0 or concurrent_acc[-1].time == access.time:
-            concurrent_acc.append(access)
+        if len(concurrent_acc) == 0 or concurrent_acc[-1].time == record.time:
+            concurrent_acc.append(record)
             continue
+        cache.accesses(concurrent_acc) # send all accesses from time t-1
+        print_progress(eve_count, tot_eve)
+        concurrent_acc = [record] # save first access of time t
 
-        # process all memory accesses at time t-1
-        cache.multi_access(concurrent_acc)
-
-        # print progress
-        if progress:
-            print_progress(eve_count, tot_eve)
-
-        # add first access of time t
-        concurrent_acc = [access]
-
-    # process all remaining memory accesses at time t
+    # send the remaining accesses to the cache
     eve_count += 1
-    cache.multi_access(concurrent_acc)
+    cache.accesses(concurrent_acc)
     if progress:
         print_progress(eve_count, tot_eve)
         print()
 
-    # flush cache and commit for tools that care about
-    # eviction
+    # flush cache and commit for modules that care about eviction
     cache.flush()
-    cache.tools.commit(st.map.time_size-1)
+    cache.modules.commit(st.Map.time_size-1)
     return
 
+
 def command_line_args_parser():
-    cs = CacheSpecs()
     synopsis = ('MAPalyzer, a tool to study the cache friendliness of '
                 'memory access patterns.')
     cache_conf = ('cache.conf:\n'
                   '  The cache file file must have this format:\n'
                   '\n'
                   f'   # Comments start with pound sign\n'
-                  f'   line_size_bytes     : <value> # default: {cs.line_size}\n'
-                  f'   associativity       : <value> # default: {cs.asso}\n'
-                  f'   cache_size_bytes    : <value> # default: {cs.cache_size}\n'
-                  f'   arch_size_bits      : <value> # default: {cs.arch}\n')
+                  f'   line_size_bytes     : <value> # default: '
+                  f' {st.Cache.line_size}\n'
+                  f'   associativity       : <value> # default: '
+                  f'{st.Cache.asso}\n'
+                  f'   cache_size_bytes    : <value> # default: '
+                  f'{st.Cache.cache_size}\n'
+                  f'   arch_size_bits      : <value> # default: '
+                  f'{st.Cache.arch}\n')
+
+    examples = ('Examples:\n'
+                '  mapanalyzer -- mapfile.map\n'
+                '  mapanalyzer --mode plot -- plotdata.metric\n')
+
     signature = ('By Claudio A. Parra. 2024.\n'
                  'parraca@uci.edu')
 
     parser = argparse.ArgumentParser(
         description=synopsis+'\n\n',
-        epilog=cache_conf+'\n\n'+signature,
+        epilog=cache_conf+'\n\n'+examples+'\n\n'+signature,
         formatter_class=argparse.RawTextHelpFormatter)
     
     # Adding arguments
     parser.add_argument(
-        'input_files', metavar='MAPFILE', nargs='+', type=str,
-        help='Memory Access Pattern file.'
+        metavar='INPUT-FILES', dest='input_files',
+        type=str, default=None,
+        help=('Comma-separated list of input files. Depending on the analysis '
+              '"mode", they are either "map" or "metrics".\n'
+              'Format: path/to/file.map{,path/to/another.map}\n'
+              '        path/to/file.metrics{,path/to/another.metrics}')
     )
     
     parser.add_argument(
-        '-ca', '--cache', metavar='CACHE', dest='cache', type=str,
-        default=None,
+        '-ca', '--cache', metavar='CACHE', dest='cachefile',
+        type=str, default=None,
         help='File describing the cache. See "cache.conf" section.'
     )
 
     parser.add_argument(
-        '-pw', '--plot-width', metavar='WIDTH', dest='plot_width', type=float, default=8,
+        '--mode', metavar='MODE', dest='mode',
+        choices=['simulate', 'plot', 'sim-plot', 'aggregate'],
+        type=str, default=None,
+        help=('Defines the operation mode of the tool:\n'
+              '    simulate  : Only run the cache simulation.\n'
+              '                You must provide a list of MAP files.\n'
+              '                Generates METRIC files.'
+              '    plot      : Plot already obtained metric data. One plot\n'
+              '                per input file.\n'
+              '                You must provide a list of METRIC files.\n'
+              '                Generates PLOT files.'
+              '    sim-plot  : Simulate cache and plot (default).\n'
+              '                Generates METRIC and PLOT files.'
+              '    aggregate : Plot the aggregation of multiple metric data\n'
+              '                files, aggregating the ones of the same kind.\n'
+              '                You must provide a list of METRIC files.\n'
+              )
+    )
+
+    parser.add_argument(
+        '-pw', '--plot-width', metavar='WIDTH', dest='plot_width',
+        type=float, default=None,
         help=("Width of the plots.\n"
               "Format: integer")
     )
     
     parser.add_argument(
-        '-ph', '--plot-height', metavar='HEIGHT', dest='plot_height', type=float, default=4,
+        '-ph', '--plot-height', metavar='HEIGHT', dest='plot_height',
+        type=float, default=None,
         help=("Height of the plots.\n"
               "Format: integer")
     )
     
     parser.add_argument(
-        '-dp', '--dpi', metavar='DPI', dest='dpi', type=int, default=200,
+        '-dp', '--dpi', metavar='DPI', dest='dpi',
+        type=int, default=None,
         help=("Choose the DPI of the resulting plots.\n"
               "Format: integer")
     )
 
     parser.add_argument(
-        '-mr', '--max-res', metavar='MR', dest='max_res', type=str, default='auto',
+        '-mr', '--max-res', metavar='MR', dest='max_res',
+        type=str, default=None,
         help=("The maximum resolution at which to show MAP.\n"
               "Format: integer | 'auto'")
     )
 
     parser.add_argument(
-        '-pl', '--plots', metavar='PLOTCODES', dest='plotcodes', type=str, default='all',
-        help=("Plots to obtain:\n"+
-              "\n".join(f"    {code:4} : {defin}" for code, defin in st.PLOTCODES.items())+"\n"
-              "    all  : Include all metrics\n"
-              "Format: 'all' | PLOTCODE{,PLOTCODE}\n"
-              "Example: 'MAP,CMR,CUR'")
+        '-pl', '--plots', metavar='PLOTCODES', dest='plotcodes',
+        type=str, default=None,
+        help=('Plots to obtain:\n'+
+              '\n'.join(
+                  f'    {code:4} : {defin}'
+                  for code, defin in st.Plot.PLOTCODES.items()
+              )+'\n'
+              '    all  : Include all metrics\n'
+              'Format: "all" | PLOTCODE{,PLOTCODE}\n'
+              'Example: "MAP,CMR,CUR"')
     )
 
     parser.add_argument(
-        '-xr', '--x-ranges', metavar='XRANGES', dest='x_ranges', type=str, default='',
+        '-xr', '--x-ranges', metavar='XRANGES', dest='x_ranges',
+        type=str, default=None,
         help=("Set a manual range for the X-axis. Useful to compare several "
               "individually produced plots.\n"
-              "Given that TLD is rotated, XRANGE actually restrict the Y axis.\n"
+              "Given that TLD is rotated, XRANGE restrict the Y-axis.\n"
               "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
               "Example: 'TLD:10:20,CMR:0:310,CMMA:1000:2000'")
     )
 
     parser.add_argument(
-        '-yr', '--y-ranges', metavar='YRANGES', dest='y_ranges', type=str, default='',
+        '-yr', '--y-ranges', metavar='YRANGES', dest='y_ranges',
+        type=str, default=None,
         help=("Set a manual range for the Y-axis. Useful to compare several "
               "individually produced plots.\n"
-              "Given that TLD is rotated, YRANGE actually restrict the X axis.\n"
+              "Given that TLD is rotated, YRANGE restrict the X-axis.\n"
               "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
               "Example: 'TLD:0.3:0.7,CMR:20:30,CMMA:0:6000'")
     )
 
     parser.add_argument(
-        '-xo', '--x-tick-ori', metavar='ORI', dest='x_orient', choices=['h', 'v'], default='v',
+        '-xo', '--x-tick-ori', metavar='ORI', dest='x_orient',
+        choices=['h', 'v'], default=None,
         help=("Orientation of the X-axis tick labels.\n"
               "Format: 'h' | 'v'")
     )
 
     parser.add_argument(
-        '-fr', '--format', metavar='FORMAT', dest='format', choices=['png', 'pdf'], default='png',
+        '-fr', '--format', metavar='FORMAT', dest='format',
+        choices=['png', 'pdf'], default=None,
         help=("Choose the output format of the plots.\n"
               "Format: 'pdf' | 'png'")
     )
@@ -156,46 +198,47 @@ def command_line_args_parser():
     return args
 
 def main():
+    # parse command line arguments
     args = command_line_args_parser()
-    print(f'CACHE PARAMETERS')
-    st.init_cache(args.cache)
-    AddrFmt.init(st.cache)
-    st.cache.describe(ind='    ')
+    st.set_mode(args)
+    st.Plot.from_args(args)
 
-    for map_filename in args.input_files:
-        print(f'\nMEMORY ACCESS PATTERN')
-        st.init_map(map_filename)
-        map_reader = MapFileReader()
-        st.map.describe(ind='    ')
+    # In simulation mode, a cache file is optional and at least one map file is
+    # mandatory.
+    if st.mode == 'simulate' or st.Plot.mode == 'sim-plot':
+        st.Cache.from_file(args.cachefile)
+        map_paths = [x.strip() for x in args.input_files.split(',')]
+        for map_pth in map_paths:
+            st.Map.from_file(map_pth)
+            mdr = MapDataReader(map_pth)
+            modules = Modules()
+            cache = Cache(modules=modules)
+            run_simulation(mdr, cache)
+            modules.finalize()
+            modules.export_metrics()
+            if st.Plot.mode == 'sim-plot':
+                modules.export_plots()
 
-        print(f'\nCREATING TOOLS AND MEMORY SYSTEM')
-        # print('[!] forcing all plots')
-        # args.plotcodes = 'all'
-        st.init_plot(
-            width = args.plot_width,
-            height = args.plot_height,
-            dpi = args.dpi,
-            max_res = args.max_res,
-            format = args.format,
-            prefix = os.path.basename(os.path.splitext(map_filename)[0]),
-            include_plots = args.plotcodes,
-            x_orient = args.x_orient,
-            x_ranges = args.x_ranges,
-            y_ranges = args.y_ranges,
-            data_X_size = st.map.time_size,
-            data_Y_size = st.map.num_padded_bytes
-        )
-        tools = Tools()
-        tools.describe()
-        cache = Cache(tools=tools)
+    # In plot mode, at least one metric file is mandatory.
+    elif st.mode == 'plot':
+        met_paths = [x.strip() for x in args.input_files.split(',')]
+        for met_pth in met_paths:
+            met_dict = json_to_dict(met_pth)
+            st.Cache.from_dict(met_dict['cache'])
+            st.Map.from_dict(met_dict['map'])
+            modules = Modules()
+            modules.plot_from_dict(met_dict['module'])
 
-        print(f'\nRETRACING MAP')
-        run_simulation(map_reader, cache)
+    # In aggregate mode, at least one metric
+    elif st.mode == 'aggregate':
+        raise Exception('[!!] NOT IMPLEMENTED')
 
-        print(f'\nPLOTTING')
-        tools.plot()
+    # Unknown mode.
+    else:
+        raise ValueError(f'Invalid mode "{args.mode}".')
 
     print('Done')
+    exit(0)
 
 
 def main_wrapper():

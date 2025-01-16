@@ -2,7 +2,6 @@ from collections import deque
 
 from mapanalyzer.util import AddrFmt
 from mapanalyzer.settings import Settings as st
-from mapanalyzer.map_file_reader import MemAccess
 
 class Block:
     def __init__(self, block_size, tag=None, dirty=False):
@@ -63,23 +62,23 @@ class Set:
 
 
 class Cache:
-    def __init__(self, tools=None):
-        if tools is None:
-            raise ValueError('tools cannot be None')
-        self.tools = tools
+    def __init__(self, modules=None):
+        if modules is None:
+            raise ValueError('modules object cannot be None')
+        self.modules = modules
         self.blocks_in_cache = {}
-        self.sets = [Set(st.cache.asso) for _ in range(st.cache.num_sets)]
+        self.sets = [Set(st.Cache.asso) for _ in range(st.Cache.num_sets)]
         return
 
-    def multi_access(self, concurrent_access):
+    def accesses(self, concurrent_access):
         common_time = concurrent_access[0].time
         for a in concurrent_access:
-            self.access(a)
-        self.tools.commit(common_time)
+            self.__single_access(a)
+        self.modules.commit(common_time)
 
         return
 
-    def access(self, access):
+    def __single_access(self, access):
         """ Access 'n bytes' starting from address 'addr'. If this requires to
         access multiple cache lines, then generate multiple accesses."""
         # Access object:
@@ -88,16 +87,16 @@ class Cache:
         # - event : read or write event {'R', 'W'}
         # - thread: the thread accessing data
         # - time  : the timestamp of the instruction.
-        addr = access.addr - st.map.aligned_start_addr
+        addr = access.addr - st.Map.aligned_start_addr
         n_bytes = access.size
-        self.tools.map.add_access(access)
+        self.modules.map.add_access(access)
 
         # check correct bit_length
-        if addr.bit_length() > st.cache.arch:
-            raise ValueError("Error: Access issued to address larger than"
-                             " the one defined for this cache.")
-            exit(1)
-
+        if addr.bit_length() > st.Cache.arch:
+            raise ValueError(f'Error: Access issued to address '
+                             f'larger ({addr.bit_length()} bits) than '
+                             f'the architecture defined for this cache '
+                             f'({st.Cache.arch} bits).')
 
         # access the potentially many lines
         while n_bytes > 0:
@@ -106,46 +105,44 @@ class Cache:
             p_tag = v_tag
 
             # handle multi-line accesses
-            if n_bytes > (st.cache.line_size - offset):
-                this_block_n_bytes = st.cache.line_size - offset
+            if n_bytes > (st.Cache.line_size - offset):
+                this_block_n_bytes = st.Cache.line_size - offset
             else:
                 this_block_n_bytes = n_bytes
 
-            block_access = MemAccess(access.time,
-                                     access.thread,
-                                     access.event,
-                                     this_block_n_bytes,
-                                     addr)
-            self.tools.locality.add_access(block_access)
+            self.modules.locality.add_access(
+                access.time, access.thread, access.event,
+                this_block_n_bytes, addr)
+
             # access this_block
             writing = (access.event == 'W')
             if (p_tag,set_index) not in self.blocks_in_cache:
                 # MISS
-                self.tools.hitmiss.add_hm(access, (0,1)) # miss++
+                self.modules.hitmiss.add_hm(access, (0,1)) # miss++
 
                 # fetch block from main memory
-                fetched_block = Block(st.cache.line_size, tag=p_tag,
+                fetched_block = Block(st.Cache.line_size, tag=p_tag,
                                             dirty=writing)
-                self.tools.aliasing.fetch(set_index, access.time)
-                self.tools.cost.add_access('r') # read
+                self.modules.aliasing.fetch(set_index, access.time)
+                self.modules.cost.add_access('r') # read
 
                 # add fetched block to the cache
                 self.blocks_in_cache[(p_tag,set_index)] = fetched_block
-                self.tools.usage.update(delta_valid=st.cache.line_size)
+                self.modules.usage.update(delta_valid=st.Cache.line_size)
 
                 # handle potentially evicted block
                 evicted_block = self.sets[set_index].push_block(fetched_block)
                 tag_out = None if evicted_block is None else evicted_block.tag
-                self.tools.evicd.update(access.time, set_index, p_tag, tag_out)
+                self.modules.evicd.update(access.time, set_index, p_tag, tag_out)
                 if evicted_block is not None:
                     # EVICTION
                     del self.blocks_in_cache[(evicted_block.tag,set_index)]
-                    self.tools.usage.update(
+                    self.modules.usage.update(
                         delta_access=-evicted_block.count_accessed(),
-                        delta_valid=-st.cache.line_size)
+                        delta_valid=-st.Cache.line_size)
                     if evicted_block.dirty:
                         # WRITE DIRTY BLOCK
-                        self.tools.cost.add_access('w') # write
+                        self.modules.cost.add_access('w') # write
                     else:
                         # DROP CLEAN BLOCK
                         pass
@@ -153,14 +150,14 @@ class Cache:
             else:
                 # HIT
                 resident_block = self.blocks_in_cache[(p_tag,set_index)]
-                self.tools.hitmiss.add_hm(access, (1,0)) # hit++
+                self.modules.hitmiss.add_hm(access, (1,0)) # hit++
                 self.sets[set_index].touch_block(resident_block)
 
             # mark accessed bytes
             old_ab = resident_block.count_accessed()
             resident_block.access(offset, this_block_n_bytes, write=writing)
             new_ab = resident_block.count_accessed()
-            self.tools.usage.update(delta_access=new_ab-old_ab)
+            self.modules.usage.update(delta_access=new_ab-old_ab)
 
             # update address and reminding bytes to read for a potential new loop
             addr += this_block_n_bytes
@@ -169,16 +166,17 @@ class Cache:
 
     def flush(self):
         """evict all cache lines"""
-        for set_idx in range(st.cache.num_sets):
+        for set_idx in range(st.Cache.num_sets):
             s = self.sets[set_idx]
             evicted_block = s.pop_lru_block()
             tag_out = None if evicted_block is None else evicted_block.tag
             while evicted_block is not None:
                 tag_out = evicted_block.tag
-                self.tools.evicd.update(st.map.time_size, set_idx, None, tag_out)
-                #self.tools.usage.update()
+                self.modules.evicd.update(st.Map.time_size, set_idx, None,
+                                          tag_out)
+                #self.modules.usage.update()
                 if evicted_block.dirty:
-                    self.tools.cost.add_access('w')
+                    self.modules.cost.add_access('w')
                 evicted_block = s.pop_lru_block() # get next evicted block
         return
 

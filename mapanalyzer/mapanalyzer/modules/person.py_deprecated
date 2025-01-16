@@ -4,7 +4,7 @@ from matplotlib.colors import ListedColormap
 import numpy as np
 
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette, AddrFmt
+from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette, AddrFmt
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import sub_resolution_between
 

@@ -2,20 +2,20 @@ import sys
 import matplotlib.pyplot as plt
 
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette
+from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette
 from mapanalyzer.settings import Settings as st
 
-class CacheUsage:
-    def __init__(self, shared_X=None, hue=120):
-        self.tool_name = 'Cache Usage Rate'
-        self.tool_about = ('Percentage of valid bytes in cache that are used before eviction.')
+class Cost:
+    def __init__(self, shared_X=None, hue=180):
+        self.tool_name = 'Main Mem. Access'
+        self.tool_about = ('Distribution of main memory read and write operations.')
         self.ps = PlotStrings(
-            title  = 'CUR',
-            code   = 'CUR',
+            title  = 'CMMA',
+            code   = 'CMMA',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Usage Rate [%]',
-            suffix = '_plot-05-usage',
-            subtit = 'higher is better'
+            ylab   = 'Cumulative Main Memory Access [count]',
+            suffix = '_plot-04-access-count',
+            subtit = 'lower is better'
         )
         self.enabled = self.ps.code in st.plot.include
         if not self.enabled:
@@ -23,29 +23,44 @@ class CacheUsage:
 
         self.X = shared_X if shared_X is not None else \
             [i for i in range(st.map.time_size)]
-
-        self.tool_palette = Palette(hue=[hue],
+        self.axes = None
+        self.tool_palette = Palette(hue=[hue,(hue+180)%360],
                                     lightness=st.plot.pal_lig,
                                     saturation=st.plot.pal_sat,
                                     alpha=st.plot.pal_alp)
 
-        self.accessed_bytes = 0
-        self.valid_bytes = 0
-        self.usage_ratio = [-1] * len(self.X)
+        self.read = 0
+        self.read_dist = [0] * len(self.X)
+        self.write = 0
+        self.write_dist = [0] * len(self.X)
+        self.last_time = 0
+
         return
 
-    def update(self, delta_access=0, delta_valid=0):
+    def add_access(self, rw):
         if not self.enabled:
             return
-        """Update counters by deltas"""
-        self.accessed_bytes += delta_access
-        self.valid_bytes += delta_valid
+        """Adds to read or write counter"""
+        if rw == 'r':
+            self.read += 1
+        else:
+            self.write += 1
         return
 
     def commit(self, time):
         if not self.enabled:
             return
-        self.usage_ratio[time] = 100 * self.accessed_bytes / self.valid_bytes
+        # fill possible empty times with previous counts.
+        last_read = self.read_dist[self.last_time]
+        last_write = self.write_dist[self.last_time]
+        for t in range(self.last_time+1, time):
+            self.read_dist[t] = last_read
+            self.write_dist[t] = last_write
+
+        # add updated counters
+        self.read_dist[time] = self.read
+        self.write_dist[time] = self.write
+        self.last_time = time
 
     def describe(self, ind=''):
         if not self.enabled:
@@ -70,45 +85,54 @@ class CacheUsage:
         x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
         self.axes.set_xticks(x_ticks)
         # self.axes.grid(axis='x', which='both',
-        #           alpha=0.1, color='k', zorder=1,
+        #           zorder=1,
+        #           alpha=st.plot.grid_main_alpha,
         #           linestyle=st.plot.grid_other_style,
         #           linewidth=st.plot.grid_other_width)
         return X
 
     def plot_setup_Y(self):
-        # define Y-axis data range based on data and user input
-        Y_min = 0
-        Y_max = 100
+        # Data range based on data and user input
+        Y_min = min(self.read_dist[0], self.write_dist[0])
+        Y_max = self.read_dist[-1] + self.write_dist[-1]
         if self.ps.code in st.plot.y_ranges:
             Y_min = int(st.plot.y_ranges[self.ps.code][0])
             Y_max = int(st.plot.y_ranges[self.ps.code][1])
         Y_padding = (Y_max - Y_min)/200
         self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
         # add tails at start/end of Y for cosmetic purposes.
-        Y_usage = [self.usage_ratio[0]] + self.usage_ratio + [self.usage_ratio[-1]]
+        # Y_rwd starts at write height, that's why we add read+write.
+        Y_rwd = [self.read_dist[0]+self.write_dist[0]] \
+            + [self.read_dist[i] + self.write_dist[i] for i in range(len(self.read_dist))] \
+            + [self.read_dist[-1]+self.write_dist[-1]]
+        Y_wd = [self.write_dist[0]] + self.write_dist + [self.write_dist[-1]]
 
-        # Axis details: label, ticks, and grid
+        # Axis details: spine, label, ticks, and grid
+        #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
         self.axes.set_ylabel(self.ps.ylab)
         self.axes.tick_params(axis='y',
-                              left=True, right=False,
-                              labelleft=True, labelright=False,
+                              left=True, labelleft=True,
+                              right=False, labelright=False,
                               width=st.plot.grid_main_width)
         y_ticks = create_up_to_n_ticks(range(Y_min, Y_max+1), base=10,
                                        n=st.plot.max_ytick_count)
         self.axes.set_yticks(y_ticks)
-        self.axes.grid(axis='y', which='both',
+        self.axes.grid(axis='y', which='both', #color=self.tool_palette.fg,
                        zorder=1,
                        alpha=st.plot.grid_main_alpha,
                        linewidth=st.plot.grid_main_width,
                        linestyle=st.plot.grid_main_style)
-        return Y_usage
+        return (Y_rwd,Y_wd)
 
     def draw_textbox(self):
-        # insert text box with average usage
-        avg = sum(self.usage_ratio)/len(self.usage_ratio)
-        text = f'Avg: {avg:.2f}%'
-        self.axes.text(0.98, 0.98, text, transform=self.axes.transAxes,
-                       ha='right', va='top',
+        # insert text box with total number of accesses
+        tot_read = self.read_dist[-1]
+        tot_write = self.write_dist[-1]
+        text = \
+            f'mm.R: {tot_read:,}\n'+\
+            f'mm.W: {tot_write:,}'
+        self.axes.text(0.98, 0.02, text, transform=self.axes.transAxes,
+                       ha='right', va='bottom',
                        bbox=dict(facecolor=st.plot.tbox_bg , edgecolor=st.plot.tbox_border,
                                  boxstyle="square,pad=0.2"),
                        fontdict=dict(family=st.plot.tbox_font, size=st.plot.tbox_font_size),
@@ -134,18 +158,25 @@ class CacheUsage:
         self.axes = fig.add_axes(bottom_axes.get_position())
 
         # plot map
-        if bottom_axes is not None:
+        if bottom_tool is not None:
             bottom_tool.plot(axes=bottom_axes)
 
-        # setup axes and obtain data ranges
+        # Setup axes and obtain data ranges
         X = self.plot_setup_X()
-        Y_usage = self.plot_setup_Y()
+        Y_rwd,Y_wd = self.plot_setup_Y()
 
-        # plot the usage rate
-        self.axes.fill_between(X, -1, Y_usage, step='mid', zorder=2,
-                               color=self.tool_palette[0][0],
-                               facecolor=self.tool_palette[0][1],
+        i = 0 # plot read plot (above write plot)
+        self.axes.fill_between(X, Y_wd, Y_rwd, step='mid', zorder=2,
+                               color=self.tool_palette[i][0],
+                               facecolor=self.tool_palette[i][1],
                                linewidth=st.plot.linewidth)
+
+        i = 1 # plot write plot (below read plot)
+        self.axes.fill_between(X, -1, Y_wd, step='mid', zorder=2,
+                               color=self.tool_palette[i][0],
+                               facecolor=self.tool_palette[i][1],
+                               linewidth=st.plot.linewidth)
+
         # finish plot setup
         self.draw_textbox()
         self.plot_setup_general()

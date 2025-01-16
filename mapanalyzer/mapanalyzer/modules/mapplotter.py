@@ -4,7 +4,7 @@ from collections import deque
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette, Dbg
+from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import sub_resolution_between
 
@@ -31,9 +31,9 @@ class Map:
         # select the resolution of the map grid. If too large, pick a value
         # under max_res
         map_mat_rows = sub_resolution_between(st.map.num_padded_bytes,
-                                              st.plot.min_res, st.plot.max_res)
+                                              st.plot.min_map_res, st.plot.max_map_res)
         map_mat_cols = sub_resolution_between(st.map.time_size,
-                                              st.plot.min_res, st.plot.max_res)
+                                              st.plot.min_map_res, st.plot.max_map_res)
         # cols: whole memory snapshot at a given instruction
         # rows: byte state across all instructions
         self.access_matrix = [[0] * map_mat_cols for _ in range(map_mat_rows)]
@@ -95,6 +95,16 @@ class Map:
         # this tool does not need to run anything after processing a batch
         # of concurrent accesses.
         return
+
+    def finalize(self):
+        # no post-simulation computation to be done
+        return
+
+    def export_metrics(self):
+        # save self.X
+        # save self.access_matrix
+        # save
+        raise Exception('[!!] NOT IMPLEMENTED')
 
 
     def plot(self, bottom_tool=None, axes=None, draw_X_grid=False, draw_Y_grid=False):

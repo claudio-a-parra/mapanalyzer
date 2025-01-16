@@ -1,79 +1,10 @@
+import os, json
 import colorsys
 import matplotlib.pyplot as plt
-from itertools import chain, combinations
+from itertools import combinations
 from math import prod
 
 from mapanalyzer.settings import Settings as st
-
-class AddrFmt:
-    sp = None
-    max_tag = None
-    max_index = None
-    max_offset = None
-
-    @classmethod
-    def init(cls, specs):
-        AddrFmt.sp = specs
-        AddrFmt.max_tag = 2**cls.sp.bits_tag - 1
-        AddrFmt.max_index = 2**cls.sp.bits_set - 1
-        AddrFmt.max_offset = 2**cls.sp.bits_off - 1
-
-    @classmethod
-    def bin(cls, address):
-        tag, index, offset = cls.split(address)
-        padded_bin = \
-            "|T:"  + cls.pad(tag,    2, cls.max_tag)  +\
-            "| I:" + cls.pad(index,  2, cls.max_index) +\
-            "| O:" + cls.pad(offset, 2, cls.max_offset)+\
-            "|"
-        return padded_bin
-
-    @classmethod
-    def hex(cls, address):
-        tag, index, offset = cls.split(address)
-        padded_hex = \
-            "|T:"  + cls.pad(tag,    16, cls.max_tag)  +\
-            "| I:" + cls.pad(index,  16, cls.max_index) +\
-            "| O:" + cls.pad(offset, 16, cls.max_offset)+\
-            "|"
-        return padded_hex
-
-    @classmethod
-    def split(cls, address):
-        # print(f"split: addr:{address}")
-        offset_mask = (1 << cls.sp.bits_off) - 1
-        offset = address & offset_mask
-        index_mask = (1 << cls.sp.bits_set) - 1
-        index = (address >> cls.sp.bits_off) & index_mask
-        tag = address >> (cls.sp.bits_set + cls.sp.bits_off)
-        return tag, index, offset
-
-    @classmethod
-    def pad(cls, number, base, max_val):
-        group_width = 4
-        if base == 2:
-            conv_number = bin(number)[2:]
-            max_num_width = max_val.bit_length()
-            group_digits = 4
-        elif base == 16:
-            conv_number = hex(number)[2:]
-            max_num_width = (max_val.bit_length() + 3) // 4
-            group_digits = 1
-        else:
-            raise ValueError("Unexpected base. use either 2 or 16")
-        padded_conv_number = conv_number.zfill(max_num_width)
-        rev_pcn = padded_conv_number[::-1]
-        rev_ret = ""
-        for i in range(0, len(padded_conv_number), group_digits):
-            r_digits = rev_pcn[i:i+group_digits]
-            r_digits = r_digits.ljust(group_width)
-            rev_ret += r_digits + " "
-
-            #digits = padded_conv_number[i:i+group_digits]
-            #digits = digits.rjust(group_width)
-            #ret += " " + digits
-        return rev_ret[::-1][1:]
-
 
 def create_up_to_n_ticks(full_list, base=10, n=10):
     """
@@ -105,7 +36,6 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
     tick_list = full_list[::tick_step]
     return tick_list
 
-
 def save_fig(fig, plotcode, plot_name_suffix):
     filename=f'{st.plot.prefix}{plot_name_suffix}.{st.plot.format}'
     print(f'    {plotcode:{st.plot.ui_plotname_hpad}}: ', flush=True, end='')
@@ -115,62 +45,38 @@ def save_fig(fig, plotcode, plot_name_suffix):
     plt.close(fig)
     return
 
+def save_json(data, plotcode, plot_name_suffix):
+    filename=f'{st.plot.prefix}{plot_name_suffix}.json'
+    print(f'    {plotcode:{st.plot.ui_plotname_hpad}}: ', flush=True, end='')
+    with open(filename, 'w') as f:
+        json.dump(data, f)
+    print(f'{filename}')
+    return
+
+def json_to_dict(json_path):
+    if json_path is None:
+        print('Error while reading json file: '
+              'No file path provided.')
+        exit(1)
+    try:
+        jfile = open(json_path, 'r')
+    except:
+        print(f'Error while reading {json_path}: '
+              'File does not exist or cannot be read.')
+        exit(1)
+        jdict = json.load(jfile)
+        jfile.close()
+        return jdict
 
 class PlotStrings:
-    def __init__(self, title='Title', code='PLT', xlab='X', ylab='Y', suffix='__plot',
-                 subtit='Subtitle'):
+    def __init__(self, title='Title', code='PLT', xlab='X', ylab='Y',
+                 suffix='__plot', subtit='Subtitle'):
         self.title = title
         self.code = code
         self.xlab  = xlab
         self.ylab  = ylab
         self.suffix= suffix
         self.subtit= subtit
-
-
-class Dbg:
-    lv = 0
-    step = 4
-
-    @classmethod
-    def P(cls, m='', ind=''):
-        lines = Dbg.s(m=m)
-        print(f'{ind}{lines}', end='')
-        return
-
-    @classmethod
-    def p(cls, m=''):
-        if st.verb:
-            lines = Dbg.s(m=m)
-            print(f'{lines}', end='')
-        return
-
-    @classmethod
-    def s(cls, m=''):
-        ind = ' ' * Dbg.lv
-        if not isinstance(m, str) and hasattr(m, '__getitem__'):
-            m_lines = [str(m.__class__)]
-            for l in m:
-                m_lines += [f' ├ {str(l)}']
-            m_lines[-1] = f' └ {m_lines[-1][3:]}'
-        else:
-            m_lines = str(m).split('\n')
-
-        # add indentation
-        ret_val = ''
-        for l in m_lines:
-            if l == '' or l == '\n':
-                continue
-            ret_val += f'{ind}{l}\n'
-        return ret_val
-
-    @classmethod
-    def i(cls):
-        Dbg.lv += cls.step
-
-    @classmethod
-    def o(cls):
-        Dbg.lv -= cls.step
-
 
 def hsl2rgb(h, s, l, a):
     try:
@@ -187,7 +93,6 @@ def hsl2rgb(h, s, l, a):
     r,g,b = colorsys.hls_to_rgb(h, l, s)
     r,g,b,a = round(r*255), round(g*255), round(b*255), round(a*255)
     return f'#{r:02X}{g:02X}{b:02X}{a:02X}'
-
 
 class Palette:
     # create hsl palettes.
@@ -262,8 +167,8 @@ class Palette:
     def __len__(self):
         return len(self.col)
 
-# Helper function to get prime factors
 def prime_factors(n):
+    """Helper function to get prime factors"""
     factors = []
     while n % 2 == 0:
         factors.append(2)
@@ -276,8 +181,8 @@ def prime_factors(n):
         factors.append(n)
     return factors
 
-# find a lower resolution
 def sub_resolution_between(native, min_res, max_res):
+    """Find a good lower resolution"""
     if native < max_res:
         return native
 

@@ -3,7 +3,7 @@ from collections import deque
 import matplotlib.pyplot as plt
 
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Dbg, Palette
+from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette
 from mapanalyzer.settings import Settings as st
 
 
@@ -207,7 +207,7 @@ class HitMiss:
         self.axes = fig.add_axes(bottom_axes.get_position())
 
         # plot map
-        if bottom_axes is not None:
+        if bottom_tool is not None:
             bottom_tool.plot(axes=bottom_axes)
 
         # setup axes and obtain data ranges

@@ -1,9 +1,9 @@
 import sys, os, json
-
-HPAD = 17
+from datetime import datetime
 
 class Settings:
     mode = 'sim-plot'
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     @classmethod
     def set_mode(cls, args):
@@ -21,6 +21,15 @@ class Settings:
             getattr(cls, prop).describe(ind='    ')
         return
 
+    class UI:
+        ############################################################
+        #### CONSTANT VALUES
+        cache_param_hpad = 17
+        map_param_hpad = 17
+        module_name_hpad = 17
+        metric_code_hpad = 17
+
+
     class Cache:
         ############################################################
         #### CONSTANT VALUES
@@ -31,8 +40,6 @@ class Settings:
             'line_size_bytes' : 'line_size',
             'associativity'   : 'asso',
         }
-        # terminal UI
-        ui_cacheparam_hpad = HPAD
 
         ############################################################
         #### BASIC VALUES
@@ -145,7 +152,7 @@ class Settings:
             return
 
         @classmethod
-        def basics_to_dict(cls):
+        def to_dict(cls):
             if not cls.initialized:
                 raise Exception("Cache not initialized. Cannot export.")
             return {
@@ -314,10 +321,6 @@ class Settings:
         img_border_pad = 0.025 # padding around the image
         img_title_vpad = 6 # padding between the plot and its title
 
-        # terminal UI
-        ui_modulename_hpad = HPAD
-        ui_plotname_hpad = HPAD
-
         # Plots Axes
         max_xtick_count = 11
         max_ytick_count = 11
@@ -365,7 +368,14 @@ class Settings:
         x_ranges = 'full'
         y_ranges = 'full'
 
-        # Specific to MAP plot
+        # Specific to MAP plot.
+        # min_map_res is only used if the native resolution is too large (above
+        # this maximum), and by trying to find a "nice" lower resolution, the
+        # only found is too low (below this minimum).
+        # If that is the case, then max_map_res is used.
+        #
+        # This is a derived value because sensible values is derived from the
+        # width, height, and dpi given.
         min_map_res,max_map_res = 1, 'auto'
         #
         # Specific of Personality
@@ -382,7 +392,8 @@ class Settings:
             cls.width = assg_val(cls.width, args.plot_width)
             cls.height = assg_val(cls.height, args.plot_height)
             cls.dpi = assg_val(cls.dpi, args.dpi)
-            cls.max_res = assg_val(cls.max_res, args.max_res) # overwritten by __init_derived_values()
+            # overwritten by __init_derived_values()
+            cls.max_map_res = assg_val(cls.max_map_res, args.max_res)
             cls.format = assg_val(cls.format, args.format)
             cls.include = assg_val(cls.include, args.plotcodes)
             cls.x_orient = assg_val(cls.x_orient, args.x_orient)
@@ -398,8 +409,8 @@ class Settings:
             cls.include = cls.__init_include_plots(cls.include)
             cls.x_ranges = cls.__init_ranges(cls.x_ranges)
             cls.y_ranges = cls.__init_ranges(cls.y_ranges)
-            cls.min_res,cls.max_res = cls.__init_map_resolution(
-                cls.width, cls.height, cls.dpi, cls.max_res)
+            cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
+                cls.width, cls.height, cls.dpi, cls.max_map_res)
             print('[!] Hardcoded jump_line_width')
             cls.jump_line_width = 1 #max(0.2,min(3,12*(width/data_X_size)))
             return
@@ -442,6 +453,9 @@ class Settings:
 
         @classmethod
         def __init_map_resolution(cls, width, height, dpi, max_res):
+            # guess the number of pixels in the smallest width or height
+            # of the plot area. Pick the smallest between that and the
+            # minimum
             min_res = round(min(0.9*min(width,height)*dpi,210))
             if max_res == 'auto':
                 max_res = round(min(0.9*min(width,height)*dpi,2310))
@@ -502,7 +516,6 @@ class Settings:
             'event-count'  : ('event_count',10),
             'max-time'     : ('time_size',10), # this one is adapted
         }
-        ui_mapparam_hpad = HPAD
 
         ############################################################
         #### BASIC VALUES
@@ -518,7 +531,7 @@ class Settings:
 
         ############################################################
         #### DERIVED VALUES
-        prefix = None # unique name derived from file_path
+        ID = None # unique name derived from file_path
         # aligned_start_addr <= start_addr.
         # This value is aligned to the beginning of a block
         aligned_start_addr = None
@@ -619,6 +632,7 @@ class Settings:
 
             file.close()
             cls.__init_derived_values()
+            cls.initialized = True
             return
 
         @classmethod
@@ -635,8 +649,8 @@ class Settings:
         def __init_derived_values(cls):
             # the/path/to/mapfile.map --> the_path_to_mapfile
             basename = os.path.splitext(cls.file_path)[0]
-            path_elements = os.path.normalpath(basename).split(os.sep)
-            cls.prefix = '_'.join(path_elements)
+            path_elements = os.path.normpath(basename).split(os.sep)
+            cls.ID = '_'.join(path_elements)
 
             # compute padding bytes to make the memory chunk block-aligned.
             if not Settings.Cache.initialized:
@@ -666,7 +680,7 @@ class Settings:
             return
 
         @classmethod
-        def basics_to_dict(cls):
+        def to_dict(cls):
             if not cls.initialized:
                 raise Exception("Map not initialized. Cannot export.")
             return {

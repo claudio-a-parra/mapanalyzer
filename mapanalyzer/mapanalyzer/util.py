@@ -1,8 +1,6 @@
 import os, json
 import colorsys
 import matplotlib.pyplot as plt
-from itertools import combinations
-from math import prod
 
 from mapanalyzer.settings import Settings as st
 
@@ -12,14 +10,17 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
     nice numbers (multiples of powers of 10 or 2) and not having
     more than n elements.
     """
+    if full_list is None or len(full_list) == 0 or n == 0:
+        return []
+
     # if two ticks, return the extremes.
     if n == 2:
         return [full_list[0], full_list[-1]]
 
-    if n == len(full_list):
+    if n >= len(full_list):
         return full_list
 
-    # find a label_step such that we print at most n ticks
+    # find a tick_step such that we print at most n ticks
     tick_step = 1
     tot_ticks = len(full_list)
     factors = [1,2,2.5,5] if base==10 else [1]
@@ -33,21 +34,22 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
                 break
         if found:
             break
+
     tick_list = full_list[::tick_step]
     return tick_list
 
-def save_fig(fig, plotcode, plot_name_suffix):
-    filename=f'{st.plot.prefix}{plot_name_suffix}.{st.plot.format}'
-    print(f'    {plotcode:{st.plot.ui_plotname_hpad}}: ', flush=True, end='')
-    fig.savefig(filename, dpi=st.plot.dpi, bbox_inches='tight',
-                pad_inches=st.plot.img_border_pad)
+def save_fig(fig, code):
+    filename=f'{st.Map.ID}.{code}_plot.{st.Plot.format}'
+    print(f'    {code:{st.UI.metric_code_hpad}}: ', flush=True, end='')
+    fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
+                pad_inches=st.Plot.img_border_pad)
     print(f'{filename}')
     plt.close(fig)
     return
 
-def save_json(data, plotcode, plot_name_suffix):
-    filename=f'{st.plot.prefix}{plot_name_suffix}.json'
-    print(f'    {plotcode:{st.plot.ui_plotname_hpad}}: ', flush=True, end='')
+def save_json(data, code):
+    filename=f'{st.Map.ID}.{code}_metric.json'
+    print(f'    {code:{st.UI.metric_code_hpad}}: ', flush=True, end='')
     with open(filename, 'w') as f:
         json.dump(data, f)
     print(f'{filename}')
@@ -69,14 +71,13 @@ def json_to_dict(json_path):
         return jdict
 
 class PlotStrings:
-    def __init__(self, title='Title', code='PLT', xlab='X', ylab='Y',
-                 suffix='__plot', subtit='Subtitle'):
+    def __init__(self, title='Title', subtit='Subtitle', code='COD',
+                 xlab='X-axis', ylab='Y-axis'):
         self.title = title
+        self.subtit= subtit
         self.code = code
         self.xlab  = xlab
         self.ylab  = ylab
-        self.suffix= suffix
-        self.subtit= subtit
 
 def hsl2rgb(h, s, l, a):
     try:
@@ -166,39 +167,3 @@ class Palette:
 
     def __len__(self):
         return len(self.col)
-
-def prime_factors(n):
-    """Helper function to get prime factors"""
-    factors = []
-    while n % 2 == 0:
-        factors.append(2)
-        n //= 2
-    for i in range(3, int(n**0.5) + 1, 2):
-        while n % i == 0:
-            factors.append(i)
-            n //= i
-    if n > 2:
-        factors.append(n)
-    return factors
-
-def sub_resolution_between(native, min_res, max_res):
-    """Find a good lower resolution"""
-    if native < max_res:
-        return native
-
-    # Get the prime factors of the native resolution
-    factors = prime_factors(native)
-
-    # Generate all products of combinations of factors in descending order
-    power_set = sorted(
-        (prod(ps) for r in range(1, len(factors) + 1) for ps in combinations(factors, r)),
-        reverse=True
-    )
-
-    # Find the largest valid resolution within the range
-    for r in power_set:
-        if min_res <= r < max_res:
-            return r
-
-    # If no suitable resolution is found, return max_res as a fallback
-    return max_res

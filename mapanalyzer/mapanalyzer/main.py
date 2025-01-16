@@ -9,20 +9,21 @@ from mapanalyzer.util import json_to_dict
 from mapanalyzer.cache import Cache
 from mapanalyzer.modules.modules import Modules
 
-def run_simulation(map_data_reader, cache):
+def run_simulation(map_data_reader, cache, ind=''):
     """Run the simulation sending concurrent accesses to the cache
     in batches. At the end, flush the cache and send a last commit
     to the cache."""
+    print(f'{ind}TRACING MAP')
     # check cache alignment of the allocated memory
     _,_,byte = st.AddrFmt.split(st.Map.start_addr)
     if byte != 0:
-        print(f'    Allocated memory is not cache aligned. '
+        print(f'{ind}    Allocated memory is not cache aligned. '
               f'First address is {byte} bytes into a cache line.')
 
-    def print_progress(count, total):
+    def print_progress(count, total, ind=''):
         """helper function to print the simulation progress"""
-        print('\033[2K\r    '
-              f'{(100*count/total):5.1f}% '
+        print(f'\033[2K\r{ind}'
+              f'    {(100*count/total):5.1f}% '
               f'{count:8d}/{total}'
               ,end='')
         sys.stdout.flush()
@@ -45,9 +46,8 @@ def run_simulation(map_data_reader, cache):
     # send the remaining accesses to the cache
     eve_count += 1
     cache.accesses(concurrent_acc)
-    if progress:
-        print_progress(eve_count, tot_eve)
-        print()
+    print_progress(eve_count, tot_eve)
+    print()
 
     # flush cache and commit for modules that care about eviction
     cache.flush()
@@ -205,7 +205,7 @@ def main():
 
     # In simulation mode, a cache file is optional and at least one map file is
     # mandatory.
-    if st.mode == 'simulate' or st.Plot.mode == 'sim-plot':
+    if st.mode == 'simulate' or st.mode == 'sim-plot':
         st.Cache.from_file(args.cachefile)
         map_paths = [x.strip() for x in args.input_files.split(',')]
         for map_pth in map_paths:
@@ -215,8 +215,9 @@ def main():
             cache = Cache(modules=modules)
             run_simulation(mdr, cache)
             modules.finalize()
+            print('EXPORTING RESULTS')
             modules.export_metrics()
-            if st.Plot.mode == 'sim-plot':
+            if st.mode == 'sim-plot':
                 modules.export_plots()
 
     # In plot mode, at least one metric file is mandatory.

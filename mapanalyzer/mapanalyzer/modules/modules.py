@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.modules.mapplotter import Map
-from mapanalyzer.modules.locality import Locality
-from mapanalyzer.modules.hitmiss import HitMiss
-from mapanalyzer.modules.cost import Cost
+# from mapanalyzer.modules.locality import Locality
+# from mapanalyzer.modules.hitmiss import HitMiss
+# from mapanalyzer.modules.cost import Cost
 from mapanalyzer.modules.usage import CacheUsage
-from mapanalyzer.modules.alias import Aliasing
-from mapanalyzer.modules.eviction import EvictionDuration
+# from mapanalyzer.modules.alias import Aliasing
+# from mapanalyzer.modules.eviction import EvictionDuration
 
 class Modules:
     def __init__(self):
@@ -33,7 +33,7 @@ class Modules:
 
         # set the space needed to print the widest module name
         st.Plot.ui_modulename_hpad = \
-            max([len(mod.module_name)+1 for mod in self.modules_list])
+            max([len(m.name)+1 for m in self.modules_list])
         return
 
     def describe(self, ind='    '):
@@ -57,7 +57,7 @@ class Modules:
 
     def export_plots(self):
         for mod in self.modules_list:
-            mod.plot(bottom_module=self.map)
+            mod.export_plots(bg_module=self.map)
         return
 
     def plot_from_dict(self, plot_dict):

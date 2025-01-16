@@ -1,6 +1,5 @@
 from collections import deque
 
-from mapanalyzer.util import AddrFmt
 from mapanalyzer.settings import Settings as st
 
 class Block:
@@ -68,6 +67,7 @@ class Cache:
         self.modules = modules
         self.blocks_in_cache = {}
         self.sets = [Set(st.Cache.asso) for _ in range(st.Cache.num_sets)]
+        print('[!] Commenting modules other than MAP and usage.')
         return
 
     def accesses(self, concurrent_access):
@@ -100,7 +100,7 @@ class Cache:
 
         # access the potentially many lines
         while n_bytes > 0:
-            v_tag, set_index, offset = AddrFmt.split(addr)
+            v_tag, set_index, offset = st.AddrFmt.split(addr)
             # TODO: implement TLB and physical addresses
             p_tag = v_tag
 
@@ -110,21 +110,21 @@ class Cache:
             else:
                 this_block_n_bytes = n_bytes
 
-            self.modules.locality.add_access(
-                access.time, access.thread, access.event,
-                this_block_n_bytes, addr)
+            #!self.modules.locality.add_access(
+            #!    access.time, access.thread, access.event,
+            #!    this_block_n_bytes, addr)
 
             # access this_block
             writing = (access.event == 'W')
             if (p_tag,set_index) not in self.blocks_in_cache:
                 # MISS
-                self.modules.hitmiss.add_hm(access, (0,1)) # miss++
+                #!self.modules.hitmiss.add_hm(access, (0,1)) # miss++
 
                 # fetch block from main memory
                 fetched_block = Block(st.Cache.line_size, tag=p_tag,
                                             dirty=writing)
-                self.modules.aliasing.fetch(set_index, access.time)
-                self.modules.cost.add_access('r') # read
+                #!self.modules.aliasing.fetch(set_index, access.time)
+                #!self.modules.cost.add_access('r') # read
 
                 # add fetched block to the cache
                 self.blocks_in_cache[(p_tag,set_index)] = fetched_block
@@ -133,7 +133,7 @@ class Cache:
                 # handle potentially evicted block
                 evicted_block = self.sets[set_index].push_block(fetched_block)
                 tag_out = None if evicted_block is None else evicted_block.tag
-                self.modules.evicd.update(access.time, set_index, p_tag, tag_out)
+                #!self.modules.evicd.update(access.time, set_index, p_tag, tag_out)
                 if evicted_block is not None:
                     # EVICTION
                     del self.blocks_in_cache[(evicted_block.tag,set_index)]
@@ -142,7 +142,8 @@ class Cache:
                         delta_valid=-st.Cache.line_size)
                     if evicted_block.dirty:
                         # WRITE DIRTY BLOCK
-                        self.modules.cost.add_access('w') # write
+                        #!self.modules.cost.add_access('w') # write
+                        pass #!
                     else:
                         # DROP CLEAN BLOCK
                         pass
@@ -150,7 +151,7 @@ class Cache:
             else:
                 # HIT
                 resident_block = self.blocks_in_cache[(p_tag,set_index)]
-                self.modules.hitmiss.add_hm(access, (1,0)) # hit++
+                #!self.modules.hitmiss.add_hm(access, (1,0)) # hit++
                 self.sets[set_index].touch_block(resident_block)
 
             # mark accessed bytes
@@ -172,11 +173,12 @@ class Cache:
             tag_out = None if evicted_block is None else evicted_block.tag
             while evicted_block is not None:
                 tag_out = evicted_block.tag
-                self.modules.evicd.update(st.Map.time_size, set_idx, None,
-                                          tag_out)
+                #!self.modules.evicd.update(st.Map.time_size, set_idx, None,
+                #!                          tag_out)
                 #self.modules.usage.update()
                 if evicted_block.dirty:
-                    self.modules.cost.add_access('w')
+                    #!self.modules.cost.add_access('w')
+                    pass #!
                 evicted_block = s.pop_lru_block() # get next evicted block
         return
 

@@ -2,33 +2,32 @@ import sys
 
 from mapanalyzer.settings import Settings as st
 
-class __Record:
-    """One record from the map file."""
-    def __init__(self, time, thread, event, size, addr):
-        # almost all members are integers.
-        try:
-            self.time = int(time)
-            self.thread = int(thread)
-            self.event = event
-            self.size = int(size)
-            self.addr = int(addr)
-        except:
-            print('Incorrect values to create __MemRecord:\n'
-                  f'    time  : {time}\n'
-                  f'    thread: {thread}\n'
-                  f'    event : {event}\n'
-                  f'    size  : {size}\n'
-                  f'    addr  : {addr}')
-            sys.exit(1)
-        return
-
-    def __str__(self):
-        return (f'tim:{self.time}, thr:{self.thread}, '
-                f'eve:{self.event}, addr:{self.addr}, '
-                f'siz:{self.size}')
-
-
 class MapDataReader:
+    class __Record:
+        """One record from the map file."""
+        def __init__(self, time, thread, event, size, addr):
+            # almost all members are integers.
+            try:
+                self.time = int(time)
+                self.thread = int(thread)
+                self.event = event
+                self.size = int(size)
+                self.addr = int(addr)
+            except:
+                print('Incorrect values to create __MemRecord:\n'
+                      f'    time  : {time}\n'
+                      f'    thread: {thread}\n'
+                      f'    event : {event}\n'
+                      f'    size  : {size}\n'
+                      f'    addr  : {addr}')
+                sys.exit(1)
+            return
+
+        def __str__(self):
+            return (f'tim:{self.time}, thr:{self.thread}, '
+                    f'eve:{self.event}, addr:{self.addr}, '
+                    f'siz:{self.size}')
+
     """iterates over the map file, reading one record at the time."""
     def __init__(self, map_file_path):
         self.file_path = map_file_path
@@ -125,4 +124,4 @@ class MapDataReader:
         # I was probably drunk when I thought this... I am pretty sure
         # I am adding and subtracting the same shit somewhere else...
         addr = st.Map.aligned_start_addr + st.Map.left_pad + off
-        return __Record(time, thr, ev, size, addr)
+        return self.__Record(time, thr, ev, size, addr)

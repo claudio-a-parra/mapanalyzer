@@ -7,17 +7,19 @@ from mapanalyzer.settings import Settings as st
 
 class CacheUsage:
     def __init__(self, shared_X=None, hue=120):
+        # Module info
         self.name = 'Cache Usage Rate'
         self.about = ('Percentage of valid bytes in cache that are used '
                            'before eviction.')
+        # Metric(s) info
         self.ps = PlotStrings(
             title  = 'CUR',
+            subtit = 'higher is better',
             code   = 'CUR',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Usage Rate [%]',
-            suffix = '_plot-05-usage',
-            subtit = 'higher is better'
+            ylab   = 'Cache Usage Rate [%]'
         )
+
         self.enabled = self.ps.code in st.Plot.include
         if not self.enabled:
             return
@@ -55,7 +57,8 @@ class CacheUsage:
     def describe(self, ind=''):
         if not self.enabled:
             return
-        print(f'{ind}{self.name:{st.plot.ui_modulename_hpad}}: '
+        nc = f'{self.name} ({self.ps.code})'
+        print(f'{ind}{nc:{st.UI.module_name_hpad}}: '
               f'{self.about}')
         return
 
@@ -64,37 +67,75 @@ class CacheUsage:
         return
 
     def export_metrics(self):
-        # export plotcode, X, and Y to json file
-        raise Exception('[!!] NOT IMPLEMENTED')
+        self_dict = self.__to_dict()
+        save_json(self_dict, self.ps.code)
+        return
 
-    def setup_X_axis(self):
+    def export_plots(self, bg_module=None):
+        if not self.enabled:
+            return
+
+        # create two set of axes: bg: MAP. fg: this module's metrics
+        fig,bg_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+        fg_axes = fig.add_axes(bg_axes.get_position())
+
+        # plot map in the background
+        if bg_module is not None:
+            bg_module.bg_plot(axes=bg_axes)
+
+        # setup X and Y axes and add tails to the X and Y arrays
+        # for cosmetic purposes (because of the step function)
+        X_padding = self.__setup_X_axis(fg_axes)
+        Y_padding = self.__setup_Y_axis(fg_axes)
+        X = [self.X[0]-X_padding] + self.X + [self.X[-1]+X_padding]
+        Y = [self.usage_ratio[0]] + self.usage_ratio + [self.usage_ratio[-1]]
+
+        # plot the usage rate
+        fg_axes.fill_between(
+            X, -1, Y, step='mid', zorder=2,
+            color=self.palette[0][0],
+            facecolor=self.palette[0][1],
+            linewidth=st.Plot.linewidth
+        )
+
+        # finish plot setup
+        self.__setup_general(fg_axes)
+        self.__draw_textbox(fg_axes)
+
+        # save figure
+        save_fig(fig, self.ps.code)
+        return
+
+    def __setup_X_axis(self, axes):
         # define X-axis data range based on data and user input
         X_min = self.X[0]
         X_max = self.X[-1]
         if self.ps.code in st.Plot.x_ranges:
             X_min = int(st.Plot.x_ranges[self.ps.code][0])
             X_max = int(st.Plot.x_ranges[self.ps.code][1])
-        X_padding = (X_max - X_min) / 200
-        self.axes.set_xlim(X_min-X_padding, X_max+X_padding)
+        X_padding = 0.5
+        axes.set_xlim(X_min-X_padding, X_max+X_padding)
 
         # Axis details: label, ticks and grid
-        self.axes.set_xlabel(self.ps.xlab)
+        axes.set_xlabel(self.ps.xlab)
         rot = -90 if st.Plot.x_orient == 'v' else 0
-        self.axes.tick_params(axis='x',
-                              top=False, bottom=True,
-                              labeltop=False, labelbottom=True,
-                              rotation=rot, width=st.Plot.grid_other_width)
-        x_ticks = create_up_to_n_ticks(self.X, base=10,
-                                       n=st.Plot.max_xtick_count)
-        self.axes.set_xticks(x_ticks)
-        self.axes.grid(axis='x', which='both',
-                       zorder=1,
-                       alpha=st.Plot.grid_other_alpha,
-                       linewidth=st.Plot.grid_other_width,
-                       linestyle=st.Plot.grid_other_style)
+        axes.tick_params(
+            axis='x', rotation=rot, width=st.Plot.grid_other_width,
+            top=False, labeltop=False, bottom=True, labelbottom=True
+        )
+        axes.set_xticks(
+            create_up_to_n_ticks(self.X, base=10, n=st.Plot.max_xtick_count)
+        )
+        axes.grid(
+            axis='x', which='both',
+            zorder=1,
+            alpha=st.Plot.grid_other_alpha,
+            linewidth=st.Plot.grid_other_width,
+            linestyle=st.Plot.grid_other_style
+        )
         return X_padding
 
-    def setup_Y_axis(self):
+    def __setup_Y_axis(self, axes):
         # define Y-axis data range based on data and user input
         Y_min = 0
         Y_max = 100
@@ -102,109 +143,66 @@ class CacheUsage:
             Y_min = int(st.Plot.y_ranges[self.ps.code][0])
             Y_max = int(st.Plot.y_ranges[self.ps.code][1])
         Y_padding = (Y_max - Y_min) / 200
-        self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
+        axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
 
         # Axis details: label, ticks, and grid
-        self.axes.set_ylabel(self.ps.ylab)
-        self.axes.tick_params(axis='y',
-                              left=True, right=False,
-                              labelleft=True, labelright=False,
-                              width=st.Plot.grid_main_width)
-        y_ticks = create_up_to_n_ticks(range(Y_min, Y_max+1), base=10,
-                                       n=st.Plot.max_ytick_count)
-        self.axes.set_yticks(y_ticks)
-        self.axes.grid(axis='y', which='both',
-                       zorder=1,
-                       alpha=st.Plot.grid_main_alpha,
-                       linewidth=st.Plot.grid_main_width,
-                       linestyle=st.Plot.grid_main_style)
+        axes.set_ylabel(self.ps.ylab)
+        axes.tick_params(
+            axis='y', width=st.Plot.grid_main_width,
+            left=True, labelleft=True, right=False, labelright=False
+        )
+        axes.set_yticks(
+            create_up_to_n_ticks(range(Y_min, Y_max+1), base=10,
+                                 n=st.Plot.max_ytick_count)
+        )
+        axes.grid(
+            axis='y', which='both',
+            zorder=1,
+            alpha=st.Plot.grid_main_alpha,
+            linewidth=st.Plot.grid_main_width,
+            linestyle=st.Plot.grid_main_style
+        )
         return Y_padding
 
-    def draw_textbox(self):
+    def __draw_textbox(self, axes):
         # insert text box with average usage
+        print(self.usage_ratio)
         avg = sum(self.usage_ratio)/len(self.usage_ratio)
         text = f'Avg: {avg:.2f}%'
-        self.axes.text(
-            0.98, 0.98, text, transform=self.axes.transAxes,
+        axes.text(
+            0.98, 0.98, text, transform=axes.transAxes,
             ha='right', va='top',
             bbox=dict(facecolor=st.Plot.tbox_bg,
                       edgecolor=st.Plot.tbox_border,
                       boxstyle="square,pad=0.2"),
             fontdict=dict(family=st.Plot.tbox_font,
                           size=st.Plot.tbox_font_size),
-            zorder=1000)
+            zorder=1000
+        )
         return
 
-    def setup_general(self):
+    def __setup_general(self, axes):
         # background color
-        self.axes.patch.set_facecolor(self.palette.bg)
+        axes.patch.set_facecolor(self.palette.bg)
 
         # setup title
-        title_string = f'{self.ps.title}: {st.Map.prefix}'
+        title_string = f'{self.ps.title}: {st.Map.ID}'
         if self.ps.subtit:
-            title_string += f'. ({self.ps.subtit})'
-        self.axes.set_title(title_string, fontsize=10,
-                            pad=st.Plot.img_title_vpad)
+            title_string += f' ({self.ps.subtit})'
+        axes.set_title(
+            title_string, fontsize=10, pad=st.Plot.img_title_vpad
+        )
         return
 
-    def plot(self, bottom_tool=None):
-        if not self.enabled:
-            return
-
-        # create two set of axes: for the map (bottom) and the tool
-        fig,bottom_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
-        self.axes = fig.add_axes(bottom_axes.get_position())
-
-        # plot map
-        if bottom_tool is not None:
-            bottom_tool.plot(axes=bottom_axes)
-
-        # setup X and Y axes and add tails to the X and Y arrays
-        # for cosmetic purposes (because of the step function)
-        X_padding = self.setup_X_axis()
-        Y_padding = self.setup_Y_axis()
-        X = [self.X[0]-X_padding] + self.X + [self.X[-1]+X_padding]
-        Y = [self.usage_ratio[0]] + self.usage_ratio + [self.usage_ratio[-1]]
-
-
-        # plot the usage rate
-        self.axes.fill_between(X, -1, Y, step='mid', zorder=2,
-                               color=self.palette[0][0],
-                               facecolor=self.palette[0][1],
-                               linewidth=st.Plot.linewidth)
-        # finish plot setup
-        self.draw_textbox()
-        self.plot_setup_general()
-
-        # save data and image
-        save_json(self.to_json(), self.ps.code, self.ps.suffix)
-        save_fig(fig, self.ps.code, self.ps.suffix)
-        return
-
-    def to_json(self):
+    def __to_dict(self):
         data = {
-            "plotcode": self.ps.code, # to check validity
-            "map": st.map.to_jdict(),
-            "cache": st.cache.to_jdict(),
-            "data_series": [
-                {
-                    "label": "usage_ratio", # data to export
-                    "x": self.X,
-                    "y": self.usage_ratio
-                }
-            ]
+            'timestamp': st.timestamp,
+            'map': st.Map.to_dict(),
+            'cache': st.Cache.to_dict(),
+            'metric': {
+                'code': self.ps.code,
+                'x': self.X,
+                'y': self.usage_ratio
+            }
         }
         return data
-
-    def from_json(self, jdict):
-        # import
-        return
-
-    def from_json(self, json_in):
-        import_from_json(json_path=json_in)
-        slef.plot(bottom_tool=bottom_tool)
-        return
-
-    def aggregate_plots(self, jdicts):
-
-        return

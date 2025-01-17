@@ -147,8 +147,8 @@ class Map:
         # no post-simulation computation to be done
         return
 
-    def export_metrics(self):
-        self_dict = self.__to_dict()
+    def export_metrics(self, bg_module=None):
+        self_dict = self.to_dict()
         save_json(self_dict, self.ps.code)
         return
 
@@ -373,7 +373,7 @@ class Map:
                 zorder=0)
         return
 
-    def __to_dict(self):
+    def to_dict(self):
         data = {
             'timestamp': st.timestamp,
             'map': st.Map.to_dict(),
@@ -385,3 +385,16 @@ class Map:
             }
         }
         return data
+
+    def load_from_dict(self, data):
+        """Load data from dictionary"""
+        if data['code'] != self.ps.code:
+            return
+        self.X = data['x']
+        self.space_time = data['space_time']
+        return
+
+    def plot_from_dict(self, data, bg_module=None):
+        self.load_from_dict(data)
+        self.export_plots()
+        return

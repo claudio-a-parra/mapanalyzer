@@ -4,7 +4,7 @@ from datetime import datetime
 class Settings:
     mode = 'sim-plot'
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
+    metric_keys = ['cache', 'map', 'mapplot', 'metric', 'timestamp']
     @classmethod
     def set_mode(cls, args):
         if args.mode is not None:
@@ -125,9 +125,10 @@ class Settings:
             return
 
         @classmethod
-        def from_dict(cls, cache_dict):
+        def from_dict(cls, cache_dict, file_path=None):
             # load data from the cache section of the metric file
             cls.__dict_to_basics(cache_dict)
+            cls.file_path = file_path
 
             # compute derived values
             cls.__init_derived_values()
@@ -176,19 +177,20 @@ class Settings:
                 fname = ' (Default values)'
             else:
                 fname = f' ({cls.file_path})'
-            print(f'{ind}CACHE PARAMETERS{fname}')
-            print(f'{ind}{i}{"Address Size":{cls.ui_cacheparam_hpad}}: '
+            print(f'\n{ind}CACHE PARAMETERS{fname}')
+            hpad = Settings.UI.cache_param_hpad
+            print(f'{ind}{i}{"Address Size":{hpad}}: '
                   f'{cls.arch} bits ('
                   f'tag:{cls.bits_tag} | '
                   f'idx:{cls.bits_set} | '
                   f'off:{cls.bits_off})\n'
-                  f'{ind}{i}{"Cache size":{cls.ui_cacheparam_hpad}}: '
+                  f'{ind}{i}{"Cache size":{hpad}}: '
                   f'{cls.cache_size} bytes\n'
-                  f'{ind}{i}{"Number of sets":{cls.ui_cacheparam_hpad}}:'
+                  f'{ind}{i}{"Number of sets":{hpad}}:'
                   f' {cls.num_sets}\n'
-                  f'{ind}{i}{"Line size":{cls.ui_cacheparam_hpad}}: '
+                  f'{ind}{i}{"Line size":{hpad}}: '
                   f'{cls.line_size} bytes\n'
-                  f'{ind}{i}{"Associativity":{cls.ui_cacheparam_hpad}}: '
+                  f'{ind}{i}{"Associativity":{hpad}}: '
                   f'{cls.asso}-way'
             )
             return
@@ -636,9 +638,10 @@ class Settings:
             return
 
         @classmethod
-        def from_dict(cls, map_dict):
+        def from_dict(cls, map_dict, file_path=None):
             # load data from the map section of the metric file
             cls.__dict_to_basics(map_dict)
+            cls.file_path = file_path
 
             # compute derived values
             cls.__init_derived_values()
@@ -647,8 +650,15 @@ class Settings:
 
         @classmethod
         def __init_derived_values(cls):
+            # determine a unique id based on the path to the map file
+            # or the json file.
             # the/path/to/mapfile.map --> the_path_to_mapfile
-            basename = os.path.splitext(cls.file_path)[0]
+            # the/path/to/mapfile.metric.map --> the_path_to_mapfile
+            basename, extension = os.path.splitext(cls.file_path)
+            if extension == '.map':
+                basename = basename
+            else:
+                basename, extension = os.path.splitext(basename)
             path_elements = os.path.normpath(basename).split(os.sep)
             cls.ID = '_'.join(path_elements)
 
@@ -708,16 +718,17 @@ class Settings:
                 fname = ' (No MAP file)'
             else:
                 fname = f' ({cls.file_path})'
-            print(f'{ind}MEMORY ACCESS PATTERN{fname}')
-            print(f'{ind}{i}{"First Address":{cls.ui_mapparam_hpad}}: '
+            print(f'\n{ind}MEMORY ACCESS PATTERN{fname}')
+            hpad = Settings.UI.map_param_hpad
+            print(f'{ind}{i}{"First Address":{hpad}}: '
                   f'{hex(cls.start_addr)}\n'
-                  f'{ind}{i}{"Memory Size":{cls.ui_mapparam_hpad}}: '
+                  f'{ind}{i}{"Memory Size":{hpad}}: '
                   f'{cls.mem_size} bytes\n'
-                  f'{ind}{i}{"Maximum Time":{cls.ui_mapparam_hpad}}: '
+                  f'{ind}{i}{"Maximum Time":{hpad}}: '
                   f'{cls.time_size-1}\n'
-                  f'{ind}{i}{"Thread Count":{cls.ui_mapparam_hpad}}: '
+                  f'{ind}{i}{"Thread Count":{hpad}}: '
                   f'{cls.thread_count}\n'
-                  f'{ind}{i}{"Event Count":{cls.ui_mapparam_hpad}}: '
+                  f'{ind}{i}{"Event Count":{hpad}}: '
                   f'{cls.event_count}'
             )
             return

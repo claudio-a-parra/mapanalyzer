@@ -9,22 +9,21 @@ from mapanalyzer.util import json_to_dict
 from mapanalyzer.cache import Cache
 from mapanalyzer.modules.modules import Modules
 
-def run_simulation(map_data_reader, cache, ind=''):
+def run_simulation(map_data_reader, cache):
     """Run the simulation sending concurrent accesses to the cache
     in batches. At the end, flush the cache and send a last commit
     to the cache."""
-    print(f'{ind}TRACING MAP')
+    print(f'\nTRACING MAP')
     # check cache alignment of the allocated memory
     _,_,byte = st.AddrFmt.split(st.Map.start_addr)
     if byte != 0:
-        print(f'{ind}    Allocated memory is not cache aligned. '
+        print(f'    Allocated memory is not cache aligned. '
               f'First address is {byte} bytes into a cache line.')
 
-    def print_progress(count, total, ind=''):
+    def print_progress(count, total):
         """helper function to print the simulation progress"""
-        print(f'\033[2K\r{ind}'
-              f'    {(100*count/total):5.1f}% '
-              f'{count:8d}/{total}'
+        print(f'\033[2K\r    '
+              f'{(100*count/total):5.1f}% {count:8d}/{total}'
               ,end='')
         sys.stdout.flush()
         return
@@ -207,15 +206,16 @@ def main():
     # mandatory.
     if st.mode == 'simulate' or st.mode == 'sim-plot':
         st.Cache.from_file(args.cachefile)
+        st.Cache.describe()
         map_paths = [x.strip() for x in args.input_files.split(',')]
         for map_pth in map_paths:
             st.Map.from_file(map_pth)
+            st.Map.describe()
             mdr = MapDataReader(map_pth)
             modules = Modules()
             cache = Cache(modules=modules)
             run_simulation(mdr, cache)
             modules.finalize()
-            print('EXPORTING RESULTS')
             modules.export_metrics()
             if st.mode == 'sim-plot':
                 modules.export_plots()
@@ -223,12 +223,18 @@ def main():
     # In plot mode, at least one metric file is mandatory.
     elif st.mode == 'plot':
         met_paths = [x.strip() for x in args.input_files.split(',')]
+        if len(met_paths) == 0:
+            print('Error: in "plot" mode you must provide at least one'
+                  'metric file.')
+            exit(1)
         for met_pth in met_paths:
             met_dict = json_to_dict(met_pth)
-            st.Cache.from_dict(met_dict['cache'])
-            st.Map.from_dict(met_dict['map'])
+            st.Cache.from_dict(met_dict['cache'], file_path=met_pth)
+            st.Cache.describe()
+            st.Map.from_dict(met_dict['map'], file_path=met_pth)
+            st.Map.describe()
             modules = Modules()
-            modules.plot_from_dict(met_dict['module'])
+            modules.plot_from_dict(met_dict['metric'], met_dict['mapplot'])
 
     # In aggregate mode, at least one metric
     elif st.mode == 'aggregate':

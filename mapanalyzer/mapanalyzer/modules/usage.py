@@ -66,22 +66,23 @@ class CacheUsage:
         # no post-simulation computation to be done
         return
 
-    def export_metrics(self):
+    def export_metrics(self, bg_module):
         self_dict = self.__to_dict()
+        self_dict['mapplot'] = bg_module.to_dict()['metric']
         save_json(self_dict, self.ps.code)
         return
 
     def export_plots(self, bg_module=None):
         if not self.enabled:
             return
-
-        # create two set of axes: bg: MAP. fg: this module's metrics
-        fig,bg_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
-        fg_axes = fig.add_axes(bg_axes.get_position())
-
-        # plot map in the background
+        # If there is a background plot module, create two sets of axes
         if bg_module is not None:
+            # create two set of axes: bg: MAP. fg: this module's metrics
+            fig,bg_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+            fg_axes = fig.add_axes(bg_axes.get_position())
             bg_module.bg_plot(axes=bg_axes)
+        else:
+            fig,fg_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
         # setup X and Y axes and add tails to the X and Y arrays
         # for cosmetic purposes (because of the step function)
@@ -166,7 +167,6 @@ class CacheUsage:
 
     def __draw_textbox(self, axes):
         # insert text box with average usage
-        print(self.usage_ratio)
         avg = sum(self.usage_ratio)/len(self.usage_ratio)
         text = f'Avg: {avg:.2f}%'
         axes.text(
@@ -202,7 +202,20 @@ class CacheUsage:
             'metric': {
                 'code': self.ps.code,
                 'x': self.X,
-                'y': self.usage_ratio
+                'usage_ratio': self.usage_ratio
             }
         }
         return data
+
+    def load_from_dict(self, data):
+        """Load data from dictionary"""
+        if data['code'] != self.ps.code:
+            return
+        self.X = data['x']
+        self.usage_ratio = data['usage_ratio']
+        return
+
+    def plot_from_dict(self, data, bg_module=None):
+        self.load_from_dict(data)
+        self.export_plots(bg_module=bg_module)
+        return

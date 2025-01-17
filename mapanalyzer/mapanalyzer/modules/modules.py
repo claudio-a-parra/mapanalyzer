@@ -52,18 +52,22 @@ class Modules:
         return
 
     def export_metrics(self):
+        print('\nEXPORTING METRICS')
         for mod in self.modules_list:
-            mod.export_metrics()
+            mod.export_metrics(bg_module=self.map)
 
     def export_plots(self):
+        print('\nEXPORTING PLOTS')
         for mod in self.modules_list:
             mod.export_plots(bg_module=self.map)
         return
 
-    def plot_from_dict(self, plot_dict):
+    def plot_from_dict(self, met_dict, map_dict):
+        self.map.load_from_dict(map_dict)
         # Give the dictionary to all modules. They will internally decide
         # whether to plot it or not based on their plotcode. Some modules have
         # more than one plotcode, so let the module decide.
+        print('\nPLOTTING METRICS')
         for mod in self.modules_list:
-            mod.plot_from_dict(plot_dict)
+            mod.plot_from_dict(met_dict, bg_module=self.map)
         return

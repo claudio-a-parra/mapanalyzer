@@ -66,9 +66,17 @@ def json_to_dict(json_path):
         print(f'Error while reading {json_path}: '
               'File does not exist or cannot be read.')
         exit(1)
-        jdict = json.load(jfile)
-        jfile.close()
-        return jdict
+    jdict = json.load(jfile)
+    jfile.close()
+    if not all(key in jdict for key in st.metric_keys):
+        print(f'Error while reading {json_path}: '
+              'File does not seem to be a (complete) metric file. '
+              'Not all first-level keys present.')
+        exit(1)
+
+    # enable only the metric specified by the file
+    st.Plot.include = { jdict['metric']['code'] }
+    return jdict
 
 class PlotStrings:
     def __init__(self, title='Title', subtit='Subtitle', code='COD',

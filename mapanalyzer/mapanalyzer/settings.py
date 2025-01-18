@@ -26,7 +26,7 @@ class Settings:
         #### CONSTANT VALUES
         cache_param_hpad = 17
         map_param_hpad = 17
-        module_name_hpad = 17
+        module_name_hpad = 23
         metric_code_hpad = 17
 
 
@@ -505,15 +505,22 @@ class Settings:
     class Map:
         ############################################################
         #### CONSTANT VALUES
-        # headers and name:value pairs.
-        warning_header = '# WARNING'
-        metadata_header = '# METADATA'
-        data_header = '# DATA'
-        # file_name -> (member_name, int_base)
+        # headers
+        header_error = '# ERROR'
+        header_warning = '# WARNING'
+        header_metadata = '# METADATA'
+        header_data = '# DATA'
+
+        # find headers in these top lines (or until header_data is found)
+        header_lines = 100
+
+        # name-in-file : (value, integer_base)
         key_map = {
             'start-addr'   : ('start_addr',16),
             'end-addr'     : ('end_addr', 16),
             'block-size'   : ('mem_size',10),
+            'owner-thread' : ('owner_thread',10),
+            'slice-size'   : ('slice_size',10),
             'thread-count' : ('thread_count',10),
             'event-count'  : ('event_count',10),
             'max-time'     : ('time_size',10), # this one is adapted
@@ -525,6 +532,8 @@ class Settings:
         start_addr = None
         end_addr = None
         mem_size = None
+        owner_thread = None
+        slice_size = None
         thread_count = None
         event_count = None
         time_size = None
@@ -553,6 +562,7 @@ class Settings:
 
         @classmethod
         def from_file(cls, map_filepath):
+            # check for file existence.
             if map_filepath is None:
                 print('You must specify a map file.')
                 exit(1)
@@ -564,40 +574,81 @@ class Settings:
                       'File does not exist or cannot be read.')
                 exit(1)
 
-
-            # Skip to metadata section
-            line = file.readline()
-            while line.strip() != cls.metadata_header:
-                if line == '':
-                    print(f'Error while reading {cls.file_path}: '
-                          'EOF reached before any metadata.')
-                    exit(1)
-                print(f'    {line.strip()}')
+            # Collect lines from the different sections
+            unknown = '__#__Unknown Section__#__'
+            sections = {
+                unknown: [],
+                cls.header_error: [],
+                cls.header_warning: [],
+                cls.header_metadata: [],
+                cls.header_data: [],
+            }
+            current_section = unknown
+            while True:
                 line = file.readline()
 
-            # Read Metadata
-            while line.strip() not in (cls.warning_header,
-                                       cls.data_header):
-                if line == '':
-                    print(f'Error while reading {cls.file_path}: '
-                          'EOF reached before any data.')
-                    exit(1)
-                # skip empty lines or comments
+                # EOF or data section found
+                if line == '' or line.strip() == cls.header_data:
+                    break
+
+                # if new section found, start storing lines on its array
                 line = line.strip()
-                if line == '' or line[0] == '#':
-                    line = file.readline()
+                if line != unknown and line in sections:
+                    current_section = line
                     continue
-                # parse name:val
+
+                # skip empty and comment lines
+                if line == '' or line[0] == '#':
+                    continue
+
+                # store line in its section's array
+                sections[current_section].append(line)
+            file.close()
+
+            # If top sections: error, warning, and metadata are
+            # all empty, that means this is not a valid MAP file.
+            if len(sections[cls.header_error]) == 0 and \
+               len(sections[cls.header_warning]) == 0 and \
+               len(sections[cls.header_metadata]) == 0:
+                print(f'Error while reading {cls.file_path}: '
+                      'This doesn\'t seem to be a valid MAP file.')
+                exit(1)
+
+            # If there are errors, show them and stop
+            if len(sections[cls.header_error]) != 0:
+                print(f'Error while reading {cls.file_path}: '
+                      'The MAP file reports ERRORS:')
+                for l in sections[cls.header_error]:
+                    print(f'>>>>{l}')
+                exit(1)
+
+            # If there are warnings, show them and continue
+            if len(sections[cls.header_warning]) != 0:
+                print(f'Warning: {cls.file_path} reports WARNINGS:')
+                for l in sections[cls.header_warning]:
+                    print(f'>>>>{l}')
+
+            # If there is no metadata section, that is also
+            # a non-recoverable error
+            if len(sections[cls.header_metadata]) == 0:
+                print(f'Error while reading {cls.file_path}: '
+                      'The MAP file does not have a METADATA section.')
+                exit(1)
+
+            # Read Metadata
+            for line in sections[cls.header_metadata]:
+                # parse 'name: val' lines
                 try:
                     no_comment_line = line.split('#')[0].strip()
                     name,val = no_comment_line.split(':')
                     name,val = name.strip(),val.strip()
                 except:
                     print(f'Error while reading {cls.file_path}: '
-                          'Malformed line in Metadata Section:\n'
+                          'Malformed line in METADATA Section:\n'
                           f'>>>>{line}')
                     exit(1)
-                # check for recognized pair
+                # check if it is a recognized pair (known name and
+                # correct integer parsing)
                 if name in cls.key_map:
                     try:
                         int_val = int(val, cls.key_map[name][1])
@@ -606,19 +657,24 @@ class Settings:
                               f'Invalid value for in Metadata Section.\n'
                               f'>>>>{line}')
                         exit(1)
+                    # accepting and storing the value
                     setattr(cls, cls.key_map[name][0], int_val)
-
-                # get next line
-                line = file.readline()
+                else:
+                    print(f'Warning while reading {cls.file_path}: '
+                          'Unrecognized METADATA parameter name:\n'
+                          f'>>>>{line}')
 
             # if any value is missing, error.
-            if None in (cls.start_addr, cls.end_addr, cls.mem_size,
-                        cls.thread_count, cls.event_count, cls.time_size):
+            missing = []
+            for name in cls.key_map:
+                if getattr(cls, cls.key_map[name][0]) is None:
+                    missing.append(name)
+            if len(missing) != 0:
                 print(f'Error while reading {cls.file_path}: '
-                      f'Incomplete Metadata.\n'
-                      'Data needed:\n')
-                for d in cls.key_map:
-                    print(f'    {d}')
+                      f'Incomplete METADATA section.\n'
+                      'Missing data:')
+                for m in missing:
+                    print(f' - {m}')
                 exit(1)
 
             # error if start_addr, mem_size and end_addr are incoherent.
@@ -632,7 +688,6 @@ class Settings:
             # convert max-time index (what comes in the file) to time_size
             cls.time_size +=1
 
-            file.close()
             cls.__init_derived_values()
             cls.initialized = True
             return

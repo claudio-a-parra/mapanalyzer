@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, Palette, \
+from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
     save_fig, save_json
 from mapanalyzer.settings import Settings as st
 
@@ -12,7 +12,7 @@ class CacheUsage:
         self.about = ('Percentage of valid bytes in cache that are used '
                            'before eviction.')
         # Metric(s) info
-        self.ps = PlotStrings(
+        self.ps = MetricStrings(
             title  = 'CUR',
             subtit = 'higher is better',
             code   = 'CUR',
@@ -69,7 +69,7 @@ class CacheUsage:
     def export_metrics(self, bg_module):
         self_dict = self.__to_dict()
         self_dict['mapplot'] = bg_module.to_dict()['metric']
-        save_json(self_dict, self.ps.code)
+        save_json(self_dict, self.ps)
         return
 
     def export_plots(self, bg_module=None):
@@ -104,7 +104,7 @@ class CacheUsage:
         self.__draw_textbox(fg_axes)
 
         # save figure
-        save_fig(fig, self.ps.code)
+        save_fig(fig, self.ps)
         return
 
     def __setup_X_axis(self, axes):

@@ -4,7 +4,7 @@ from collections import deque
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, Palette, \
+from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
     save_fig, save_json
 from mapanalyzer.settings import Settings as st
 from itertools import combinations
@@ -12,52 +12,13 @@ from math import prod
 
 
 class Map:
-    @staticmethod
-    def __sub_resolution_between(native, min_res, max_res):
-        """Find a good lower resolution"""
-        if native < max_res:
-            return native
-
-        def prime_factors(n):
-            """Helper function to get prime factors"""
-            factors = []
-            while n % 2 == 0:
-                factors.append(2)
-                n //= 2
-            for i in range(3, int(n**0.5) + 1, 2):
-                while n % i == 0:
-                    factors.append(i)
-                    n //= i
-            if n > 2:
-                factors.append(n)
-            return factors
-
-        # Get the prime factors of the native resolution
-        factors = prime_factors(native)
-
-        # Generate all products of combinations of factors in descending order
-        power_set = sorted(
-            (prod(ps)
-             for r in range(1, len(factors) + 1)
-             for ps in combinations(factors, r)),
-            reverse=True
-        )
-
-        # Find the largest valid resolution within the range
-        for r in power_set:
-            if min_res <= r < max_res:
-                return r
-
-        # If no suitable resolution is found, return max_res as a fallback
-        return max_res
-
     def __init__(self, hue=120):
         # Module info
         self.name = 'Mem Acc Pattern'
         self.about = 'Visual representation of the Memory Access Pattern.'
 
         # Metric(s) info
-        self.ps = PlotStrings(
+        self.ps = MetricStrings(
             title = 'MAP',
             subtit = None,
             code = 'MAP',
@@ -91,7 +52,7 @@ class Map:
         if not self.standalone_plot:
             return
         nc = f'{self.name} ({self.ps.code})'
-        print(f'{ind}{nc:{st.Plot.UI.module_name_hpad}}: '
+        print(f'{ind}{nc:{st.UI.module_name_hpad}}: '
               f'{self.about}')
         return
 
@@ -147,9 +108,11 @@ class Map:
         # no post-simulation computation to be done
         return
 
-    def export_metrics(self, bg_module=None):
+    def export_metrics(self, bg_module):
         self_dict = self.to_dict()
-        save_json(self_dict, self.ps.code)
+        # This shit is redundant, but it is for standardized format... sue me.
+        self_dict['mapplot'] = bg_module.to_dict()['metric']
+        save_json(self_dict, self.ps)
         return
 
     def export_plots(self, bg_module=None):
@@ -195,7 +158,7 @@ class Map:
         self.__draw_X_grid(axes)
         self.__draw_Y_grid(axes)
         self.__fade_padding_bytes(axes)
-        save_fig(fig, self.ps.code)
+        save_fig(fig, self.ps)
         return
 
     def bg_plot(self, axes, draw_x_grid=False, draw_y_grid=False):
@@ -398,3 +361,42 @@ class Map:
         self.load_from_dict(data)
         self.export_plots()
         return
+
+    @staticmethod
+    def __sub_resolution_between(native, min_res, max_res):
+        """Find a good lower resolution"""
+        if native < max_res:
+            return native
+
+        def prime_factors(n):
+            """Helper function to get prime factors"""
+            factors = []
+            while n % 2 == 0:
+                factors.append(2)
+                n //= 2
+            for i in range(3, int(n**0.5) + 1, 2):
+                while n % i == 0:
+                    factors.append(i)
+                    n //= i
+            if n > 2:
+                factors.append(n)
+            return factors
+
+        # Get the prime factors of the native resolution
+        factors = prime_factors(native)
+
+        # Generate all products of combinations of factors in descending order
+        power_set = sorted(
+            (prod(ps)
+             for r in range(1, len(factors) + 1)
+             for ps in combinations(factors, r)),
+            reverse=True
+        )
+
+        # Find the largest valid resolution within the range
+        for r in power_set:
+            if min_res <= r < max_res:
+                return r
+
+        # If no suitable resolution is found, return max_res as a fallback
+        return max_res

@@ -2,6 +2,7 @@ import sys
 import matplotlib.pyplot as plt
 
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import MetricStrings
 from mapanalyzer.modules.mapplotter import Map
 # from mapanalyzer.modules.locality import Locality
 # from mapanalyzer.modules.hitmiss import HitMiss
@@ -12,6 +13,8 @@ from mapanalyzer.modules.usage import CacheUsage
 
 class Modules:
     def __init__(self):
+        # Reset Metrics counter
+        MetricStrings.counter = 0
         # Create set of modules with shared X axis (for plots)
         self.map = Map()
         # self.locality = Locality(shared_X=self.map.X)
@@ -37,6 +40,7 @@ class Modules:
         return
 
     def describe(self, ind='    '):
+        print('\nMAPANALYZER MODULES')
         for mod in self.modules_list:
             mod.describe(ind=ind)
         return
@@ -57,7 +61,7 @@ class Modules:
             mod.export_metrics(bg_module=self.map)
 
     def export_plots(self):
-        print('\nEXPORTING PLOTS')
+        print('\nGENERATING PLOTS')
         for mod in self.modules_list:
             mod.export_plots(bg_module=self.map)
         return

@@ -1,6 +1,7 @@
 from collections import deque
 
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.ui import UI
 
 class Block:
     def __init__(self, block_size, tag=None, dirty=False):
@@ -67,10 +68,11 @@ class Cache:
         self.modules = modules
         self.blocks_in_cache = {}
         self.sets = [Set(st.Cache.asso) for _ in range(st.Cache.num_sets)]
-        print('[!] Commenting modules other than MAP and usage.')
+        UI.warning('Commenting modules other than MAP and usage. '
+                   'Marked with "#!".')
         return
 
-    def accesses(self, concurrent_access):
+    def __accesses(self, concurrent_access):
         common_time = concurrent_access[0].time
         for a in concurrent_access:
             self.__single_access(a)
@@ -89,7 +91,7 @@ class Cache:
         # - time  : the timestamp of the instruction.
         addr = access.addr - st.Map.aligned_start_addr
         n_bytes = access.size
-        self.modules.map.add_access(access)
+        self.modules.map.probe(access=access)
 
         # check correct bit_length
         if addr.bit_length() > st.Cache.arch:
@@ -128,7 +130,7 @@ class Cache:
 
                 # add fetched block to the cache
                 self.blocks_in_cache[(p_tag,set_index)] = fetched_block
-                self.modules.usage.update(delta_valid=st.Cache.line_size)
+                self.modules.usage.probe(delta_valid=st.Cache.line_size)
 
                 # handle potentially evicted block
                 evicted_block = self.sets[set_index].push_block(fetched_block)
@@ -137,7 +139,7 @@ class Cache:
                 if evicted_block is not None:
                     # EVICTION
                     del self.blocks_in_cache[(evicted_block.tag,set_index)]
-                    self.modules.usage.update(
+                    self.modules.usage.probe(
                         delta_access=-evicted_block.count_accessed(),
                         delta_valid=-st.Cache.line_size)
                     if evicted_block.dirty:
@@ -158,14 +160,14 @@ class Cache:
             old_ab = resident_block.count_accessed()
             resident_block.access(offset, this_block_n_bytes, write=writing)
             new_ab = resident_block.count_accessed()
-            self.modules.usage.update(delta_access=new_ab-old_ab)
+            self.modules.usage.probe(delta_access=new_ab-old_ab)
 
             # update address and reminding bytes to read for a potential new loop
             addr += this_block_n_bytes
             n_bytes -= this_block_n_bytes
         return
 
-    def flush(self):
+    def __flush(self):
         """evict all cache lines"""
         for set_idx in range(st.Cache.num_sets):
             s = self.sets[set_idx]
@@ -175,7 +177,13 @@ class Cache:
                 tag_out = evicted_block.tag
                 #!self.modules.evicd.update(st.Map.time_size, set_idx, None,
                 #!                          tag_out)
-                #self.modules.usage.update()
+
+                # It doesn't make much sense to register usage on flush
+                # self.modules.usage.probe(
+                #     delta_access=-evicted_block.count_accessed(),
+                #     delta_valid=st.Cache.line_size)
+
+
                 if evicted_block.dirty:
                     #!self.modules.cost.add_access('w')
                     pass #!
@@ -192,3 +200,39 @@ class Cache:
             ret += f'| {blk_id:>6} --> {self.blocks_in_cache[k]}\n'
         ret += '+---------------------'
         return ret
+
+    def run_simulation(self, map_data_reader):
+        """Run the simulation sending concurrent accesses to the cache
+        in batches. At the end, flush the cache and send a last commit
+        to the cache."""
+        UI.indent_in('SIMULATING CACHE')
+        # check cache alignment of the allocated memory
+        _,_,byte = st.AddrFmt.split(st.Map.start_addr)
+        if byte != 0:
+            UI.info(f'Allocated memory is not cache aligned, first '
+                    f'address is {byte} bytes into a cache line.')
+
+        # send batches with concurrent accesses to the cache.
+        tot_eve = st.Map.event_count
+        eve_count = -1
+        concurrent_acc = []
+        for record in map_data_reader:
+            eve_count += 1
+            # collect all accesses happening at the same time mark
+            if len(concurrent_acc) == 0 or concurrent_acc[-1].time == record.time:
+                concurrent_acc.append(record)
+                continue
+            self.__accesses(concurrent_acc) # send all accesses from time t-1
+            UI.progress(eve_count, tot_eve)
+            concurrent_acc = [record] # save first access of time t
+
+        # send the remaining accesses to the cache
+        eve_count += 1
+        self.__accesses(concurrent_acc)
+        UI.progress(eve_count, tot_eve)
+        UI.nl()
+        # flush cache and commit for modules that care about eviction
+        self.__flush()
+        self.modules.commit(st.Map.time_size-1)
+        UI.indent_out()
+        return

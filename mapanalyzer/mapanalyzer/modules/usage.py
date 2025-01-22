@@ -4,13 +4,17 @@ import matplotlib.pyplot as plt
 from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
     save_fig, save_json
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.ui import UI
 
 class CacheUsage:
-    def __init__(self, shared_X=None, hue=120):
+    hue = 120
+    def __init__(self, shared_X=None, hue=None):
         # Module info
         self.name = 'Cache Usage Rate'
         self.about = ('Percentage of valid bytes in cache that are used '
-                           'before eviction.')
+                      'before eviction.')
+        self.metrics = 'CUR'
+
         # Metric(s) info
         self.ps = MetricStrings(
             title  = 'CUR',
@@ -29,6 +33,8 @@ class CacheUsage:
         else:
             self.X = [i for i in range(st.Map.time_size)]
 
+        if hue is None:
+            hue = self.__class__.hue
         self.hue = hue
         self.palette = Palette(
             hue=[hue],
@@ -41,7 +47,7 @@ class CacheUsage:
         self.usage_ratio = [-1] * len(self.X)
         return
 
-    def update(self, delta_access=0, delta_valid=0):
+    def probe(self, delta_access=0, delta_valid=0):
         """Update counters by deltas"""
         if not self.enabled:
             return
@@ -53,14 +59,6 @@ class CacheUsage:
         if not self.enabled:
             return
         self.usage_ratio[time] = 100 * self.accessed_bytes / self.valid_bytes
-
-    def describe(self, ind=''):
-        if not self.enabled:
-            return
-        nc = f'{self.name} ({self.ps.code})'
-        print(f'{ind}{nc:{st.UI.module_name_hpad}}: '
-              f'{self.about}')
-        return
 
     def finalize(self):
         # no post-simulation computation to be done
@@ -219,3 +217,10 @@ class CacheUsage:
         self.load_from_dict(data)
         self.export_plots(bg_module=bg_module)
         return
+
+    @classmethod
+    def aggregate_metrics(cls, metrics_list):
+        """Given a list of 'metric' dictionaries, aggregate their
+        values in a meaningful manner"""
+        for met in metrics_list:
+            UI.info(f'{met["code"]}')

@@ -1,0 +1,181 @@
+from sys import stdout, stderr # to define where to write output
+from colorama import Fore, Style # for colored messages
+
+class UI:
+    ############################################################
+    #### CONSTANT VALUES
+    metric_code_hpad = 5 # space needed to print any metric code
+    il = 0 # indentation level
+    iw = 4 # indentation width
+    ind = '' # the actual indentation string
+
+    @classmethod
+    def __color_msg(cls, msg='', symb='', indent=True, ind_str='', pre='',
+                    msg_color=Fore.RESET, end='\n', out=stdout):
+        """Message has some parts:
+        .------+-------------------------------------- indentation
+        |      |
+        [!]     WARNING: the message I want to say\n
+         |         |              |                +-- end
+         |         |              +------------------- message
+         |         +---------------------------------- pre-message
+         +-------------------------------------------- symbol
+        """
+        # determine indentation string.
+        if indent and len(msg) > 0:
+            # indent
+            if len(ind_str) > 0:
+                pass
+            elif len(symb) < len(cls.ind):
+                ind_str = f'{symb}{cls.ind[len(symb):]}'
+            else:
+                ind_str = symb
+        else:
+            ind_str = ''
+
+        # add ': ' to pre-message
+        if len(msg) != 0 and len(pre) != 0:
+            pre = f'{pre}: '
+
+        # Add indentation to all lines of the message
+        second_line_ind = ''
+        msg_lines = msg.split('\n')
+        msg = f'\n{cls.ind}{second_line_ind}'.join(msg_lines)
+
+        # print message
+        print(msg_color + f'{ind_str}{pre}{msg}' + Style.RESET_ALL,
+              file=out, end=end)
+
+        if end != '\n':
+            out.flush()
+        return
+
+    @classmethod
+    def indent_in(cls, title='', symb=''):
+        """Increase indentation with a possible title"""
+        if title:
+            cls.__color_msg(msg=f'\n{title}', symb=symb,
+                            msg_color=f'{Style.BRIGHT}{Fore.GREEN}',
+                            out=stdout)
+        cls.il += 1
+        cls.ind = ' ' * (cls.il*cls.iw)
+        return
+
+    @classmethod
+    def indent_out(cls):
+        """decrease indentation"""
+        cls.il = max(cls.il - 1, 0)
+        cls.ind = ' ' * (cls.il*cls.iw)
+        return
+
+    @classmethod
+    def indent_set(cls, ind=0):
+        """set indentation directly"""
+        cls.il = max(ind, 0)
+        cls.ind = ''
+        return
+
+    @classmethod
+    def error(cls, msg, symb='(!) ', pre='ERROR', do_exit=True, code=1):
+        """print an error message to stderr and possibly exit with a
+        given code"""
+        cls.__color_msg(msg=msg, symb=symb, pre=pre, msg_color=Fore.RED,
+                        out=stderr)
+
+        # exit if requested
+        if code == 0:
+            code = 1
+        if do_exit:
+            exit(code)
+        return
+
+    @classmethod
+    def warning(cls, msg, symb='(!) ', pre='WARNING'):
+        """print a warning message to stderr"""
+        cls.__color_msg(msg=msg, symb=symb, pre=pre, msg_color=Fore.YELLOW,
+                        out=stderr)
+        return
+
+    @classmethod
+    def info(cls, msg, symb='', pre='INFO', out='err'):
+        """print an informative message to (by default) stderr"""
+        if out == 'out':
+            out = stdout
+        else:
+            out = stderr
+        cls.__color_msg(msg=msg, symb=symb, pre=pre, msg_color=Fore.CYAN,
+                        out=out)
+        return
+
+    @classmethod
+    def text(cls, msg, indent=True, end='\n', out='out'):
+        """print regular text to (by default) stdout and respecting the
+        current indentation level."""
+        if out == 'out':
+            out = stdout
+        else:
+            out = stderr
+        cls.__color_msg(msg=msg, indent=indent, end=end, out=out)
+        return
+
+    @classmethod
+    def nl(cls, out='out'):
+        """print a new line '\n' by default to stdout"""
+        if out == 'out':
+            out = stdout
+        else:
+            out = stderr
+        cls.__color_msg(out=out)
+        return
+
+    @classmethod
+    def progress(cls, count, total):
+        """print a progress ratio that overwrites the same (current) line"""
+        step = max(total // 200, 1)
+        if count % step == 0 or count == total:
+            cls.__color_msg(msg=f'{(100*count/total):5.1f}% {count:8d}/{total}',
+                            ind_str=f'\033[2K\r{cls.ind}', end='', out=stdout)
+        return
+
+    @classmethod
+    def columns(cls, cols, sep='', cols_width='auto'):
+        """Print a table with columns. If cols_width is auto, then
+        compute each column width, otherwise, use the values given
+        in cols_width (array_like, with one integer per column of cols)"""
+        if len(cols) == 0:
+            cls.error('UI.columns: Printing empty array.')
+
+        # Check columns equal length
+        cols_len = [len(c) for c in cols]
+        if min(cols_len) != max(cols_len):
+            cls.error('UI.columns: Trying to print a table with columns of '
+                      'different length.')
+
+        # if auto column width, then compute it. Otherwise, use the given one
+        if cols_width == 'auto':
+            cols_width = []
+            for col in cols:
+                col_width = 0
+                for text in col:
+                    text = str(text)
+                    if col_width < len(text):
+                        col_width = len(text)
+                cols_width.append(col_width)
+        else:
+            if len(cols_width) != len(cols):
+                cls.error('UI.columns: number of columns and number of '
+                          'column-width values is not the same.')
+
+        # Create rows
+        rows = len(cols[0])
+        all_lines = []
+        for r in range(rows):
+            row_elems = [f'{str(col[r]).ljust(cols_width[c])}'
+                         for c,col in enumerate(cols)]
+            line = sep.join(row_elems)
+            all_lines.append(line)
+
+        # join rows and print them
+        table = '\n'.join(all_lines)
+        cls.__color_msg(msg=table)
+        return

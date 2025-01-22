@@ -3,19 +3,21 @@ import sys
 from collections import deque
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+from itertools import combinations
+from math import prod
 
 from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
     save_fig, save_json
 from mapanalyzer.settings import Settings as st
-from itertools import combinations
-from math import prod
-
+from mapanalyzer.ui import UI
 
 class Map:
-    def __init__(self, hue=120):
+    hue = 120
+    def __init__(self, hue=None):
         # Module info
         self.name = 'Mem Acc Pattern'
         self.about = 'Visual representation of the Memory Access Pattern.'
+        self.metrics = 'MAP'
 
         # Metric(s) info
         self.ps = MetricStrings(
@@ -28,6 +30,8 @@ class Map:
 
         self.enabled = True # always enabled
         self.standalone_plot = self.ps.code in st.Plot.include
+        if hue is None:
+            hue = self.__class__.hue
         self.hue = hue
         self.tool_palette = Palette(hue=hue)
         self.X = [i for i in range(st.Map.time_size)]
@@ -48,15 +52,7 @@ class Map:
 
         return
 
-    def describe(self, ind=''):
-        if not self.standalone_plot:
-            return
-        nc = f'{self.name} ({self.ps.code})'
-        print(f'{ind}{nc:{st.UI.module_name_hpad}}: '
-              f'{self.about}')
-        return
-
-    def add_access(self, access):
+    def probe(self, access):
         """The idea is to take an access happening at (addr, time), and
         map it to (y,x) in self.space_time."""
         if not self.enabled:
@@ -76,11 +72,10 @@ class Map:
             # out of boundary access attempt
             if addr < st.Map.left_pad or \
                st.Map.aligned_end_addr-st.Map.right_pad < addr:
-                print(f'Error: The map file has an access out of boundaries '
-                      f'at (time,thread,event,size,offset):\n'
-                      f'    {access.time},{access.thread},{access.event},'
-                      f'{access.size},{addr-st.Map.left_pad}')
-                exit(1)
+                UI.error(f'The map file has an access out of boundaries '
+                         f'at (time,thread,event,size,offset):\n'
+                         f'{access.time},{access.thread},{access.event},'
+                         f'{access.size},{addr-st.Map.left_pad}')
             # get percentage (from first to last possible address or time)
             max_real_addr = max(1, st.Map.num_padded_bytes - 1)
             max_real_time = max(1, st.Map.time_size - 1)

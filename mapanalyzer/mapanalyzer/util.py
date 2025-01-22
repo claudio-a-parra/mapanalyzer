@@ -1,9 +1,10 @@
 import os, json
-import colorsys
+import colorsys # to convert from hls to rgb
 import matplotlib.pyplot as plt
 import argparse # to get command line arguments
 
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.ui import UI
 
 class MetricStrings:
     counter = 0
@@ -103,13 +104,12 @@ class MapDataReader:
                 self.size = int(size)
                 self.addr = int(addr)
             except:
-                print('Incorrect values to create __MemRecord:\n'
-                      f'    time  : {time}\n'
-                      f'    thread: {thread}\n'
-                      f'    event : {event}\n'
-                      f'    size  : {size}\n'
-                      f'    addr  : {addr}')
-                exit(1)
+                UI.error('Incorrect values to create __MemRecord:\n'
+                      f'time  : {time}\n'
+                      f'thread: {thread}\n'
+                      f'event : {event}\n'
+                      f'size  : {size}\n'
+                      f'addr  : {addr}')
             return
 
         def __str__(self):
@@ -126,11 +126,9 @@ class MapDataReader:
         try:
             self.file = open(self.file_path, 'r')
         except FileNotFoundError:
-            print(f'Error while reading {self.file_path}: '
-                  'File does not exist or cannot be read.')
-            exit(1)
+            UI.error(f'While reading "{self.file_path}":\n'
+                     'File does not exist or cannot be read.')
         return
-
 
     def __go_to_section(self, header):
         if self.file.closed:
@@ -142,9 +140,8 @@ class MapDataReader:
 
             # EOF found
             if line == '':
-                print(f'Error while reading {self.file_path}: '
-                      f'File has no section "{header}".')
-                exit(1)
+                UI.error(f'While reading {self.file_path}: '
+                         f'File has no section "{header}".')
 
             # check if at header
             line = line.strip()
@@ -182,15 +179,15 @@ class MapDataReader:
         try:
             time,thr,ev,size,off = line.split(',')
         except:
-            print(f'Error while reading {self.file_path}: '
-                  'The input line does not have the correct number of fields:\n'
-                  f'>>>> {line}')
-            exit(1)
+            UI.error(f'While reading "{self.file_path}":\n'
+                     'Incorrect number of fields:\n'
+                     f'>>> {line}')
         try:
             off = int(off)
         except:
-            print('Incorrect value for offset:\n'
-                  f'    {off}')
+            UI.error(f'While reading {self.file_path}: '
+                     'Incorrect value for offset:\n'
+                     f'>>> {off}')
             exit(1)
 
         # Transform the (relative) offset to (absolute) address.
@@ -233,45 +230,51 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
     tick_list = full_list[::tick_step]
     return tick_list
 
-def save_fig(fig, metric_strings:MetricStrings):
-    code = metric_strings.code
-    number = metric_strings.number
-    filename=f'{st.Map.ID}.plot_{number}_{code}.{st.Plot.format}'
-    print(f'    {code:{st.UI.metric_code_hpad}}: ', flush=True, end='')
-    fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
-                pad_inches=st.Plot.img_border_pad)
-    print(f'{filename}')
-    plt.close(fig)
-    return
-
 def save_json(data, metric_strings:MetricStrings):
     code = metric_strings.code
     number = metric_strings.number
     filename=f'{st.Map.ID}.metric_{number}_{code}.json'
-    print(f'    {code:{st.UI.metric_code_hpad}}: ', flush=True, end='')
+    UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
     with open(filename, 'w') as f:
         json.dump(data, f)
-    print(f'{filename}')
+    UI.text(filename, indent=False)
+    return
+
+def save_fig(fig, metric_strings:MetricStrings):
+    code = metric_strings.code
+    number = metric_strings.number
+    filename=f'{st.Map.ID}.plot_{number}_{code}.{st.Plot.format}'
+    UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
+    fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
+                pad_inches=st.Plot.img_border_pad)
+    UI.text(filename, indent=False)
+    plt.close(fig)
     return
 
 def json_to_dict(json_path):
     if json_path is None:
-        print('Error while reading json file: '
-              'No file path provided.')
-        exit(1)
+        UI.error(f'While reading "{json_path}":\n'
+                 'No file path provided.')
     try:
         jfile = open(json_path, 'r')
+    except json.JSONDecodeError:
+        UI.error(f'While reading "{json_path}":\n'
+                 'File does not seem to be a valid JSON file.')
     except:
-        print(f'Error while reading {json_path}: '
-              'File does not exist or cannot be read.')
-        exit(1)
+        UI.error(f'While reading "{json_path}":\n'
+                 'File does not exist or cannot be read.')
     jdict = json.load(jfile)
     jfile.close()
+
     if not all(key in jdict for key in st.metric_keys):
-        print(f'Error while reading {json_path}: '
-              'File does not seem to be a (complete) metric file. '
-              'Not all first-level keys present.')
-        exit(1)
+        k_str = []
+        for k in st.metric_keys:
+            k_str.append(f' - "{k}"')
+        k_str = '\n'.join(k_str)
+        UI.error(f'While reading "{json_path}:"\n'
+                 'File does not seem to be a (complete) metric file. '
+                 'Not all first-level keys present. Necessary keys:\n'
+                 f'{k_str}')
 
     # enable only the metric specified by the file
     st.Plot.include = { jdict['metric']['code'] }
@@ -286,8 +289,7 @@ def hsl2rgb(h, s, l, a):
            (not (0 <= a <= 100)):
             raise ValueError
     except ValueError:
-        print('hsl2rgb(): Incorrect value given to either h, s, l, or a')
-        exit(1)
+        UI.error('hsl2rgb(): Incorrect value given to either h, s, l, or a')
     h,s,l,a = h/360.0, s/100.0, l/100.0, a/100.0
     r,g,b = colorsys.hls_to_rgb(h, l, s)
     r,g,b,a = round(r*255), round(g*255), round(b*255), round(a*255)

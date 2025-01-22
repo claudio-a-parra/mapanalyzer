@@ -1,9 +1,11 @@
-import sys, os, json
+import os
 from datetime import datetime
+
+from mapanalyzer.ui import UI
 
 class Settings:
     mode = 'sim-plot'
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
     metric_keys = ['cache', 'map', 'mapplot', 'metric', 'timestamp']
     @classmethod
     def set_mode(cls, args):
@@ -13,21 +15,14 @@ class Settings:
 
     @classmethod
     def describe(cls, ind=''):
-        print('SETTINGS')
+        UI.indent_in('SETTINGS')
         ret_str = ''
         my_attrs = ['Plot', 'Cache', 'Map']
-        for prop in my_attrs:
-            print(f'{prop.upper()}')
-            getattr(cls, prop).describe(ind='    ')
+        for attr in my_attrs:
+            UI.text(f'{attr.upper()}')
+            getattr(cls, attr).describe()
         return
 
-    class UI:
-        ############################################################
-        #### CONSTANT VALUES
-        cache_param_hpad = 17
-        map_param_hpad = 17
-        module_name_hpad = 23
-        metric_code_hpad = 17
 
 
     class Cache:
@@ -62,11 +57,11 @@ class Settings:
         def from_file(cls, filename=None):
             # if no file, compute derived values from default basics
             if filename is None:
-                print('[!] No cache file given. Using default '
-                      'configuration.')
+                pass
+                #UI.info('No cache file given. Using default configuration.')
             elif not os.path.isfile(filename):
-                print(f'[!] File {filename} does not exist. Using default '
-                      'configuration.')
+                UI.error(f'While reading "{filename}":\n'
+                         'File does not exist or cannot be read.')
 
             # If cache file exists, then use it.
             else:
@@ -85,33 +80,32 @@ class Settings:
 
                         # ignore lines not like <name>:<value>
                         if len(key_val_arr) != 2:
-                            print(f'[!] {filename}: Ignoring invalid line\n'
-                                  f'    >>>>{line}')
+                            UI.warning(f'Ignoring invalid line:\n'
+                                       f'>>> {line}')
                             continue
                         name,val = key_val_arr[0], key_val_arr[1]
 
                         # ignore invalid property names
                         if name not in cls.key_map:
-                            print(f'[!] Invalid property. Ignoring it:\n'
-                                  f'    >>>>{line}')
+                            UI.warning(f'Ignoring invalid property:\n'
+                                       f'>>> {line}')
                             continue
 
                         # ignore invalid values
                         try:
                             val = int(val)
                         except Exception:
-                            print(f'[!] Invalid value. Ignoring it:\n'
-                                  f'    >>>>{line}')
+                            UI.warning(f'Ignoring invalid value:\n'
+                                       f'>>> {line}')
                             continue
 
                         name_vals[name] = val
 
                     # error if cache file was given but it is incomplete.
                     if len(cls.key_map) != len(name_vals):
-                        print(f'[!] Cache file given does not have all '
-                              'necessary properties.\n'
-                              '    See mapanalyzer --help.')
-                        exit(1)
+                        UI.error('Cache file given does not have all '
+                                 'necessary properties.\n'
+                                 'See mapanalyzer --help.')
 
                     # apply values
                     cls.file_path = filename
@@ -155,7 +149,7 @@ class Settings:
         @classmethod
         def to_dict(cls):
             if not cls.initialized:
-                raise Exception("Cache not initialized. Cannot export.")
+                UI.error('Cache.to_dict: Cache not initialized, cannot export.')
             return {
                 'line_size_bytes': cls.line_size,
                 'associativity': cls.asso,
@@ -171,28 +165,31 @@ class Settings:
             return ret_str[:-1]
 
         @classmethod
-        def describe(cls, ind=''):
-            i = '    '
+        def describe(cls):
             if cls.file_path is None:
-                fname = ' (Default values)'
+                fname = ' (Default Values)'
             else:
                 fname = f' ({cls.file_path})'
-            print(f'\n{ind}CACHE PARAMETERS{fname}')
-            hpad = Settings.UI.cache_param_hpad
-            print(f'{ind}{i}{"Address Size":{hpad}}: '
-                  f'{cls.arch} bits ('
+            UI.indent_in(title=f'CACHE PARAMETERS{fname}')
+            names = [
+                'Address Size',
+                'Cache Size',
+                'Number of Sets',
+                'Line Size',
+                'Associativity'
+            ]
+            vals = [
+                f'{cls.arch} bits ('
                   f'tag:{cls.bits_tag} | '
                   f'idx:{cls.bits_set} | '
-                  f'off:{cls.bits_off})\n'
-                  f'{ind}{i}{"Cache size":{hpad}}: '
-                  f'{cls.cache_size} bytes\n'
-                  f'{ind}{i}{"Number of sets":{hpad}}:'
-                  f' {cls.num_sets}\n'
-                  f'{ind}{i}{"Line size":{hpad}}: '
-                  f'{cls.line_size} bytes\n'
-                  f'{ind}{i}{"Associativity":{hpad}}: '
-                  f'{cls.asso}-way'
-            )
+                  f'off:{cls.bits_off})',
+                f'{cls.cache_size} bytes',
+                f'{cls.num_sets}',
+                f'{cls.line_size} bytes',
+                f'{cls.asso}-way'
+            ]
+            UI.columns((names, vals), sep=' : ')
+            UI.indent_out()
             return
 
 
@@ -246,7 +243,6 @@ class Settings:
         @classmethod
         def split(cls, address):
             """Splits an address into its tag, index, and offset parts."""
-            # print(f"split: addr:{address}")
             offset_mask = (1 << cls.bits_off) - 1
             offset = address & offset_mask
             index_mask = (1 << cls.bits_set) - 1
@@ -283,19 +279,15 @@ class Settings:
             return rev_ret[::-1][1:]
 
         @classmethod
-        def describe(cls, ind=''):
-            i = '    '
-            print(f'{ind}ADDR FORMATTER')
-            print(
-                f'{ind}{i}max_tag    :{cls.max_tag}\n'
-                f'{ind}{i}bits_tag   :{cls.bits_tag}\n'
-                f'{ind}{i}max_index  :{cls.max_index}\n'
-                f'{ind}{i}bits_set   :{cls.bits_set}\n'
-                f'{ind}{i}max_offset :{cls.max_offset}\n'
-                f'{ind}{i}bits_off   :{cls.bits_off}'
-            )
+        def describe(cls):
+            UI.indent_in(title='ADDR FORMATTER')
+            names = ['max_tag', 'bits_tag', 'max_index', 'bits_set',
+                     'max_offset', 'bits_off']
+            vals = [cls.max_tag, cls.bits_tag, cls.max_index, cls.bits_set,
+                    cls.max_offset, cls.bits_off]
+            UI.columns((names, vals), sep=' : ')
+            UI.indent_out()
             return
-
 
     class Plot:
         ############################################################
@@ -413,7 +405,7 @@ class Settings:
             cls.y_ranges = cls.__init_ranges(cls.y_ranges)
             cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
                 cls.width, cls.height, cls.dpi, cls.max_map_res)
-            print('[!] Hardcoded jump_line_width')
+            UI.warning('Hardcoded jump_line_width.')
             cls.jump_line_width = 1 #max(0.2,min(3,12*(width/data_X_size)))
             return
 
@@ -427,7 +419,7 @@ class Settings:
                     if up in cls.PLOTCODES:
                         including.add(up)
                     else:
-                        print(f'Warning: Unknown plotcode "{up}".')
+                        UI.warning(f'Unknown plotcode "{up}".')
             return including
 
         @classmethod
@@ -441,14 +433,11 @@ class Settings:
                         min_val = float(min_val)
                         max_val = float(max_val)
                     except ValueError:
-                        print(f'Error: Range with wrong format "{ran}".')
-                        exit(1)
+                        UI.error(f'Plot Range with wrong format "{ran}".')
                     if min_val >= max_val:
-                        print(f'Error: Range min:{min_val} >= max:{max_val}.')
-                        exit(1)
+                        UI.error(f'Plot Range min:{min_val} >= max:{max_val}.')
                     if plcode not in cls.PLOTCODES:
-                        print(f'Error: Invalid plotcode "{plcode}"')
-                        exit(1)
+                        UI.error(f'Invalid plotcode "{plcode}".')
 
                     ranges[plcode] = (min_val, max_val)
             return ranges
@@ -465,40 +454,27 @@ class Settings:
                 try:
                     max_res = int(max_res)
                 except:
-                    print(f'Error: max-res must be an integer or \'auto\'')
-                    exit(1)
+                    UI.error(f'Error: max-res must be an integer or "auto".')
             return (min_res,max_res)
 
         @classmethod
-        def __str__(cls):
-            ret_str = ''
-            my_attrs = [
+        def describe(cls):
+            attrs = [
                 'width', 'height', 'dpi', 'format', 'img_border_pad',
-                'img_title_vpad', 'ui_modulename_hpad', 'ui_plotname_hpad',
+                'img_title_vpad',
                 'max_xtick_count', 'max_ytick_count', 'max_map_ytick_count',
                 'x_orient', 'linewidth', 'pal_lig', 'pal_sat', 'pal_alp',
                 'grid_main_width', 'grid_main_style', 'grid_main_alpha',
                 'grid_other_width', 'grid_other_style', 'grid_other_alpha',
                 'grid_max_bytes', 'grid_max_blocks', 'tbox_bg', 'tbox_border',
                 'tbox_font', 'tbox_font_size', 'fade_bytes_alpha', 'include',
-                'x_ranges', 'y_ranges', 'min_res', 'max_res', 'jump_line_width',
-                'initialized'
+                'x_ranges', 'y_ranges', 'min_map_res', 'max_map_res',
+                'jump_line_width', 'initialized'
             ]
-            for prop in my_attrs:
-                val = getattr(cls, prop)
-                if type(val) == str:
-                    val = f'\'{val}\''
-                ret_str += f'{prop:7}: {val}\n'
-            return ret_str[:-1]
-
-        @classmethod
-        def describe(cls, ind=''):
-            i = '    '
-            cls_str = cls.__str__()
-            cls_str = cls_str.split('\n')
-            print(f'{ind}PLOT OPTIONS')
-            for line in cls_str:
-                print(f'{ind}{i}{line}')
+            vals = [getattr(cls, at) for at in attrs]
+            UI.indent_in(title='PLOT OPTIONS')
+            UI.columns((attrs, vals), sep=' : ')
+            UI.indent_out()
             return
 
 
@@ -564,15 +540,13 @@ class Settings:
         def from_file(cls, map_filepath):
             # check for file existence.
             if map_filepath is None:
-                print('You must specify a map file.')
-                exit(1)
+                UI.error('You must specify a MAP file.')
             cls.file_path = map_filepath
             try:
                 file = open(cls.file_path, 'r')
             except:
-                print(f'Error while reading {cls.file_path}: '
-                      'File does not exist or cannot be read.')
-                exit(1)
+                UI.error(f'While reading MAP file "{cls.file_path}":\n'
+                         'File does not exist or cannot be read.')
 
             # Collect lines from the different sections
             unknown = '__#__Unknown Section__#__'
@@ -605,35 +579,36 @@ class Settings:
                 sections[current_section].append(line)
             file.close()
 
-            # If top sections: error, warning, and metadata are
-            # all empty, that means this is not a valid MAP file.
-            if len(sections[cls.header_error]) == 0 and \
-               len(sections[cls.header_warning]) == 0 and \
-               len(sections[cls.header_metadata]) == 0:
-                print(f'Error while reading {cls.file_path}: '
-                      'This doesn\'t seem to be a valid MAP file.')
-                exit(1)
+            # If there are error or warning sections, print them.
+            if len(sections[cls.header_error]) != 0 or \
+               len(sections[cls.header_warning]) != 0:
 
-            # If there are errors, show them and stop
-            if len(sections[cls.header_error]) != 0:
-                print(f'Error while reading {cls.file_path}: '
-                      'The MAP file reports ERRORS:')
-                for l in sections[cls.header_error]:
-                    print(f'>>>>{l}')
-                exit(1)
+                # If there are errors, show them and stop
+                if len(sections[cls.header_error]) != 0:
+                    e_str = []
+                    for l in sections[cls.header_error]:
+                        e_str.append(f'>>> {l}')
+                    e_str = '\n'.join(e_str)
+                    UI.error(f'While reading MAP file "{cls.file_path}":\n'
+                             'File reports ERRORS:\n'
+                             f'{e_str}')
 
-            # If there are warnings, show them and continue
-            if len(sections[cls.header_warning]) != 0:
-                print(f'Warning: {cls.file_path} reports WARNINGS:')
-                for l in sections[cls.header_warning]:
-                    print(f'>>>>{l}')
+                # If there are warnings, show them and continue
+                if len(sections[cls.header_warning]) != 0:
+                    w_str = []
+                    for l in sections[cls.header_warning]:
+                        w_str.append(f'>>> {l}')
+                    w_str = '\n'.join(w_str)
+                    UI.warning(f'While reading MAP file "{cls.file_path}":\n'
+                               'File reports WARNINGS:\n'
+                               f'{w_str}')
 
             # If there is no metadata section, that is also
             # a non-recoverable error
             if len(sections[cls.header_metadata]) == 0:
-                print(f'Error while reading {cls.file_path}: '
-                      'The MAP file does not have a METADATA section.')
-                exit(1)
+                UI.error(f'While reading MAP file "{cls.file_path}":\n'
+                         'File does not have a METADATA section.\n'
+                         'Is this a valid MAP file?')
 
             # Read Metadata
             for line in sections[cls.header_metadata]:
@@ -643,26 +618,26 @@ class Settings:
                     name,val = no_comment_line.split(':')
                     name,val = name.strip(),val.strip()
                 except:
-                    print(f'Error while reading {cls.file_path}: '
-                          'Malformed line in METADATA Section:\n'
-                          f'>>>>{line}')
-                    exit(1)
+                    UI.error(f'While reading MAP file "{cls.file_path}":\n'
+                             'Malformed line in METADATA Section.\n'
+                             f'>>> {line}')
+
                 # check if it is a recognized pair (known name and
                 # correct integer parsing)
                 if name in cls.key_map:
                     try:
                         int_val = int(val, cls.key_map[name][1])
                     except ValueError:
-                        print(f'Error while reading {cls.file_path}: '
-                              f'Invalid value for in Metadata Section.\n'
-                              f'>>>>{line}')
-                        exit(1)
+                        UI.error(f'While reading MAP file "{cls.file_path}":\n'
+                                 f'Invalid value in METADATA section.\n'
+                                 f'>>> {line}')
+
                     # accepting and storing the value
                     setattr(cls, cls.key_map[name][0], int_val)
                 else:
-                    print(f'Warning while reading {cls.file_path}: '
-                          'Unrecognized METADATA parameter name:\n'
-                          f'>>>>{line}')
+                    UI.warning(f'While reading MAP file "{cls.file_path}":\n'
+                               'Unrecognized METADATA parameter name.\n'
+                               f'>>> {line}')
 
             # if any value is missing, error.
             missing = []
@@ -670,20 +645,20 @@ class Settings:
                 if getattr(cls, cls.key_map[name][0]) is None:
                     missing.append(name)
             if len(missing) != 0:
-                print(f'Error while reading {cls.file_path}: '
-                      f'Incomplete METADATA section.\n'
-                      'Missing data:')
+                m_str = []
                 for m in missing:
-                    print(f' - {m}')
-                exit(1)
+                    m_str.append(f' - {m}')
+                m_str = '\n'.join(m_str)
+                UI.error(f'While reading MAP file "{cls.file_path}":\n'
+                         f'Incomplete METADATA section. Missing data:\n'
+                         f'{m_str}')
 
             # error if start_addr, mem_size and end_addr are incoherent.
             if cls.end_addr - cls.start_addr + 1 != cls.mem_size:
-                print(f'Error while reading {cls.file_path}: '
-                      'The start/end addresses and size are inconsistent:\n'
-                      f'    {hex(cls.end_addr)} - {hex(cls.start_addr)} + 1 '
-                      f'!= {cls.mem_size}')
-                exit(1)
+                UI.error(f'While reading MAP file "{cls.file_path}":\n'
+                         'The (start,end,size) parameters are inconsistent:\n'
+                         f'{hex(cls.end_addr)} - {hex(cls.start_addr)} + 1 '
+                         f'!= {cls.mem_size}')
 
             # convert max-time index (what comes in the file) to time_size
             cls.time_size +=1
@@ -767,23 +742,16 @@ class Settings:
             return ret_str[:-1]
 
         @classmethod
-        def describe(cls, ind=''):
-            i = '    '
+        def describe(cls):
             if cls.file_path is None:
                 fname = ' (No MAP file)'
             else:
                 fname = f' ({cls.file_path})'
-            print(f'\n{ind}MEMORY ACCESS PATTERN{fname}')
-            hpad = Settings.UI.map_param_hpad
-            print(f'{ind}{i}{"First Address":{hpad}}: '
-                  f'{hex(cls.start_addr)}\n'
-                  f'{ind}{i}{"Memory Size":{hpad}}: '
-                  f'{cls.mem_size} bytes\n'
-                  f'{ind}{i}{"Maximum Time":{hpad}}: '
-                  f'{cls.time_size-1}\n'
-                  f'{ind}{i}{"Thread Count":{hpad}}: '
-                  f'{cls.thread_count}\n'
-                  f'{ind}{i}{"Event Count":{hpad}}: '
-                  f'{cls.event_count}'
-            )
+            UI.indent_in(title=f'MEMORY ACCESS PATTERN{fname}')
+            names = ['First Address', 'Memory Size', 'Maximum Time',
+                     'Thread Count', 'Event Count']
+            vals = [f'0x{cls.start_addr:X}', f'{cls.mem_size} bytes',
+                    cls.time_size-1, cls.thread_count, cls.event_count]
+            UI.columns((names, vals), sep=' : ')
+            UI.indent_out()
             return

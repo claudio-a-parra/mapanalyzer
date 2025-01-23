@@ -7,16 +7,14 @@ from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
 class MetricStrings:
-    counter = 0
-    def __init__(self, title='Title', subtit='Subtitle', code='COD',
+    def __init__(self, title='Title', subtit='Subtitle', numb='00', code='COD',
                  xlab='X-axis', ylab='Y-axis'):
         self.title = title
         self.subtit= subtit
         self.code = code
         self.xlab  = xlab
         self.ylab  = ylab
-        self.number = f'{MetricStrings.counter:02}'
-        MetricStrings.counter += 1
+        self.number = numb
         return
 
 class Palette:
@@ -230,7 +228,7 @@ def create_up_to_n_ticks(full_list, base=10, n=10):
     tick_list = full_list[::tick_step]
     return tick_list
 
-def save_json(data, metric_strings:MetricStrings):
+def save_metric(data, metric_strings:MetricStrings):
     code = metric_strings.code
     number = metric_strings.number
     filename=f'{st.Map.ID}.metric_{number}_{code}.json'
@@ -240,10 +238,15 @@ def save_json(data, metric_strings:MetricStrings):
     UI.text(filename, indent=False)
     return
 
-def save_fig(fig, metric_strings:MetricStrings):
+def __save_plot(fig, metric_strings:MetricStrings, type_prefix='plot'):
     code = metric_strings.code
     number = metric_strings.number
-    filename=f'{st.Map.ID}.plot_{number}_{code}.{st.Plot.format}'
+    id_prefix = ''
+    if st.Map.ID != '':
+        id_prefix = f'{st.Map.ID}.'
+    filename=f'{id_prefix}{type_prefix}_{number}_{code}.{st.Plot.format}'
+
+    # save file
     UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
     fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
                 pad_inches=st.Plot.img_border_pad)
@@ -251,34 +254,55 @@ def save_fig(fig, metric_strings:MetricStrings):
     plt.close(fig)
     return
 
-def json_to_dict(json_path):
+def save_aggr(fig, metric_strings:MetricStrings):
+    __save_plot(fig, metric_strings, type_prefix='aggr')
+    return
+
+def save_plot(fig, metric_strings:MetricStrings):
+    __save_plot(fig, metric_strings, type_prefix='plot')
+    return
+
+def load_json(json_path):
+    """open and verify this is a json file"""
     if json_path is None:
         UI.error(f'While reading "{json_path}":\n'
                  'No file path provided.')
     try:
-        jfile = open(json_path, 'r')
+        json_file = open(json_path, 'r')
+    except (FileNotFoundError, IOError):
+        UI.error(f'While reading "{json_path}":\n'
+                 'File does not exist or cannot be read.')
+    try:
+        j_dict = json.load(json_file)
     except json.JSONDecodeError:
         UI.error(f'While reading "{json_path}":\n'
                  'File does not seem to be a valid JSON file.')
-    except:
-        UI.error(f'While reading "{json_path}":\n'
-                 'File does not exist or cannot be read.')
-    jdict = json.load(jfile)
-    jfile.close()
+    json_file.close()
+    return j_dict
 
-    if not all(key in jdict for key in st.metric_keys):
-        k_str = []
-        for k in st.metric_keys:
-            k_str.append(f' - "{k}"')
-        k_str = '\n'.join(k_str)
-        UI.error(f'While reading "{json_path}:"\n'
+def missing_keys(met_dict):
+    """Verify that all first level keys are present"""
+    missing_keys = []
+    mk_str = ''
+    for k in st.metric_keys:
+        if k not in met_dict:
+            missing_keys.append(k)
+    if len(missing_keys) > 0:
+        missing_keys = [f' - "{k}"' for k in missing_keys]
+        mk_str = '\n'.join(missing_keys)
+    return mk_str
+
+def load_metric(metric_path):
+    met_dict = load_json(metric_path)
+    mk_str = missing_keys(met_dict)
+    if len(mk_str) > 0:
+        UI.error(f'While reading "{metric_path}:"\n'
                  'File does not seem to be a (complete) metric file. '
                  'Not all first-level keys present. Necessary keys:\n'
-                 f'{k_str}')
-
+                 f'{mk_str}')
     # enable only the metric specified by the file
-    st.Plot.include = { jdict['metric']['code'] }
-    return jdict
+    st.Plot.include = { met_dict['metric']['code'] }
+    return met_dict
 
 def hsl2rgb(h, s, l, a):
     try:
@@ -296,7 +320,7 @@ def hsl2rgb(h, s, l, a):
     return f'#{r:02X}{g:02X}{b:02X}{a:02X}'
 
 def command_line_args_parser():
-    synopsis = ('MAP Alyzer, a tool to study the cache friendliness of '
+    synopsis = ('MAP Analyzer, a tool to study the cache friendliness of '
                 'memory access patterns.')
     cache_conf = ('cache.conf\n'
                   '  The cache file file must have this format:\n'
@@ -334,10 +358,10 @@ def command_line_args_parser():
 
     # Adding arguments
     parser.add_argument(
-        metavar='INPUT-FILES', dest='input_files', nargs='+',
+        metavar='INPUT-FILE', dest='input_files', nargs='+',
         type=str, default=None,
         help=('List of input files. Depending on the analysis '
-              '"mode", they are either "map" or "metric" type.')
+              '"mode", they are either MAP or METRIC type.')
     )
 
     parser.add_argument(

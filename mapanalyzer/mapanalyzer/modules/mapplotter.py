@@ -7,7 +7,7 @@ from itertools import combinations
 from math import prod
 
 from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
-    save_fig, save_json
+    save_plot, save_metric
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
@@ -23,12 +23,14 @@ class Map:
         self.ps = MetricStrings(
             title = 'MAP',
             subtit = None,
+            numb   = '00',
             code = 'MAP',
             xlab   = 'Time [access instr.]',
             ylab   = 'Space [bytes]',
         )
 
         self.enabled = True # always enabled
+        # only to determine whether to export metric/plots
         self.standalone_plot = self.ps.code in st.Plot.include
         if hue is None:
             hue = self.__class__.hue
@@ -104,10 +106,12 @@ class Map:
         return
 
     def export_metrics(self, bg_module):
-        self_dict = self.to_dict()
-        # This shit is redundant, but it is for standardized format... sue me.
-        self_dict['mapplot'] = bg_module.to_dict()['metric']
-        save_json(self_dict, self.ps)
+        if not self.enabled or not self.standalone_plot:
+            return
+        data = st.to_dict()
+        data['metric'] = self.to_dict()
+        data['mapplot'] = None
+        save_metric(data, self.ps)
         return
 
     def export_plots(self, bg_module=None):
@@ -153,7 +157,7 @@ class Map:
         self.__draw_X_grid(axes)
         self.__draw_Y_grid(axes)
         self.__fade_padding_bytes(axes)
-        save_fig(fig, self.ps)
+        save_plot(fig, self.ps)
         return
 
     def bg_plot(self, axes, draw_x_grid=False, draw_y_grid=False):
@@ -332,17 +336,11 @@ class Map:
         return
 
     def to_dict(self):
-        data = {
-            'timestamp': st.timestamp,
-            'map': st.Map.to_dict(),
-            'cache': st.Cache.to_dict(),
-            'metric': {
-                'code': self.ps.code,
-                'x': self.X,
-                'space_time': self.space_time
-            }
+        return {
+            'code': self.ps.code,
+            'x': self.X,
+            'space_time': self.space_time
         }
-        return data
 
     def load_from_dict(self, data):
         """Load data from dictionary"""

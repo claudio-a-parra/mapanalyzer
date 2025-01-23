@@ -7,6 +7,7 @@ class Settings:
     mode = 'sim-plot'
     timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
     metric_keys = ['cache', 'map', 'mapplot', 'metric', 'timestamp']
+
     @classmethod
     def set_mode(cls, args):
         if args.mode is not None:
@@ -14,13 +15,21 @@ class Settings:
         return
 
     @classmethod
+    def to_dict(cls):
+        data = {
+            'timestamp': cls.timestamp,
+            'map': cls.Map.to_dict(),
+            'cache': cls.Cache.to_dict()
+        }
+        return data
+
+    @classmethod
     def describe(cls, ind=''):
         UI.indent_in('SETTINGS')
-        ret_str = ''
         my_attrs = ['Plot', 'Cache', 'Map']
         for attr in my_attrs:
-            UI.text(f'{attr.upper()}')
             getattr(cls, attr).describe()
+        UI.indent_out()
         return
 
 
@@ -515,10 +524,14 @@ class Settings:
         time_size = None
 
         initialized = False
+        initd_from_dict = False
 
         ############################################################
         #### DERIVED VALUES
-        ID = None # unique name derived from file_path
+        # common prefix of list of file paths that can be discarded.
+        path_prefix = None
+        # unique name derived from file_path and cls.path_prefix
+        ID = ''
         # aligned_start_addr <= start_addr.
         # This value is aligned to the beginning of a block
         aligned_start_addr = None
@@ -663,40 +676,63 @@ class Settings:
             # convert max-time index (what comes in the file) to time_size
             cls.time_size +=1
 
+            # compute derived values
+            cls.initd_from_dict = False
             cls.__init_derived_values()
             cls.initialized = True
             return
 
         @classmethod
-        def from_dict(cls, map_dict, file_path=None):
+        def from_dict(cls, map_dict, met_file_path=None):
             # load data from the map section of the metric file
             cls.__dict_to_basics(map_dict)
-            cls.file_path = file_path
+            cls.file_path = met_file_path
 
             # compute derived values
+            cls.initd_from_dict = True
             cls.__init_derived_values()
             cls.initialized = True
             return
+
+        @classmethod
+        def set_path_prefix(cls, input_files_paths):
+            """If only one file was given, then, use the directory name:
+            If multiple files were given, then, use the common path."""
+            if len(input_files_paths) == 0:
+                UI.error('No input files were given.')
+            elif len(input_files_paths) == 1:
+                cls.path_prefix = os.path.dirname(input_files_paths[0])
+            else:
+                cls.path_prefix = os.path.commonpath(input_files_paths)
+            return
+
+        @classmethod
+        def generate_id(cls):
+            """
+            Determine a unique ID based on the input's path minus the stored
+            cls.path_prefix
+            """
+            relative_path = os.path.relpath(cls.file_path, cls.path_prefix)
+            basename, _ = os.path.splitext(relative_path)
+
+            if cls.initd_from_dict:
+                orig_map_prefix, _ = os.path.splitext(basename)
+            else:
+                orig_map_prefix = basename
+            path_elements = os.path.normpath(orig_map_prefix).split(os.sep)
+            map_id = '_'.join(path_elements)
+
+            return map_id
 
         @classmethod
         def __init_derived_values(cls):
-            # determine a unique id based on the path to the map file
-            # or the json file.
-            # the/path/to/mapfile.map --> the_path_to_mapfile
-            # the/path/to/mapfile.metric.map --> the_path_to_mapfile
-            basename, extension = os.path.splitext(cls.file_path)
-            if extension == '.map':
-                basename = basename
-            else:
-                basename, extension = os.path.splitext(basename)
-            path_elements = os.path.normpath(basename).split(os.sep)
-            cls.ID = '_'.join(path_elements)
-
+            """Compute derived values from the basic ones"""
+            cls.ID = cls.generate_id()
             # compute padding bytes to make the memory chunk block-aligned.
             if not Settings.Cache.initialized:
-                raise Exception('Cache settings must be initialized '
-                                'before MAP settings, as the memory padding '
-                                'depends on cache settings values.')
+                UI.error('Cache settings must be initialized before MAP '
+                         'settings, as the memory padding depends on the cache '
+                         'settings values.')
             cls.left_pad  = cls.start_addr & (Settings.Cache.line_size-1)
             cls.aligned_start_addr = cls.start_addr - cls.left_pad
             cls.right_pad = (Settings.Cache.line_size-1) - \

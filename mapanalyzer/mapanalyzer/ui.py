@@ -76,7 +76,7 @@ class UI:
         return
 
     @classmethod
-    def error(cls, msg, symb='(!) ', pre='ERROR', do_exit=True, code=1):
+    def error(cls, msg, symb='!! ', pre='ERROR', do_exit=True, code=1):
         """print an error message to stderr and possibly exit with a
         given code"""
         cls.__color_msg(msg=msg, symb=symb, pre=pre, msg_color=Fore.RED,
@@ -90,7 +90,7 @@ class UI:
         return
 
     @classmethod
-    def warning(cls, msg, symb='(!) ', pre='WARNING'):
+    def warning(cls, msg, symb='! ', pre='WARNING'):
         """print a warning message to stderr"""
         cls.__color_msg(msg=msg, symb=symb, pre=pre, msg_color=Fore.YELLOW,
                         out=stderr)

@@ -96,27 +96,22 @@ class Modules:
         return
 
     @classmethod
-    def classify_and_aggregate_metrics(cls, mixed_metrics_dicts):
-        UI.indent_in(title='AGGREGATING SAME-TYPE METRICS')
+    def aggregate_metrics(cls, metrics_dicts:dict):
+        UI.indent_in(title='AGGREGATING SAME-CODE METRICS')
+        UI.warning('DRAFT IMPLEMENTATION')
 
-        # classify metrics by their code
-        classified_metrics = {}
-        for met_dict in mixed_metrics_dicts:
-            met_code = met_dict['code']
-            if met_code not in classified_metrics:
-                classified_metrics[met_code] = []
-            classified_metrics[met_code].append(met_dict)
+        codes_list = sorted(metrics_dicts.keys())
 
-        # dispatch a list of "same type" metrics to each registered module
-        for c_met_code in classified_metrics:
-            if c_met_code not in cls.Aggr_Modules:
-                UI.warning(f'Metric "{c_met_code}" is not mapped to any '
+        for code in codes_list:
+            same_code_metrics = metrics_dicts[code]
+            # check that the metric code is known
+            if code not in cls.Aggr_Modules:
+                UI.warning(f'Metric "{code}" is not mapped to any '
                            'aggregate-enabled Module. '
-                           f'Ignoring {len(classified_metrics[c_met_code])} '
+                           f'Ignoring {len(same_code_metrics)} '
                            'metric files.')
             else:
-                aggr_module = cls.Aggr_Modules[c_met_code]
-                same_type_metrics = classified_metrics[c_met_code]
-                aggr_module.aggregate_metrics(same_type_metrics)
+                aggr_module = cls.Aggr_Modules[code]
+                aggr_module.export_aggregated_plots(same_code_metrics)
         UI.indent_out()
         return

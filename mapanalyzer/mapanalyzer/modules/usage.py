@@ -2,12 +2,22 @@ import matplotlib.pyplot as plt
 
 
 from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
-    save_fig, save_json
+    save_plot, save_metric, save_aggr
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
 class CacheUsage:
     hue = 120
+    # Metric(s) info
+    aggr_met_str = MetricStrings(
+        title  = 'Aggregated CUR',
+        subtit = 'higher is better',
+        numb   = '01',
+        code   = 'CUR_aggr',
+        xlab   = 'Time [access instr.]',
+        ylab   = 'Cache Usage Rate [%]'
+    )
+
     def __init__(self, shared_X=None, hue=None):
         # Module info
         self.name = 'Cache Usage Rate'
@@ -19,6 +29,7 @@ class CacheUsage:
         self.ps = MetricStrings(
             title  = 'CUR',
             subtit = 'higher is better',
+            numb   = '01',
             code   = 'CUR',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Usage Rate [%]'
@@ -65,9 +76,10 @@ class CacheUsage:
         return
 
     def export_metrics(self, bg_module):
-        self_dict = self.__to_dict()
-        self_dict['mapplot'] = bg_module.to_dict()['metric']
-        save_json(self_dict, self.ps)
+        data = st.to_dict()
+        data['metric'] = self.__to_dict()
+        data['mapplot'] = bg_module.to_dict()
+        save_metric(data, self.ps)
         return
 
     def export_plots(self, bg_module=None):
@@ -102,7 +114,7 @@ class CacheUsage:
         self.__draw_textbox(fg_axes)
 
         # save figure
-        save_fig(fig, self.ps)
+        save_plot(fig, self.ps)
         return
 
     def __setup_X_axis(self, axes):
@@ -193,17 +205,11 @@ class CacheUsage:
         return
 
     def __to_dict(self):
-        data = {
-            'timestamp': st.timestamp,
-            'map': st.Map.to_dict(),
-            'cache': st.Cache.to_dict(),
-            'metric': {
-                'code': self.ps.code,
-                'x': self.X,
-                'usage_ratio': self.usage_ratio
-            }
+        return {
+            'code': self.ps.code,
+            'x': self.X,
+            'usage_ratio': self.usage_ratio
         }
-        return data
 
     def load_from_dict(self, data):
         """Load data from dictionary"""
@@ -219,8 +225,23 @@ class CacheUsage:
         return
 
     @classmethod
-    def aggregate_metrics(cls, metrics_list):
+    def export_aggregated_plots(cls, metrics_list):
         """Given a list of 'metric' dictionaries, aggregate their
         values in a meaningful manner"""
-        for met in metrics_list:
-            UI.info(f'{met["code"]}')
+        num_mets = len(metrics_list)
+        all_x = [m['x'] for m in metrics_list]
+        all_y = [m['usage_ratio'] for m in metrics_list]
+
+        fig,axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # showcase data
+        for m in range(num_mets):
+            met_x = all_x[m]
+            met_y = all_y[m]
+            axes.plot(met_x, met_y, alpha=0.3)
+
+        # set title
+        axes.set_title('Rough Multi-Plot')
+
+        save_aggr(fig, cls.aggr_met_str)
+        return

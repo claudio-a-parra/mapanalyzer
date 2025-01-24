@@ -7,8 +7,26 @@ from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
 class CacheUsage:
+    # Module info
+    name = 'Cache Usage Rate'
+    about = 'Percentage of valid bytes in cache that are used before eviction'
+    metrics = ['CUR']
     hue = 120
+    palette = Palette(
+        hue=(hue, hue),
+        sat=st.Plot.p_sat,
+        lig=st.Plot.p_lig,
+        alp=st.Plot.p_alp)
     # Metric(s) info
+    met_str = MetricStrings(
+        title  = 'CUR',
+        subtit = 'higher is better',
+        numb   = '01',
+        code   = 'CUR',
+        xlab   = 'Time [access instr.]',
+        ylab   = 'Cache Usage Rate [%]'
+    )
+    # Aggregated Metric info
     aggr_met_str = MetricStrings(
         title  = 'Aggregated CUR',
         subtit = 'higher is better',
@@ -18,24 +36,8 @@ class CacheUsage:
         ylab   = 'Cache Usage Rate [%]'
     )
 
-    def __init__(self, shared_X=None, hue=None):
-        # Module info
-        self.name = 'Cache Usage Rate'
-        self.about = ('Percentage of valid bytes in cache that are used '
-                      'before eviction.')
-        self.metrics = 'CUR'
-
-        # Metric(s) info
-        self.ps = MetricStrings(
-            title  = 'CUR',
-            subtit = 'higher is better',
-            numb   = '01',
-            code   = 'CUR',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Usage Rate [%]'
-        )
-
-        self.enabled = self.ps.code in st.Plot.include
+    def __init__(self, shared_X=None):
+        self.enabled = self.met_str.code in st.Plot.include
         if not self.enabled:
             return
 
@@ -43,15 +45,6 @@ class CacheUsage:
             self.X = shared_X
         else:
             self.X = [i for i in range(st.Map.time_size)]
-
-        if hue is None:
-            hue = self.__class__.hue
-        self.hue = hue
-        self.palette = Palette(
-            hue=[hue],
-            lightness=st.Plot.pal_lig,
-            saturation=st.Plot.pal_sat,
-            alpha=st.Plot.pal_alp)
 
         self.accessed_bytes = 0
         self.valid_bytes = 0
@@ -75,11 +68,18 @@ class CacheUsage:
         # no post-simulation computation to be done
         return
 
+    def __to_dict(self):
+        return {
+            'code': self.met_str.code,
+            'x': self.X,
+            'usage_ratio': self.usage_ratio
+        }
+
     def export_metrics(self, bg_module):
         data = st.to_dict()
         data['metric'] = self.__to_dict()
         data['mapplot'] = bg_module.to_dict()
-        save_metric(data, self.ps)
+        save_metric(data, self.met_str)
         return
 
     def export_plots(self, bg_module=None):
@@ -94,126 +94,37 @@ class CacheUsage:
         else:
             fig,fg_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
-        # setup X and Y axes and add tails to the X and Y arrays
-        # for cosmetic purposes (because of the step function)
-        X_padding = self.__setup_X_axis(fg_axes)
-        Y_padding = self.__setup_Y_axis(fg_axes)
-        X = [self.X[0]-X_padding] + self.X + [self.X[-1]+X_padding]
+        # padded data series
+        X_pad = 0.5
+        X = [self.X[0]-X_pad] + self.X + [self.X[-1]+X_pad]
         Y = [self.usage_ratio[0]] + self.usage_ratio + [self.usage_ratio[-1]]
 
         # plot the usage rate
         fg_axes.fill_between(
             X, -1, Y, step='mid', zorder=2,
-            color=self.palette[0][0],
-            facecolor=self.palette[0][1],
+            color=self.palette[0][0][0][0],
+            facecolor=self.palette[1][1][1][1],
             linewidth=st.Plot.linewidth
         )
 
-        # finish plot setup
-        self.__setup_general(fg_axes)
-        self.__draw_textbox(fg_axes)
+        # Plot setup
+        self.__setup_general(fg_axes, self.palette.bg, self.met_str)
+        self.__setup_axes(axes, self.met_str.code, fn_axis='y',
+                          xlims=(self.X[0],self.X[-1]), xpad=X_pad,
+                          ylims=(0,100), ypad='auto', tick_bases=(10, 10),
+                          grid=True)
+
+        # insert text box with average usage
+        text = f'Avg: {sum(self.usage_ratio)/len(self.usage_ratio):.2f}%'
+        self.__draw_textbox(fg_axes, text)
 
         # save figure
-        save_plot(fig, self.ps)
+        save_plot(fig, self.met_str)
         return
-
-    def __setup_X_axis(self, axes):
-        # define X-axis data range based on data and user input
-        X_min = self.X[0]
-        X_max = self.X[-1]
-        if self.ps.code in st.Plot.x_ranges:
-            X_min = int(st.Plot.x_ranges[self.ps.code][0])
-            X_max = int(st.Plot.x_ranges[self.ps.code][1])
-        X_padding = 0.5
-        axes.set_xlim(X_min-X_padding, X_max+X_padding)
-
-        # Axis details: label, ticks and grid
-        axes.set_xlabel(self.ps.xlab)
-        rot = -90 if st.Plot.x_orient == 'v' else 0
-        axes.tick_params(
-            axis='x', rotation=rot, width=st.Plot.grid_other_width,
-            top=False, labeltop=False, bottom=True, labelbottom=True
-        )
-        axes.set_xticks(
-            create_up_to_n_ticks(self.X, base=10, n=st.Plot.max_xtick_count)
-        )
-        axes.grid(
-            axis='x', which='both',
-            zorder=1,
-            alpha=st.Plot.grid_other_alpha,
-            linewidth=st.Plot.grid_other_width,
-            linestyle=st.Plot.grid_other_style
-        )
-        return X_padding
-
-    def __setup_Y_axis(self, axes):
-        # define Y-axis data range based on data and user input
-        Y_min = 0
-        Y_max = 100
-        if self.ps.code in st.Plot.y_ranges:
-            Y_min = int(st.Plot.y_ranges[self.ps.code][0])
-            Y_max = int(st.Plot.y_ranges[self.ps.code][1])
-        Y_padding = (Y_max - Y_min) / 200
-        axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
-
-        # Axis details: label, ticks, and grid
-        axes.set_ylabel(self.ps.ylab)
-        axes.tick_params(
-            axis='y', width=st.Plot.grid_main_width,
-            left=True, labelleft=True, right=False, labelright=False
-        )
-        axes.set_yticks(
-            create_up_to_n_ticks(range(Y_min, Y_max+1), base=10,
-                                 n=st.Plot.max_ytick_count)
-        )
-        axes.grid(
-            axis='y', which='both',
-            zorder=1,
-            alpha=st.Plot.grid_main_alpha,
-            linewidth=st.Plot.grid_main_width,
-            linestyle=st.Plot.grid_main_style
-        )
-        return Y_padding
-
-    def __draw_textbox(self, axes):
-        # insert text box with average usage
-        avg = sum(self.usage_ratio)/len(self.usage_ratio)
-        text = f'Avg: {avg:.2f}%'
-        axes.text(
-            0.98, 0.98, text, transform=axes.transAxes,
-            ha='right', va='top',
-            bbox=dict(facecolor=st.Plot.tbox_bg,
-                      edgecolor=st.Plot.tbox_border,
-                      boxstyle="square,pad=0.2"),
-            fontdict=dict(family=st.Plot.tbox_font,
-                          size=st.Plot.tbox_font_size),
-            zorder=1000
-        )
-        return
-
-    def __setup_general(self, axes):
-        # background color
-        axes.patch.set_facecolor(self.palette.bg)
-
-        # setup title
-        title_string = f'{self.ps.title}: {st.Map.ID}'
-        if self.ps.subtit:
-            title_string += f' ({self.ps.subtit})'
-        axes.set_title(
-            title_string, fontsize=10, pad=st.Plot.img_title_vpad
-        )
-        return
-
-    def __to_dict(self):
-        return {
-            'code': self.ps.code,
-            'x': self.X,
-            'usage_ratio': self.usage_ratio
-        }
 
     def load_from_dict(self, data):
         """Load data from dictionary"""
-        if data['code'] != self.ps.code:
+        if data['code'] != self.met_str.code:
             return
         self.X = data['x']
         self.usage_ratio = data['usage_ratio']
@@ -225,6 +136,110 @@ class CacheUsage:
         return
 
     @classmethod
+    def __setup_axes(cls, mpl_axes, code, fn_axis, xlims, xpad, ylims, ypad,
+                     tick_bases, grid=False):
+        cls.__setup_labels(mpl_axes)
+        if grid:
+            cls.__setup_grid(mpl_axes, fn_axis=fn_axis)
+        comp_lims = cls.__setup_limits(mpl_axes, code, xlims, xpad, ylims, ypad)
+        cls.__setup_ticks(mpl_axes, comp_lims[0], comp_lims[1], tick_bases)
+        return
+
+    @classmethod
+    def __setup_labels(cls, mpl_axes):
+        """setup axes labels"""
+        ax_names = ('x', 'y')
+        ax_labels = (cls.met_str.xlab, cls.met_str.ylab)
+
+        # set label
+        for ax,lb in zip(ax_names, ax_labels):
+            # set label
+            set_label = getattr(mpl_axes, f'set_{ax}label')
+            set_label(lb)
+        return
+
+    @classmethod
+    def __setup_grid(cls, mpl_axes, fn_axis='y'):
+        """setup grid"""
+        ax_names = ('x', 'y')
+        # Values associated to either the independent or function axes.
+        # If the function axis is X, then reverse axes meanings.
+        ax_grd_a = st.Plot.grid_alpha
+        ax_grd_s = st.Plot.grid_style
+        ax_grd_w = st.Plot.grid_width
+        if fn_axis == 'x':
+            ax_grd_a = ax_grd_a[::-1]
+            ax_grd_s = ax_grd_s[::-1]
+            ax_grd_w = ax_grd_w[::-1]
+
+        # set grid
+        for ax,ga,gs,gw in zip(ax_names, ax_grd_a, ax_grd_s, ax_grd_w):
+            mpl_axes.grid(axis=ax, which='both', zorder=1, alpha=ga,
+                          linestyle=gs, linewidth=gw)
+        return
+
+    @classmethod
+    def __setup_limits(cls, mpl_axes, code, xlims, x_pad, ylims, y_pad):
+        ax_names = ('x', 'y')
+        ax_lmins = (xlims[0], ylims[0])
+        ax_lmaxs = (xlims[1], ylims[1])
+        ax_pads = (x_pad, y_pad)
+        computed_lims = []
+        for ax,lmin,lmax,pad in zip(ax_names, ax_lmins, ax_lmaxs, ax_pads):
+            ax_ranges = getattr(st.Plot, f'{ax}_ranges')
+            if code in ax_ranges:
+                lmin = int(ax_ranges[code][0])
+                lmax = int(ax_ranges[code][1])
+            set_lim = getattr(mpl_axes, f'set_{ax}lim')
+            if pad == 'auto':
+                pad = (lmax-lmin) / 200
+            set_lim(lmin-pad, lmax+pad)
+            computed_lims.append((lmin,lmax))
+        return computed_lims
+
+    @classmethod
+    def __setup_ticks(cls, mpl_axes, xlims, ylims, bases):
+        ax_names = ('x', 'y')
+        ax_rotat = (-90 if st.Plot.x_orient == 'v' else 0, 0)
+        ax_width = st.Plot.grid_width
+        ax_lims = (xlims, ylims)
+        ax_bases = bases
+        ax_mtick = st.Plot.ticks_max_count
+        # set ticks
+        for ax,rt,wd,lm,bs,mt in zip(ax_names, ax_rotat, ax_width, ax_lims,
+                                     ax_bases, ax_mtick):
+            mpl_axes.tick_params(axis=ax, rotation=rt, width=wd)
+            set_ticks = getattr(mpl_axes, f'set_{ax}ticks')
+            ticks = create_up_to_n_ticks(range(lm[0], lm[1]+1), base=bs, n=mt)
+            set_ticks(ticks)
+
+    @classmethod
+    def __setup_general(cls, mpl_axes, bg_color, met_str):
+        # background color
+        mpl_axes.patch.set_facecolor(bg_color)
+
+        # setup title
+        title_string = met_str.title
+        if st.Map.ID is not None:
+            title_string += f': {st.Map.ID}'
+        if met_str.subtit:
+            title_string += f' ({cls.met_str.subtit})'
+        mpl_axes.set_title(title_string, fontsize=10,
+                           pad=st.Plot.img_title_vpad)
+        return
+
+    @classmethod
+    def __draw_textbox(cls, mpl_axes, text, ha='right', va='top'):
+        mpl_axes.text(0.98, 0.98, text, transform=mpl_axes.transAxes,
+                      ha=ha, va=va, zorder=1000,
+                      bbox=dict(facecolor=st.Plot.tbox_bg,
+                                edgecolor=st.Plot.tbox_border,
+                                boxstyle="square,pad=0.2"),
+                      fontdict=dict(family=st.Plot.tbox_font,
+                                    size=st.Plot.tbox_font_size))
+        return
+
+    @classmethod
     def export_aggregated_plots(cls, metrics_list):
         """Given a list of 'metric' dictionaries, aggregate their
         values in a meaningful manner"""
@@ -232,16 +247,39 @@ class CacheUsage:
         all_x = [m['x'] for m in metrics_list]
         all_y = [m['usage_ratio'] for m in metrics_list]
 
-        fig,axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
-        # showcase data
+        # plot the individual usage rates
+        palette = Palette(
+            hue = (cls.hue, cls.hue),
+            sat = (st.Plot.p_sat[0], 50),
+            lig = (st.Plot.p_lig[0], 60),
+            alp = (100, 80)
+        )
+        avg_color = palette[0][0][0][0]
+        avg_width = 2
+        one_color = palette[1][1][1][1]
+        one_width = 0.5
         for m in range(num_mets):
             met_x = all_x[m]
             met_y = all_y[m]
-            axes.plot(met_x, met_y, alpha=0.3)
+            mpl_axes.step(
+                met_x, met_y, where='mid', zorder=2,
+                color=one_color, linewidth=one_width
+            )
 
-        # set title
-        axes.set_title('Rough Multi-Plot')
+        # find range large enough to fit all plots
+        X_min = min(m[0] for m in all_x)
+        X_max = max(m[-1] for m in all_x)
+
+        # Plot setup
+        X_pad = 0.5
+        cls.__setup_general(mpl_axes, 'white', cls.aggr_met_str)
+        cls.__setup_axes(mpl_axes, cls.met_str.code, fn_axis='y',
+                         xlims=(X_min, X_max), xpad=X_pad,
+                         ylims=(0,100), ypad='auto', tick_bases=(10, 10),
+                         grid=True)
+
 
         save_aggr(fig, cls.aggr_met_str)
         return

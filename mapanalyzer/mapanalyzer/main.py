@@ -35,6 +35,7 @@ def main():
             modules.export_metrics()
             if st.mode == 'sim-plot':
                 modules.export_plots()
+            UI.nl()
 
     # In plot mode, at least one metric file is mandatory.
     elif st.mode == 'plot':
@@ -54,7 +55,7 @@ def main():
             modules.plot_from_dict(
                 metric_dict['metric'], metric_dict['mapplot']
             )
-
+            UI.nl()
     # In aggregate mode, at least one metric
     elif st.mode == 'aggregate':
         metrics_paths = args.input_files

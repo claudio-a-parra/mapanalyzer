@@ -12,30 +12,30 @@ from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
 class Map:
+    name = 'Mem Acc Pattern'
+    about = 'Visual representation of the Memory Access Pattern.'
+    metrics = 'MAP'
     hue = 120
+    palette = Palette(
+        hue = (hue, hue),
+        sat=st.Plot.p_sat,
+        lig=st.Plot.p_lig,
+        alp=st.Plot.p_alp)
+    # Metric(s) info
+    met_str = MetricStrings(
+        title = 'MAP',
+        subtit = None,
+        numb   = '00',
+        code = 'MAP',
+        xlab   = 'Time [access instr.]',
+        ylab   = 'Space [bytes]',
+    )
+
     def __init__(self, hue=None):
-        # Module info
-        self.name = 'Mem Acc Pattern'
-        self.about = 'Visual representation of the Memory Access Pattern.'
-        self.metrics = 'MAP'
-
-        # Metric(s) info
-        self.ps = MetricStrings(
-            title = 'MAP',
-            subtit = None,
-            numb   = '00',
-            code = 'MAP',
-            xlab   = 'Time [access instr.]',
-            ylab   = 'Space [bytes]',
-        )
-
         self.enabled = True # always enabled
         # only to determine whether to export metric/plots
-        self.standalone_plot = self.ps.code in st.Plot.include
-        if hue is None:
-            hue = self.__class__.hue
-        self.hue = hue
-        self.tool_palette = Palette(hue=hue)
+        self.standalone_plot = self.__class__.met_str.code in st.Plot.include
+
         self.X = [i for i in range(st.Map.time_size)]
 
         # select the resolution of the map time-space grid.
@@ -51,7 +51,6 @@ class Map:
         # cols: whole memory snapshot at a given instruction time
         # rows: byte (space) state across all instructions
         self.space_time = [[0] * map_mat_cols for _ in range(map_mat_rows)]
-
         return
 
     def probe(self, access):
@@ -111,7 +110,7 @@ class Map:
         data = st.to_dict()
         data['metric'] = self.to_dict()
         data['mapplot'] = None
-        save_metric(data, self.ps)
+        save_metric(data, self.__class__.met_str)
         return
 
     def export_plots(self, bg_module=None):
@@ -157,7 +156,7 @@ class Map:
         self.__draw_X_grid(axes)
         self.__draw_Y_grid(axes)
         self.__fade_padding_bytes(axes)
-        save_plot(fig, self.ps)
+        save_plot(fig, self.__class__.met_str)
         return
 
     def bg_plot(self, axes, draw_x_grid=False, draw_y_grid=False):
@@ -208,17 +207,18 @@ class Map:
         return
 
     def __setup_general(self, axes, clean=False):
-        # background and spines colors
+        # background color is solid white as this plot is always the
+        # bottom-most layer
         axes.patch.set_facecolor('white')
 
+        # setup title
         if clean:
             axes.set_title('')
             return
-
-        # setup title
-        title_string = f'{self.ps.title}: {st.Map.ID}'
-        if self.ps.subtit:
-            title_string += f' ({self.ps.subtit})'
+        met_str = self.__class__.met_str
+        title_string = f'{met_str.title}: {st.Map.ID}'
+        if met_str.subtit:
+            title_string += f' ({met_str.subtit})'
         axes.set_title(
             title_string, fontsize=10, pad=st.Plot.img_title_vpad
         )
@@ -230,7 +230,7 @@ class Map:
             return
 
         # Axis details: label and ticks
-        axes.set_xlabel(self.ps.xlab)
+        axes.set_xlabel(self.__class__.met_str.xlab)
         rot = -90 if st.Plot.x_orient == 'v' else 0
         axes.tick_params(
             axis='x', rotation=rot, width=st.Plot.grid_other_width,
@@ -248,7 +248,7 @@ class Map:
             return
 
         # Axis details: label and ticks
-        axes.set_ylabel(self.ps.ylab)
+        axes.set_ylabel(self.__class__.met_str.ylab)
         axes.tick_params(
             axis='y', width=st.Plot.grid_main_width,
             left=True, labelleft=True, right=False, labelright=False
@@ -301,7 +301,7 @@ class Map:
             byte_lw = 0.5*(1 - ((st.Map.num_padded_bytes-1) / max_bytes))
             byte_sep_lines = [i-0.5 for i in range(1,st.Map.num_padded_bytes)]
             axes.hlines(y=byte_sep_lines, xmin=xmin, xmax=xmax,
-                        color=self.tool_palette[0][0],
+                        color=self.__class__.palette[0][0][0][0],
                         linewidth=byte_lw, alpha=0.1, zorder=1)
 
         if block_sep:
@@ -312,7 +312,7 @@ class Map:
             # then don't draw anything.
             if block_sep_lines[-1] != st.Cache.line_size-0.5:
                 axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
-                            color=self.tool_palette[0][0],
+                            color=self.__class__.palette[0][0][0][0],
                             linewidth=block_lw, alpha=0.4, zorder=1)
         return
 
@@ -337,14 +337,14 @@ class Map:
 
     def to_dict(self):
         return {
-            'code': self.ps.code,
+            'code': self.__class__.met_str.code,
             'x': self.X,
             'space_time': self.space_time
         }
 
     def load_from_dict(self, data):
         """Load data from dictionary"""
-        if data['code'] != self.ps.code:
+        if data['code'] != self.__class__.met_str.code:
             return
         self.X = data['x']
         self.space_time = data['space_time']

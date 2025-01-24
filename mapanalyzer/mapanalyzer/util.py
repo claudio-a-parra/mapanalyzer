@@ -18,57 +18,112 @@ class MetricStrings:
         return
 
 class Palette:
-    # create hsl palettes.
-    # Palette(hue=<val>)
-    # creates a single color at hue val.
-    # - fg, bg, col
-    #
-    # Palette(hue=[])
-    # creates again a fg and bg based on hue[0], but an array of colors
-    # - fg(hue[0]), bg(hue[0]), col[]
-    #
-    # Palette(hue_count=n)
-    # creates n colors
-    # - fg(hue[0]), bg(hue[0]), col[n]
-    def __init__(self, hue=0, hue_count=1,
-                 saturation=[50], sat_count=1,
-                 lightness=[50], lig_count=1,
-                 alpha=[80], alp_count=1):
-        # if hue is an array, then get its values. Otherwise, create an array
-        # with hue_count evenly distributed values across the spectrum.
+    """
+    Create HSLA palettes, a tensor of 4 dimensions, where the first dimension
+    is hue, the second is saturation, third is Light, and fourth is alpha.
+
+    h, s, l, a     : Either explicit list of values, or integers specifying the
+                     length of lists automatically created for each parameter.
+                     These lists create a number of elements equally spaced
+                     across the spectrum of the parameter.
+                     If a list is given, wrap h values around 360, and s,l,a
+                     values are clipped from 0 to 100.
+    {h,s,l,a}_off  : If an integer is given to a parameter X, then use its
+                     'X_off' to determine the first value of the automatic list.
+                     In the case of h, the automatic list wraps around.
+                     In the case of s,l,a, the list is composed with the range
+                     from {s,l,a}_off to 100.
+
+    Ranges:
+        hue: 0-359
+        saturation: 0-100
+        lightness: 0-100
+        alpha: 0-100
+
+    Example:
+        p = Palette(h=3, s=(50,60), l=(10), a=(100,100), h0=60)
+        p == \
+        [ # three hues, the first one is 60
+            [ # two saturations
+                [ # one lightness
+                 ['#RGBA'], ['#WXYZ'] # two alphas
+                ],
+                [...]
+            ],
+            [],
+            []
+        ]
+        p[0][0][0][1] == '#WXYZ'
+    """
+    @staticmethod
+    def __hsl2rgb(h, s, l, a):
+        try:
+            h,s,l = float(h),float(s),float(l)
+            if (not (0 <= h <= 360)) or \
+               (not (0 <= s <= 100)) or \
+               (not (0 <= l <= 100)) or \
+               (not (0 <= a <= 100)):
+                raise ValueError
+        except ValueError:
+            UI.error('Palette.__hsl2rgb(): Incorrect value given to either '
+                     'h, s, l, or a')
+        h,s,l,a = h/360.0, s/100.0, l/100.0, a/100.0
+        r,g,b = colorsys.hls_to_rgb(h, l, s)
+        r,g,b,a = round(r*255), round(g*255), round(b*255), round(a*255)
+        return f'#{r:02X}{g:02X}{b:02X}{a:02X}'
+
+    # general foreground and background
+    fg = __hsl2rgb(0, 0, 0, 100)
+    bg = __hsl2rgb(0, 0, 100, 100)
+
+    def __init__(self, hue=1, sat=1, lig=1, alp=1,
+                 h_off=0, s_off=0, l_off=0, a_off=0):
+        # determine the list of hue values
         if hasattr(hue, '__getitem__'):
-            hues = [i%360 for i in hue]
+            hue_list = [i%360 for i in hue]
         else:
-            base = hue%360
-            step = 360/hue_count
-            hues = [(round(i*step)+base)%360 for i in range(hue_count)]
+            if hue < 1:
+                UI.error('Hue count cannot be less than 1.')
+            step = 360/hue
+            hue_list = [(round(i*step)+hue0)%360 for i in range(hue)]
 
-        # if saturation is an array, get its values.
-        if hasattr(saturation, '__getitem__'):
-            sats = saturation
+        # determine the list of saturation values
+        if hasattr(sat, '__getitem__'):
+            sat_list = [max(min(i,100),0) for i in sat]
         else:
-            step = round(100/(saturation+1))
-            sats = [i*step for i in range(1, saturation+1)]
+            if sat < 1:
+                UI.error('Saturation count cannot be less than 1.')
+            sat_range = 100 - s_off
+            step = round(sat_range/(sat+1))
+            sat_list = [sat_off+i*step for i in range(1, sat+1)]
 
-        if hasattr(lightness, '__getitem__'):
-            lights = lightness
+        # determine the list of lightness values
+        if hasattr(lig, '__getitem__'):
+            lig_list = [max(min(i,100),0) for i in lig]
         else:
-            step = round(100/(lightness+1))
-            lights = [i*step for i in range(1, lightness+1)]
+            if lig < 1:
+                UI.error('Lighting count cannot be less than 1.')
+            lig_range = 100 - l_off
+            step = round(lig_range/(lig+1))
+            lig_list = [lig_off+i*step for i in range(1, lig+1)]
 
-        if hasattr(alpha, '__getitem__'):
-            alphas = alpha
+        # determine the list of alpha values
+        if hasattr(alp, '__getitem__'):
+            alp_list = [max(min(i,100),0) for i in alp]
         else:
-            alphas = [alpha] * len(lights)
+            if alp < 1:
+                UI.error('Alpha count cannot be less than 1.')
+            alp_range = 100 - a_off
+            step = round(alp_range/(alp+1))
+            alp_list = [alp_off+i*step for i in range(1, alp+1)]
 
-        if not (len(sats) == len(lights) == len(alphas)):
-            raise ValueError('If saturation, lightness or alpha are arrays, they have to be of the '
-                             'same length. Otherwise provide integers')
-        self.fg = hsl2rgb(hues[0], 100, 25, 100)
-        self.bg = hsl2rgb(hues[0], 100, 100, 70)
-        self.col = [
-            [hsl2rgb(h,s,l,a) for s,l,a in zip(sats,lights,alphas)]
-            for h in hues]
+        self.fg = self.__hsl2rgb(hue_list[0], 75,  10, 100)
+        self.bg = self.__hsl2rgb(hue_list[0], 100, 100, 90)
+        self.col = [[[[self.__hsl2rgb(h,s,l,a)
+                       for a in alp_list ]
+                      for l in lig_list]
+                     for s in sat_list]
+                    for h in hue_list]
         return
 
 
@@ -82,13 +137,13 @@ class Palette:
         ret += '       ]'
         return ret
 
-
     def __getitem__(self, idx):
         return self.col[idx]
 
-
     def __len__(self):
         return len(self.col)
+
+
 
 class MapDataReader:
     class __Record:
@@ -303,21 +358,6 @@ def load_metric(metric_path):
     # enable only the metric specified by the file
     st.Plot.include = { met_dict['metric']['code'] }
     return met_dict
-
-def hsl2rgb(h, s, l, a):
-    try:
-        h,s,l = float(h),float(s),float(l)
-        if (not (0 <= h <= 360)) or \
-           (not (0 <= s <= 100)) or \
-           (not (0 <= l <= 100)) or \
-           (not (0 <= a <= 100)):
-            raise ValueError
-    except ValueError:
-        UI.error('hsl2rgb(): Incorrect value given to either h, s, l, or a')
-    h,s,l,a = h/360.0, s/100.0, l/100.0, a/100.0
-    r,g,b = colorsys.hls_to_rgb(h, l, s)
-    r,g,b,a = round(r*255), round(g*255), round(b*255), round(a*255)
-    return f'#{r:02X}{g:02X}{b:02X}{a:02X}'
 
 def command_line_args_parser():
     synopsis = ('MAP Analyzer, a tool to study the cache friendliness of '

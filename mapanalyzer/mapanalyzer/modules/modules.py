@@ -38,13 +38,11 @@ class Modules:
 
         # list of all modules
         UI.warning('Including only MAP and CUR')
-        self.modules_list = \
-            [self.map, self.usage]
+        self.modules_list = [self.map, self.usage]
 
         # set space needed to print any metric code.
         UI.metric_code_hpad = max(
-            [len(k) for k in st.Plot.PLOTCODES.keys()]
-        ) + 1
+            [len(k) for k in st.Plot.PLOTCODES.keys()]) + 1
         return
 
     def describe(self):

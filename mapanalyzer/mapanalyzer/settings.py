@@ -324,27 +324,26 @@ class Settings:
         img_border_pad = 0.025 # padding around the image
         img_title_vpad = 6 # padding between the plot and its title
 
-        # Plots Axes
+        # Ticks (independent_variable, function_variable)
+        ticks_max_count = (11, 11)
         max_xtick_count = 11
         max_ytick_count = 11
         max_map_ytick_count = 11
+
+
         x_orient = 'v'
 
-        # Plot Lines (of the curves) [0]:line [1]:area filling
+        # line width and palette parameters (line, area_filling)
         linewidth = 0.25
-        pal_lig = [60,75]
-        pal_sat = [50,75]
-        pal_alp = [80,50]
+        p_hue = (0,0)
+        p_sat = (50,75)
+        p_lig = (60,75)
+        p_alp = (80,50)
 
-        # Visual aids (matplotlib grids and ticks)
-        # Dependent axis (normally Y)
-        grid_main_width = 0.6
-        grid_main_style = '-'
-        grid_main_alpha = 0.2
-        # Independent axis (normally X)
-        grid_other_width = 0.4
-        grid_other_style = '--'
-        grid_other_alpha = 0.2
+        # grids (independent_variable, function_variable)
+        grid_width = (0.4 , 0.6)
+        grid_style = ('--', '-')
+        grid_alpha = (0.2 , 0.2)
 
         # MAP plot
         # maximum number of bytes or blocks at which to still show the MAP grids
@@ -473,8 +472,7 @@ class Settings:
                 'img_title_vpad',
                 'max_xtick_count', 'max_ytick_count', 'max_map_ytick_count',
                 'x_orient', 'linewidth', 'pal_lig', 'pal_sat', 'pal_alp',
-                'grid_main_width', 'grid_main_style', 'grid_main_alpha',
-                'grid_other_width', 'grid_other_style', 'grid_other_alpha',
+                'grid_width', 'grid_style', 'grid_alpha',
                 'grid_max_bytes', 'grid_max_blocks', 'tbox_bg', 'tbox_border',
                 'tbox_font', 'tbox_font_size', 'fade_bytes_alpha', 'include',
                 'x_ranges', 'y_ranges', 'min_map_res', 'max_map_res',

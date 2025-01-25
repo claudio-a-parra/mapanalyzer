@@ -7,11 +7,10 @@ from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
 class MetricStrings:
-    def __init__(self, title='Title', subtit='Subtitle', numb='00', code='COD',
+    def __init__(self, title='Title', subtit='Subtitle', numb='00',
                  xlab='X-axis', ylab='Y-axis'):
         self.title = title
         self.subtit= subtit
-        self.code = code
         self.xlab  = xlab
         self.ylab  = ylab
         self.number = numb
@@ -55,6 +54,16 @@ class Palette:
         ]
         p[0][0][0][1] == '#WXYZ'
     """
+
+    @staticmethod
+    def default(hue):
+        return Palette(
+            hue=(hue,hue),
+            sat=st.Plot.p_sat,
+            lig=st.Plot.p_lig,
+            alp=st.Plot.p_alp
+        )
+
     @staticmethod
     def __hsl2rgb(h, s, l, a):
         try:
@@ -249,7 +258,7 @@ class MapDataReader:
         addr = st.Map.aligned_start_addr + st.Map.left_pad + off
         return self.__Record(time, thr, ev, size, addr)
 
-def create_up_to_n_ticks(full_list, base=10, n=10):
+def sample_list(full_list, base=10, n=10):
     """
     return a list of ticks based on full_list. The idea is to find
     nice numbers (multiples of powers of 10 or 2) and not having

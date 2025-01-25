@@ -52,7 +52,7 @@ class Modules:
         mods_about = []
         for mod in self.modules_list:
             mods_names.append(mod.name)
-            mods_metrics.append(mod.metrics)
+            mods_metrics.append(mod.metrics.keys())
             mods_about.append(mod.about)
         UI.columns((mods_names, mods_metrics, mods_about), sep=' : ')
         UI.indent_out()
@@ -70,26 +70,25 @@ class Modules:
 
     def export_metrics(self):
         UI.indent_in(title='EXPORTING METRICS')
+        # export all metrics of each module.
         for mod in self.modules_list:
-            mod.export_metrics(bg_module=self.map)
+            mod.export_all_metrics(bg_module=self.map, bg_code='MAP')
         UI.indent_out()
         return
 
     def export_plots(self):
         UI.indent_in(title='EXPORTING PLOTS')
         for mod in self.modules_list:
-            mod.export_plots(bg_module=self.map)
+            mod.export_all_plots(bg_module=self.map, bg_code='MAP')
         UI.indent_out()
         return
 
-    def plot_from_dict(self, met_dict, map_dict):
-        self.map.load_from_dict(map_dict)
-        # Give the dictionary to all modules. They will internally decide
-        # whether to plot it or not based on their plotcode. Some modules have
-        # more than one plotcode, so let the module decide.
+    def plot_from_dict(self, metric_dict:dict):
         UI.indent_in(title='PLOTTING METRICS')
+        bg_module = self.map
+        bg_module.import_metric(metric_dict, bg_mode=True)
         for mod in self.modules_list:
-            mod.plot_from_dict(met_dict, bg_module=self.map)
+            mod.plot_from_dict(metric_dict, bg_module=bg_module, bg_code='MAP')
         UI.indent_out()
         return
 

@@ -234,5 +234,8 @@ class Cache:
         # flush cache and commit for modules that care about eviction
         self.__flush()
         self.modules.commit(st.Map.time_size-1)
+
+        # signal to all modules that the simulation has finished
+        self.modules.finalize()
         UI.indent_out()
         return

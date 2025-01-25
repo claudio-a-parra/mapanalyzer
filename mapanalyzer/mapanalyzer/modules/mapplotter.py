@@ -8,46 +8,43 @@ from math import prod
 
 from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
     save_plot, save_metric
+from mapanalyzer.modules.base_module import BaseModule
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
-class Map:
+class Map(BaseModule):
     name = 'Mem Acc Pattern'
     about = 'Visual representation of the Memory Access Pattern.'
-    metrics = 'MAP'
     hue = 120
-    palette = Palette(
-        hue = (hue, hue),
-        sat=st.Plot.p_sat,
-        lig=st.Plot.p_lig,
-        alp=st.Plot.p_alp)
-    # Metric(s) info
-    met_str = MetricStrings(
-        title = 'MAP',
-        subtit = None,
-        numb   = '00',
-        code = 'MAP',
-        xlab   = 'Time [access instr.]',
-        ylab   = 'Space [bytes]',
-    )
+    palette = Palette.default(hue)
 
-    def __init__(self, hue=None):
-        self.enabled = True # always enabled
-        # only to determine whether to export metric/plots
-        self.standalone_plot = self.__class__.met_str.code in st.Plot.include
+    metrics = {
+        'MAP' :  MetricStrings(
+            title = 'MAP',
+            subtit = None,
+            numb   = '00',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Space [bytes]',
+        )
+    }
 
-        self.X = [i for i in range(st.Map.time_size)]
+    def __init__(self, shared_X=None):
+        self.enabled = any(m in st.Plot.include for m in self.metrics.keys())
+        if not self.enabled:
+            return
+        if shared_X is not None:
+            self.X = shared_X
+        else:
+            self.X = [i for i in range(st.Map.time_size)]
 
-        # select the resolution of the map time-space grid.
-        # If too large, pick a value under max_res
+        # select the resolution of the map time-space grid. If too large, pick
+        # a value under max_res
         map_mat_rows = Map.__sub_resolution_between(
-            st.Map.num_padded_bytes,
-            st.Plot.min_map_res,
-            st.Plot.max_map_res)
+            st.Map.num_padded_bytes, st.Plot.min_map_res, st.Plot.max_map_res
+        )
         map_mat_cols = Map.__sub_resolution_between(
-            st.Map.time_size,
-            st.Plot.min_map_res,
-            st.Plot.max_map_res)
+            st.Map.time_size, st.Plot.min_map_res, st.Plot.max_map_res
+        )
         # cols: whole memory snapshot at a given instruction time
         # rows: byte (space) state across all instructions
         self.space_time = [[0] * map_mat_cols for _ in range(map_mat_rows)]
@@ -104,19 +101,32 @@ class Map:
         # no post-simulation computation to be done
         return
 
-    def export_metrics(self, bg_module):
-        if not self.enabled or not self.standalone_plot:
-            return
-        data = st.to_dict()
-        data['metric'] = self.to_dict()
-        data['mapplot'] = None
-        save_metric(data, self.__class__.met_str)
+    def MAP_to_dict(self):
+        return {
+            'code': 'MAP',
+            'x': self.X,
+            'space_time': self.space_time
+        }
+
+    def dict_to_MAP(self, data):
+        class_name = self.__class__.__name__
+        my_code = 'MAP'
+        curr_fn = f'dict_to_{my_code}'
+        data_code = data['code']
+        if my_code != data_code:
+            UI.error(f'{class_name}.{curr_fn}(): {self.name} module '
+                     f'received some unknown "{data_code}" metric data rather '
+                     f'than its known "{my_code}" metric data.')
+        self.X = data['x']
+        self.space_time = data['space_time']
         return
 
-    def export_plots(self, bg_module=None):
-        if not self.enabled or not self.standalone_plot:
+    def MAP_to_plot(self, mpl_axes, bg_mode=False):
+        if not self.enabled:
             return
-        fig,axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        code = 'MAP'
+        met_str = self.metrics[code]
 
         # Create color maps based on thread and R/W access:
         #  -X : thread (X-1) read
@@ -124,42 +134,65 @@ class Map:
         #   0 : no operation.
         # Then, the palette must match the negative and positive values to the
         # read/write colors of the thread.
+        #lig_val, sat_val, alp_val = [35,70], [45,75], 96
         thr_count = st.Map.thread_count
-        lig_val, sat_val, alp_val = [35,70], [45,75], 96
         thr_palette = Palette(
-            hue_count=thr_count,
-            lightness=lig_val,
-            saturation=sat_val,
-            alpha=alp_val)
-        read_color = list(reversed(
-            [thr_palette[i][0] for i in range(thr_count)]
-        ))
-        write_color = [thr_palette[i][1] for i in range(thr_count)]
-        cmap = ListedColormap(read_color + ['#FFFFFF00'] + write_color)
+            hue = th_count,
+            sat = [45, 75],
+            lig = [35, 70],
+            alp = [100]
+        )
+        read_colors =  [thr_palette[i][0][0][0] for i in range(thr_count)]
+        write_colors = [thr_palette[i][1][1][0] for i in range(thr_count)]
+        transparent = '#FFFFFF00'
+        color_map = ListedColormap(
+            list(reversed(read_colors)) + [transparent] + write_colors
+        )
+
+        # define and pad the extent of the image
+        X_pad = 0.5
+        Y_pad = 0.5
+        ylims = (0, st.Map.num_padded_bytes - 1)
+        xlims = (self.X[0], self.X[-1])
+        # (left, right, bottom, top)
+        extent = (xlims[0]-X_pad, xlims[1]+X_pad,
+                  ylims[0]-Y_pad, ylims[1]+Y_pad)
+
+        # draw the MAP
+        mpl_axes.imshow(self.space_time, cmap=color_map, origin='lower',
+                        interpolation='none',
+                        aspect='auto', zorder=2, extent=extent,
+                        vmin=-thr_count, vmax=thr_count)
+        mpl_axes.invert_yaxis()
+
 
         # set plot limits
-        ymin = 0-0.5
-        ymax = st.Map.num_padded_bytes-0.5
-        extent = (self.X[0]-0.5, self.X[-1]+0.5, ymin, ymax)
+        real_xlim, real_ylim = self.setup_limits(
+            mpl_axes, code=code, xlims=xlims, xpad=X_pad,
+            ylims=ylims, ypad=Y_pad
+        )
 
-        # draw map
-        axes.imshow(self.space_time, cmap=cmap, origin='lower',
-                    interpolation='none',
-                    aspect='auto', zorder=2, extent=extent,
-                    vmin=-thr_count, vmax=thr_count)
-        axes.invert_yaxis()
+        # set ticks based on the real limits
+        self.setup_ticks(
+            mpl_axes, realxlim=real_xlim, realylim=real_ylim,
+            tick_bases=(10, 2), # y-axis powers of two
+            bg_mode=bg_mode
+        )
 
-        # complete plot setup
-        self.__setup_general(axes)
-        self.__setup_X_axis(axes)
-        self.__setup_Y_axis(axes)
-        self.__draw_X_grid(axes)
-        self.__draw_Y_grid(axes)
-        self.__fade_padding_bytes(axes)
-        save_plot(fig, self.__class__.met_str)
+        # set grid of bytes and blocks (not mpl grids)
+        self.setup_grid(mpl_axes)
+
+        # fade bytes used just for block-padding
+        self.__fade_padding_bytes(mpl_axes)
+
+        # set labels
+        self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
+
+        # title and bg color
+        self.setup_general(mpl_axes, met_str, bg_mode=bg_mode)
         return
 
-    def bg_plot(self, axes, draw_x_grid=False, draw_y_grid=False):
+    def MAP_to_bg_plot(self, axes, draw_x_grid=False, draw_y_grid=False):
         """to be called by other modules to superpose their own plots on
         top of MAP"""
         lig_val = [35,70]
@@ -206,57 +239,10 @@ class Map:
         self.__fade_padding_bytes(axes)
         return
 
-    def __setup_general(self, axes, clean=False):
-        # background color is solid white as this plot is always the
-        # bottom-most layer
-        axes.patch.set_facecolor('white')
-
-        # setup title
-        if clean:
-            axes.set_title('')
-            return
-        met_str = self.__class__.met_str
-        title_string = f'{met_str.title}: {st.Map.ID}'
-        if met_str.subtit:
-            title_string += f' ({met_str.subtit})'
-        axes.set_title(
-            title_string, fontsize=10, pad=st.Plot.img_title_vpad
-        )
-
-    def __setup_X_axis(self, axes, clean=False):
-        if clean:
-            axes.set_xlabel('')
-            axes.set_xticks([])
-            return
-
-        # Axis details: label and ticks
-        axes.set_xlabel(self.__class__.met_str.xlab)
-        rot = -90 if st.Plot.x_orient == 'v' else 0
-        axes.tick_params(
-            axis='x', rotation=rot, width=st.Plot.grid_other_width,
-            top=False, labeltop=False, bottom=True, labelbottom=True
-        )
-        axes.set_xticks(
-            create_up_to_n_ticks(self.X, base=10, n=st.Plot.max_xtick_count)
-        )
-        return
-
-    def __setup_Y_axis(self, axes, clean=False):
-        if clean:
-            axes.set_ylabel('')
-            axes.set_yticks([])
-            return
-
-        # Axis details: label and ticks
-        axes.set_ylabel(self.__class__.met_str.ylab)
-        axes.tick_params(
-            axis='y', width=st.Plot.grid_main_width,
-            left=True, labelleft=True, right=False, labelright=False
-        )
-        axes.set_yticks(
-            create_up_to_n_ticks(range(st.Map.num_padded_bytes), base=2,
-                                 n=st.Plot.max_ytick_count)
-        )
+    def setup_grid(self, mpl_axes, draw_x='auto', draw_y='auto',
+                   byte_sep='auto'):
+        self.__draw_X_grid(mpl_axes, draw=draw_x)
+        self.__draw_Y_grid(mpl_axes, draw=draw_y, byte_sep=byte_sep)
         return
 
     def __draw_X_grid(self, axes, draw='auto'):
@@ -268,7 +254,7 @@ class Map:
                               range(self.X[0],self.X[-1]+1)]
 
             axes.vlines(x=time_sep_lines, ymin=ymin, ymax=ymax,
-                        color='k', linewidth=0.33, alpha=0.2, zorder=1)
+                        color='k', linewidth=0.3333, alpha=0.2, zorder=1)
         return
 
     def __draw_Y_grid(self, axes, draw='auto', byte_sep='auto',
@@ -333,26 +319,6 @@ class Map:
                 st.Map.num_padded_bytes-0.5,
                 facecolor='k', alpha=fade_bytes_alpha,
                 zorder=0)
-        return
-
-    def to_dict(self):
-        return {
-            'code': self.__class__.met_str.code,
-            'x': self.X,
-            'space_time': self.space_time
-        }
-
-    def load_from_dict(self, data):
-        """Load data from dictionary"""
-        if data['code'] != self.__class__.met_str.code:
-            return
-        self.X = data['x']
-        self.space_time = data['space_time']
-        return
-
-    def plot_from_dict(self, data, bg_module=None):
-        self.load_from_dict(data)
-        self.export_plots()
         return
 
     @staticmethod

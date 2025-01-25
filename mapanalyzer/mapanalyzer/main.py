@@ -45,16 +45,14 @@ def main():
             UI.error('In "plot" mode you must at least provide one metric '
                      'file.')
         for m_path in metrics_paths:
-            metric_dict = load_metric(m_path)
-            st.Cache.from_dict(metric_dict['cache'], file_path=m_path)
+            file_dict = load_metric(m_path)
+            st.Cache.from_dict(file_dict['cache'], file_path=m_path)
             st.Cache.describe()
-            st.Map.from_dict(metric_dict['map'], file_path=m_path)
+            st.Map.from_dict(file_dict['map'], file_path=m_path)
             st.Map.describe()
             modules = Modules()
             modules.describe()
-            modules.plot_from_dict(
-                metric_dict['metric'], metric_dict['mapplot']
-            )
+            modules.plot_from_dict(file_dict)
             UI.nl()
     # In aggregate mode, at least one metric
     elif st.mode == 'aggregate':

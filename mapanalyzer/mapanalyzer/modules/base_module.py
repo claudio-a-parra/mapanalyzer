@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import Palette, MetricStrings, save_plot
+from mapanalyzer.util import Palette, MetricStrings
 """This is the base mapanalyzer module upon which other modules are created.
 This class is intended to be inherited from other mapanalyzer modules."""
 
@@ -147,41 +147,7 @@ class BaseModule:
                                     size=st.Plot.tbox_font_size))
         return
 
-    def export_all_plots(self, bg_to_plot=None, bg_module=None, bg_code=None):
-        if not self.enabled:
-            return
-
-        # if the function bg_to_plot was not directly given, then find out
-        # whether bg_module has it
-        if bg_to_plot is None:
-            if None not in (bg_module, bg_code):
-                bg_fn_name = f'{bg_code}_to_bg_plot'
-                try:
-                    bg_to_plot = getattr(bg_module, bg_fn_name)
-                except:
-                    try:
-                        module_name = bg_module.name
-                    except:
-                        UI.warning(f'Background module given doesn\'t have a '
-                                   'name.')
-                        module_name = bg_module.__class__.__name__
-                    UI.warning(f'The given background module "{module_name}" '
-                               f'has not defined the function "{bg_fn_name}". '
-                               'Background plot will not be drawn.')
-            else:
-                UI.warning(f'Neither the background plotter function, or the '
-                           'module and code of where to find it was given. '
-                           'Background plot will not be drawn.')
-        # for each metric in this module, save a figure
-        for met, met_str in self.metrics:
-            # if this metric is not included by the user, then skip its plot
-            if met not in st.Plot.include:
-                continue
-            self.export_plot(code, bg_to_plot=bg_to_plot)
-
-        return
-
-    def export_plot(self, code, bg_to_plot=None, bg_module=None, bg_code=None):
+    def TRANSITION_export_plot(self, code, bg_to_plot=None, bg_module=None, bg_code=None):
         # if the function bg_to_plot was not directly given, then find out
         # whether bg_module has it
         if bg_to_plot is None:
@@ -233,12 +199,87 @@ class BaseModule:
 
         return
 
-    def export_all_metrics(self, bg_module=None, bg_code=None):
+    def export_metric(self, code):
+        class_name = self.__class__.__name__
+        fn_name = f'{code}_to_dict'
+        try:
+            MET_to_dict = getattr(self, fn_name)
+        except:
+            UI.error('While exporting metric results. '
+                     f'{class_name}.{fn_name}() is not defined.')
+
+        return MET_to_dict()
+
+    def import_metric(self, metric_dict, bg_mode=False):
+        mode = 'bg' if bg_mode else 'fg'
+        # get the function that imports this metric
+        met_code = data[mode]['code']
+        fn_name = f'dict_to_{met_code}'
+        try:
+            dict_to_metric = getattr(self, fn_name)
+        except:
+            UI.error(f'{module_name} module has not defined the function '
+                     f'"{fn_name}".')
+        dict_to_metric(data)
+
+    @classmethod
+    def export_aggregated_plot(cls, code, metrics_list):
+        # find the method that plots the aggregated metrics
+        fn_name = f'{code}_to_aggregated_plot'
+        try:
+            metric_to_aggregated_plot = getattr(cls, fn_name)
+        except:
+            UI.error(f'{self.name} module has not defined the function '
+                     f'"{fn_name}".')
+        metric_to_aggregated_plot(metrics_list)
+
+
+# DEPRECATED
+
+    def plot_from_dict(self, data, bg_module=None, bg_code=None):
+        self.import_metric(data)
+        code = data['fg']['code']
+        self.export_plot(code, bg_module=bg_module, bg_code=bg_code)
+
+    def DEPRECATED_export_all_plots(self, bg_to_plot=None, bg_module=None, bg_code=None):
+        if not self.enabled:
+            return
+
+        # if the function bg_to_plot was not directly given, then find out
+        # whether bg_module has it
+        if bg_to_plot is None:
+            if None not in (bg_module, bg_code):
+                bg_fn_name = f'{bg_code}_to_bg_plot'
+                try:
+                    bg_to_plot = getattr(bg_module, bg_fn_name)
+                except:
+                    try:
+                        module_name = bg_module.name
+                    except:
+                        UI.warning(f'Background module given doesn\'t have a '
+                                   'name.')
+                        module_name = bg_module.__class__.__name__
+                    UI.warning(f'The given background module "{module_name}" '
+                               f'has not defined the function "{bg_fn_name}". '
+                               'Background plot will not be drawn.')
+            else:
+                UI.warning(f'Neither the background plotter function, or the '
+                           'module and code of where to find it was given. '
+                           'Background plot will not be drawn.')
+        # for each metric in this module, save a figure
+        for met, met_str in self.metrics:
+            # if this metric is not included by the user, then skip its plot
+            if met not in st.Plot.include:
+                continue
+            self.export_plot(code, bg_to_plot=bg_to_plot)
+
+        return
+
+    def DEPRECATED_export_all_pdats(self, bg_module=None, bg_code=None):
         if not self.enabled:
             return
 
         # find the background module to export its metric to a dictionary.
-        # This is normally the mapplotter module.
         bg_data = None
         if None not in (bg_module, bg_code):
             bg_fn_name = f'{bg_code}_to_dict'
@@ -273,48 +314,3 @@ class BaseModule:
 
             self.export_metric(code, bg_data=actual_bg_data)
         return
-
-    def export_metric(self, code, bg_data=None):
-        fn_name = f'{code}_to_dict'
-        try:
-            metric_to_dict = getattr(self, fn_name)
-        except:
-            UI.error(f'{self.name} module has not defined the function '
-                     f'"{fn_name}".')
-
-        # create the data to export
-        data = st.to_dict()
-        data['bg'] = bg_data
-        data['fg'] = metric_to_dict()
-
-        # save dictionary to metric file
-        save_metric(data, self.metrics[code])
-        return
-
-    def import_metric(self, metric_dict, bg_mode=False):
-        mode = 'bg' if bg_mode else 'fg'
-        # get the function that imports this metric
-        met_code = data[mode]['code']
-        fn_name = f'dict_to_{met_code}'
-        try:
-            dict_to_metric = getattr(self, fn_name)
-        except:
-            UI.error(f'{module_name} module has not defined the function '
-                     f'"{fn_name}".')
-        dict_to_metric(data)
-
-    def plot_from_dict(self, data, bg_module=None, bg_code=None):
-        self.import_metric(data)
-        code = data['fg']['code']
-        self.export_plot(code, bg_module=bg_module, bg_code=bg_code)
-
-    @classmethod
-    def export_aggregated_plot(cls, code, metrics_list):
-        # find the method that plots the aggregated metrics
-        fn_name = f'{code}_to_aggregated_plot'
-        try:
-            metric_to_aggregated_plot = getattr(cls, fn_name)
-        except:
-            UI.error(f'{self.name} module has not defined the function '
-                     f'"{fn_name}".')
-        metric_to_aggregated_plot(metrics_list)

@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
 
 from mapanalyzer.modules.base_module import BaseModule
-from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
-    save_plot, save_metric, save_aggr
+from mapanalyzer.util import MetricStrings, Palette, PlotFile
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
@@ -33,15 +32,12 @@ class CacheUsage(BaseModule):
     }
 
 
-    def __init__(self, shared_X=None):
+    def __init__(self):
         # enable only if metric is included
-        self.enabled = any(m in st.Plot.include for m in self.metrics.keys())
+        self.enabled = any(m in st.Metrics.enabled for m in self.metrics.keys())
         if not self.enabled:
             return
-        if shared_X is not None:
-            self.X = shared_X
-        else:
-            self.X = [i for i in range(st.Map.time_size)]
+        self.X = [i for i in range(st.Map.time_size)]
 
         self.accessed_bytes = 0
         self.valid_bytes = 0
@@ -137,6 +133,10 @@ class CacheUsage(BaseModule):
     def CUR_to_aggregated_plot(cls, metrics_list):
         """Given a list of 'metric' dictionaries, aggregate their
         values in a meaningful manner"""
+
+        code = 'CUR'
+        met_str = cls.aggr_metrics
+
         num_mets = len(metrics_list)
         all_x = [m['x'] for m in metrics_list]
         all_y = [m['usage_ratio'] for m in metrics_list]
@@ -175,5 +175,6 @@ class CacheUsage(BaseModule):
                          grid=True)
 
 
+        PlotFile.save(fig, met_code=code, met_str=met_str, aggr=True)
         save_aggr(fig, cls.aggr_met_str)
         return

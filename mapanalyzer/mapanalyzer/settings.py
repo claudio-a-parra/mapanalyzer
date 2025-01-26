@@ -6,7 +6,19 @@ from mapanalyzer.ui import UI
 class Settings:
     mode = 'sim-plot'
     timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-    metric_keys = ['cache', 'map', 'mapplot', 'metric', 'timestamp']
+    # used to check enabled codes and to create help message
+    ALL_METRIC_CODES = {
+        'MAP'  : 'Memory Access Pattern Visualization',
+        'SLD'  : 'Spatial Locality Degree',
+        'TLD'  : 'Temporal Locality Degree',
+        'CMR'  : 'Cache Miss Rate',
+        'CMMA' : 'Cumulative Main Memory Access',
+        'CUR'  : 'Cache Usage Ratio',
+        'AD'   : 'Aliasing Density',
+        'ED'   : 'Eviction Duration',
+        'BPA'  : 'Block Personality Adoption',
+        'EDH'  : 'Eviction Duration Histogram'
+    }
 
     @classmethod
     def set_mode(cls, args):
@@ -17,9 +29,7 @@ class Settings:
     @classmethod
     def to_dict(cls):
         data = {
-            'timestamp': cls.timestamp,
-            'map': cls.Map.to_dict(),
-            'cache': cls.Cache.to_dict()
+            'timestamp': cls.timestamp
         }
         return data
 
@@ -31,7 +41,6 @@ class Settings:
             getattr(cls, attr).describe()
         UI.indent_out()
         return
-
 
 
     class Cache:
@@ -298,91 +307,13 @@ class Settings:
             UI.indent_out()
             return
 
-    class Plot:
-        ############################################################
-        #### CONSTANT VALUES
-        PLOTCODES = {
-            'MAP': 'Graphic MAP',
-            'SLD': 'Spatial Locality Degree',
-            'TLD': 'Temporal Locality Degree',
-            'CMR': 'Cache Miss Ratio',
-            'CMMA': 'Cumulative Main Memory Access',
-            'CUR': 'Cache Usage Ratio',
-            'AD': 'Aliasing Density',
-            'ED': 'Eviction Duration',
-            'BPA': 'Block Personality Adoption',
-            'EDH': 'Eviction Duration Histogram',
-        }
 
-        ############################################################
-        #### BASIC VALUES
-        # Image to export
-        width = 8 # image width
-        height = 4 # image height
-        dpi = 200 # resolution of the image
-        format = 'png' # format, usually png or pdf
-        img_border_pad = 0.025 # padding around the image
-        img_title_vpad = 6 # padding between the plot and its title
-
-        # Ticks (independent_variable, function_variable)
-        ticks_max_count = (11, 11)
-        max_xtick_count = 11
-        max_ytick_count = 11
-        max_map_ytick_count = 11
-
-
-        x_orient = 'v'
-
-        # line width and palette parameters (line, area_filling)
-        linewidth = 0.25
-        p_hue = (0,0)
-        p_sat = (50,75)
-        p_lig = (60,75)
-        p_alp = (80,50)
-
-        # grids (independent_variable, function_variable)
-        grid_width = (0.4 , 0.6)
-        grid_style = ('--', '-')
-        grid_alpha = (0.2 , 0.2)
-
-        # MAP plot
-        # maximum number of bytes or blocks at which to still show the MAP grids
-        grid_max_bytes = 128
-        grid_max_blocks = 48
-
-        # Text boxes
-        tbox_bg = '#FFFFFF88'
-        tbox_border = '#CC000000' # transparent
-        tbox_font = 'monospace'
-        tbox_font_size = 9
-
-        # Specific to MAP plot
-        fade_bytes_alpha = 0.1 # fading of bytes out-of-range to complete the block
-
-        initialized = False
-
+    class Metrics:
         ############################################################
         # DERIVED VALUES
-        # Plots to be exported
-        include = 'all'
-
-        # Plots Axes
-        x_ranges = 'full'
-        y_ranges = 'full'
-
-        # Specific to MAP plot.
-        # min_map_res is only used if the native resolution is too large (above
-        # this maximum), and by trying to find a "nice" lower resolution, the
-        # only found is too low (below this minimum).
-        # If that is the case, then max_map_res is used.
-        #
-        # This is a derived value because sensible values is derived from the
-        # width, height, and dpi given.
-        min_map_res,max_map_res = 1, 'auto'
-        #
-        # Specific of Personality
-        jump_line_width = 1
-
+        # metrics enabled by the user
+        initialized = False
+        enabled = 'all'
 
         @classmethod
         def from_args(cls, args):
@@ -390,17 +321,8 @@ class Settings:
             def assg_val(current, new):
                 return new if new is not None else current
 
-            # set all settings from the arguments
-            cls.width = assg_val(cls.width, args.plot_width)
-            cls.height = assg_val(cls.height, args.plot_height)
-            cls.dpi = assg_val(cls.dpi, args.dpi)
-            # overwritten by __init_derived_values()
-            cls.max_map_res = assg_val(cls.max_map_res, args.max_res)
-            cls.format = assg_val(cls.format, args.format)
-            cls.include = assg_val(cls.include, args.plotcodes)
-            cls.x_orient = assg_val(cls.x_orient, args.x_orient)
-            cls.x_ranges = assg_val(cls.x_ranges, args.x_ranges)
-            cls.y_ranges = assg_val(cls.y_ranges, args.y_ranges)
+            # set values from the arguments
+            cls.enabled = assg_val(cls.enabled, args.met_codes)
 
             cls.__init_derived_values()
             cls.initialized = True
@@ -408,78 +330,28 @@ class Settings:
 
         @classmethod
         def __init_derived_values(cls):
-            cls.include = cls.__init_include_plots(cls.include)
-            cls.x_ranges = cls.__init_ranges(cls.x_ranges)
-            cls.y_ranges = cls.__init_ranges(cls.y_ranges)
-            cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
-                cls.width, cls.height, cls.dpi, cls.max_map_res)
-            UI.warning('Hardcoded jump_line_width.')
-            cls.jump_line_width = 1 #max(0.2,min(3,12*(width/data_X_size)))
+            cls.enabled = cls.__init_enabled()
             return
 
         @classmethod
-        def __init_include_plots(cls, user_plotcodes_str):
-            user_plotcodes = [x.strip() for x in user_plotcodes_str.upper().split(',')]
-            including = set(cls.PLOTCODES.keys())
-            if user_plotcodes and 'ALL' not in user_plotcodes:
-                including = set()
-                for up in user_plotcodes:
-                    if up in cls.PLOTCODES:
-                        including.add(up)
+        def __init_enabled(cls):
+            user_codes = [x.strip() for x in cls.enabled.upper().split(',')]
+            enabled = Settings.ALL_METRIC_CODES.keys() # default to all known codes
+            if len(user_codes) > 0 and 'ALL' not in user_codes:
+                enabled = set()
+                for ucod in user_codes:
+                    if ucod in Settings.ALL_METRIC_CODES.keys():
+                        enabled.add(ucod)
                     else:
-                        UI.warning(f'Unknown plotcode "{up}".')
-            return including
-
-        @classmethod
-        def __init_ranges(cls, ranges_str):
-            user_ranges = [r.strip() for r in ranges_str.upper().split(',')]
-            ranges = dict()
-            if user_ranges and 'FULL' not in user_ranges:
-                for ran in user_ranges:
-                    try:
-                        plcode, min_val, max_val = ran.split(':')
-                        min_val = float(min_val)
-                        max_val = float(max_val)
-                    except ValueError:
-                        UI.error(f'Plot Range with wrong format "{ran}".')
-                    if min_val >= max_val:
-                        UI.error(f'Plot Range min:{min_val} >= max:{max_val}.')
-                    if plcode not in cls.PLOTCODES:
-                        UI.error(f'Invalid plotcode "{plcode}".')
-
-                    ranges[plcode] = (min_val, max_val)
-            return ranges
-
-        @classmethod
-        def __init_map_resolution(cls, width, height, dpi, max_res):
-            # guess the number of pixels in the smallest width or height
-            # of the plot area. Pick the smallest between that and the
-            # minimum
-            min_res = round(min(0.9*min(width,height)*dpi,210))
-            if max_res == 'auto':
-                max_res = round(min(0.9*min(width,height)*dpi,2310))
-            else:
-                try:
-                    max_res = int(max_res)
-                except:
-                    UI.error(f'Error: max-res must be an integer or "auto".')
-            return (min_res,max_res)
+                        UI.warning(f'Unknown metric code "{ucod}". '
+                                   'Ignoring it.')
+            return enabled
 
         @classmethod
         def describe(cls):
-            attrs = [
-                'width', 'height', 'dpi', 'format', 'img_border_pad',
-                'img_title_vpad',
-                'max_xtick_count', 'max_ytick_count', 'max_map_ytick_count',
-                'x_orient', 'linewidth', 'pal_lig', 'pal_sat', 'pal_alp',
-                'grid_width', 'grid_style', 'grid_alpha',
-                'grid_max_bytes', 'grid_max_blocks', 'tbox_bg', 'tbox_border',
-                'tbox_font', 'tbox_font_size', 'fade_bytes_alpha', 'include',
-                'x_ranges', 'y_ranges', 'min_map_res', 'max_map_res',
-                'jump_line_width', 'initialized'
-            ]
+            attrs = ['enabled', 'initialized']
             vals = [getattr(cls, at) for at in attrs]
-            UI.indent_in(title='PLOT OPTIONS')
+            UI.indent_in(title='METRICS SETTINGS')
             UI.columns((attrs, vals), sep=' : ')
             UI.indent_out()
             return
@@ -787,5 +659,159 @@ class Settings:
             vals = [f'0x{cls.start_addr:X}', f'{cls.mem_size} bytes',
                     cls.time_size-1, cls.thread_count, cls.event_count]
             UI.columns((names, vals), sep=' : ')
+            UI.indent_out()
+            return
+
+
+    class Plot:
+        ############################################################
+        #### BASIC VALUES
+        # Image to export
+        width = 8 # image width
+        height = 4 # image height
+        dpi = 200 # resolution of the image
+        format = 'png' # format, usually png or pdf
+        img_border_pad = 0.025 # padding around the image
+        img_title_vpad = 6 # padding between the plot and its title
+
+        # Ticks (independent_variable, function_variable)
+        ticks_max_count = (11, 11)
+        max_xtick_count = 11
+        max_ytick_count = 11
+        max_map_ytick_count = 11
+
+
+        x_orient = 'v'
+
+        # line width and palette parameters (line, area_filling)
+        linewidth = 0.25
+        p_hue = (0,0)
+        p_sat = (50,75)
+        p_lig = (60,75)
+        p_alp = (80,50)
+
+        # grids (independent_variable, function_variable)
+        grid_width = (0.4 , 0.6)
+        grid_style = ('--', '-')
+        grid_alpha = (0.2 , 0.2)
+
+        # MAP plot
+        # maximum number of bytes or blocks at which to still show the MAP grids
+        grid_max_bytes = 128
+        grid_max_blocks = 48
+
+        # Text boxes
+        tbox_bg = '#FFFFFF88'
+        tbox_border = '#CC000000' # transparent
+        tbox_font = 'monospace'
+        tbox_font_size = 9
+
+        # Specific to MAP plot
+        fade_bytes_alpha = 0.1 # for bytes used to cache-align the block
+
+        ############################################################
+        # DERIVED VALUES
+        initialized = False
+
+        # Axes ranges to show in the different plots
+        x_ranges = 'full'
+        y_ranges = 'full'
+
+        # Specific to MAP plot.
+        # min_map_res is only used if the native resolution is too large (above
+        # this maximum), and by trying to find a "nice" lower resolution, the
+        # only found is too low (below this minimum).
+        # If that is the case, then max_map_res is used.
+        #
+        # This is a derived value because sensible values is derived from the
+        # width, height, and dpi given.
+        min_map_res,max_map_res = 1, 'auto'
+        #
+        # Specific of Personality
+        jump_line_width = 1
+
+
+        @classmethod
+        def from_args(cls, args):
+            # assign only if new value is not None
+            def assg_val(current, new):
+                return new if new is not None else current
+
+            # set all settings from the arguments
+            cls.width = assg_val(cls.width, args.plot_width)
+            cls.height = assg_val(cls.height, args.plot_height)
+            cls.dpi = assg_val(cls.dpi, args.dpi)
+            # overwritten by __init_derived_values()
+            cls.max_map_res = assg_val(cls.max_map_res, args.max_res)
+            cls.format = assg_val(cls.format, args.format)
+            cls.x_orient = assg_val(cls.x_orient, args.x_orient)
+            cls.x_ranges = assg_val(cls.x_ranges, args.x_ranges)
+            cls.y_ranges = assg_val(cls.y_ranges, args.y_ranges)
+
+            cls.__init_derived_values()
+            cls.initialized = True
+            return
+
+        @classmethod
+        def __init_derived_values(cls):
+            cls.x_ranges = cls.__init_ranges(cls.x_ranges)
+            cls.y_ranges = cls.__init_ranges(cls.y_ranges)
+            cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
+                cls.width, cls.height, cls.dpi, cls.max_map_res)
+            UI.warning('Hardcoded jump_line_width.')
+            cls.jump_line_width = 1 #max(0.2,min(3,12*(width/data_X_size)))
+            return
+
+        @classmethod
+        def __init_ranges(cls, ranges_str):
+            user_ranges = [r.strip() for r in ranges_str.upper().split(',')]
+            ranges = dict()
+            if user_ranges and 'FULL' not in user_ranges:
+                for ran in user_ranges:
+                    try:
+                        met_code, min_val, max_val = ran.split(':')
+                        min_val = float(min_val)
+                        max_val = float(max_val)
+                    except ValueError:
+                        UI.error(f'Plot Range with wrong format "{ran}".')
+                    if min_val >= max_val:
+                        UI.error(f'Plot Range min:{min_val} >= max:{max_val}.')
+                    if met_code not in Settings.ALL_METRIC_CODES.keys():
+                        UI.error(f'Invalid metric code "{met_code}".')
+
+                    ranges[met_code] = (min_val, max_val)
+            return ranges
+
+        @classmethod
+        def __init_map_resolution(cls, width, height, dpi, max_res):
+            # guess the number of pixels in the smallest width or height
+            # of the plot area. Pick the smallest between that and the
+            # minimum
+            min_res = round(min(0.9*min(width,height)*dpi,210))
+            if max_res == 'auto':
+                max_res = round(min(0.9*min(width,height)*dpi,2310))
+            else:
+                try:
+                    max_res = int(max_res)
+                except:
+                    UI.error(f'Error: max-res must be an integer or "auto".')
+            return (min_res,max_res)
+
+        @classmethod
+        def describe(cls):
+            attrs = [
+                'width', 'height', 'dpi', 'format', 'img_border_pad',
+                'img_title_vpad',
+                'max_xtick_count', 'max_ytick_count', 'max_map_ytick_count',
+                'x_orient', 'linewidth', 'pal_lig', 'pal_sat', 'pal_alp',
+                'grid_width', 'grid_style', 'grid_alpha',
+                'grid_max_bytes', 'grid_max_blocks', 'tbox_bg', 'tbox_border',
+                'tbox_font', 'tbox_font_size', 'fade_bytes_alpha',
+                'x_ranges', 'y_ranges', 'min_map_res', 'max_map_res',
+                'jump_line_width', 'initialized'
+            ]
+            vals = [getattr(cls, at) for at in attrs]
+            UI.indent_in(title='PLOTS SETTINGS')
+            UI.columns((attrs, vals), sep=' : ')
             UI.indent_out()
             return

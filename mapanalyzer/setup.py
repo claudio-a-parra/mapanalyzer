@@ -10,6 +10,7 @@ setup(
         ],
     },
     install_requires=[
-        "matplotlib"
+        "matplotlib",
+        "jsonschema"
     ],
 )

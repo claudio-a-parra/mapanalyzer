@@ -6,8 +6,7 @@ from matplotlib.colors import ListedColormap
 from itertools import combinations
 from math import prod
 
-from mapanalyzer.util import create_up_to_n_ticks, MetricStrings, Palette, \
-    save_plot, save_metric
+from mapanalyzer.util import sample_list, MetricStrings, Palette
 from mapanalyzer.modules.base_module import BaseModule
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
@@ -29,13 +28,10 @@ class Map(BaseModule):
     }
 
     def __init__(self, shared_X=None):
-        self.enabled = any(m in st.Plot.include for m in self.metrics.keys())
+        self.enabled = any(m in st.Metrics.enabled for m in self.metrics.keys())
         if not self.enabled:
             return
-        if shared_X is not None:
-            self.X = shared_X
-        else:
-            self.X = [i for i in range(st.Map.time_size)]
+        self.X = [i for i in range(st.Map.time_size)]
 
         # select the resolution of the map time-space grid. If too large, pick
         # a value under max_res

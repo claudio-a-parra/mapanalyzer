@@ -2,7 +2,7 @@ import os, json
 import colorsys # to convert from hls to rgb
 import matplotlib.pyplot as plt
 import argparse # to get command line arguments
-
+from jsonschema import validate, ValidationError # to validate pdata files
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
@@ -135,7 +135,6 @@ class Palette:
                     for h in hue_list]
         return
 
-
     def __str__(self):
         ret = ''
         ret +=f'fg    : {self.fg}\n'
@@ -152,9 +151,8 @@ class Palette:
     def __len__(self):
         return len(self.col)
 
-
-
 class MapDataReader:
+    """iterates over the map file, reading one record at the time."""
     class __Record:
         """One record from the map file."""
         def __init__(self, time, thread, event, size, addr):
@@ -179,7 +177,6 @@ class MapDataReader:
                     f'eve:{self.event}, addr:{self.addr}, '
                     f'siz:{self.size}')
 
-    """iterates over the map file, reading one record at the time."""
     def __init__(self, map_filepath):
         self.file_path = map_filepath
 
@@ -258,115 +255,115 @@ class MapDataReader:
         addr = st.Map.aligned_start_addr + st.Map.left_pad + off
         return self.__Record(time, thr, ev, size, addr)
 
-def sample_list(full_list, base=10, n=10):
-    """
-    return a list of ticks based on full_list. The idea is to find
-    nice numbers (multiples of powers of 10 or 2) and not having
-    more than n elements.
-    """
-    if full_list is None or len(full_list) == 0 or n == 0:
-        return []
+class PdataFile:
+    fmt_name = 'pdata'
+    ext = 'json'
+    schema = {
+        'type' : 'object',
+        'properties' : {
+            'meta'    : {'type' : 'object'},
+            'map'     : {'type' : 'object'},
+            'cache'   : {'type' : 'object'},
+            'metrics' : {
+                'type' : 'object',
+                'properties' : {
+                    'bg' : {
+                        'type' : ['object', 'null'],
+                        'properties' : {
+                            'code' : {'type' : 'string'}
+                        },
+                        'required' : ['code']
+                    },
+                    'fg' : {
+                        'type' : 'object',
+                        'properties' : {
+                            'code' : {'type' : 'string'}
+                        },
+                        'required' : ['code']
+                    }
+                },
+                'required' : ['fg']
+            }
+        },
+        'required' : ['meta', 'map', 'cache', 'metrics']
+    }
 
-    # if two ticks, return the extremes.
-    if n == 2:
-        return [full_list[0], full_list[-1]]
+    @classmethod
+    def save(cls, data:dict, met_code, met_str:MetricStrings):
+        code = met_code
+        number = met_str.number
+        map_id = st.Map.ID
+        prefix = f'{st.Map.ID}.' if st.Map.ID else ''
+        filename = f'{prefix}{cls.fmt_name}_{number}_{code}.{cls.ext}'
+        UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
 
-    if n >= len(full_list):
-        return full_list
+        # Verify data is a correctly formed pdata dictionary
+        try:
+            validate(instance=data, schema=cls.schema)
+        except ValidationError as e:
+            UI.error('The data being saved constitutes a malformed '
+                     f'{cls.fmt_name} file:\n'
+                     f'{e}\n'
+                     f'Please check that YourModule.{code}_to_dict() is '
+                     'storing the correct data with at least a \'code\' key '
+                     'mapping to a string.')
 
-    # find a tick_step such that we print at most n ticks
-    tick_step = 1
-    tot_ticks = len(full_list)
-    factors = [1,2,2.5,5] if base==10 else [1]
-    for i in range(14):
-        found = False
-        for f in factors:
-            f_pow_base = int(f * (base ** i))
-            if int(tot_ticks / f_pow_base) <= (n-1):
-                tick_step = f_pow_base
-                found = True
-                break
-        if found:
-            break
+        # save file
+        try:
+            with open(filename, 'w') as f:
+                json.dump(data, f)
+        except Exception as e:
+            UI.nl()
+            UI.error(f'While trying to save {filename}.\n\n{e}')
+        UI.text(filename, indent=False)
+        return
 
-    tick_list = full_list[::tick_step]
-    return tick_list
+    @classmethod
+    def load(cls, filepath):
+        if filepath is None:
+            UI.error(f'While reading pdata file. No file path provided.')
+        try:
+            open_file = open(filepath, 'r')
+        except (FileNotFoundError, IOError):
+            UI.error(f'While reading "{filepath}". File does not exist or '
+                     'cannot be read.')
+        try:
+            file_dict = json.load(open_file)
+        except json.JSONDecodeError:
+            UI.error(f'While reading "{filepath}". File does not seem to '
+                     f'be a valid {cls.ext} file.')
+        open_file.close()
 
-def save_metric(data, metric_strings:MetricStrings):
-    code = metric_strings.code
-    number = metric_strings.number
-    filename=f'{st.Map.ID}.metric_{number}_{code}.json'
-    UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
-    with open(filename, 'w') as f:
-        json.dump(data, f)
-    UI.text(filename, indent=False)
-    return
+        # Verify this is a valid pdata file
+        try:
+            validate(instance=file_dict, schema=cls.schema)
+        except ValidationError as e:
+            UI.error(f'While reading "{filepath}". This seems to be a '
+                     f'malformed {cls.fmt_name} file:\n'
+                     f'{e}')
 
-def __save_plot(fig, metric_strings:MetricStrings, type_prefix='plot'):
-    code = metric_strings.code
-    number = metric_strings.number
-    id_prefix = ''
-    if st.Map.ID != '':
-        id_prefix = f'{st.Map.ID}.'
-    filename=f'{id_prefix}{type_prefix}_{number}_{code}.{st.Plot.format}'
+        return file_dict
 
-    # save file
-    UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
-    fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
-                pad_inches=st.Plot.img_border_pad)
-    UI.text(filename, indent=False)
-    plt.close(fig)
-    return
+class PlotFile:
+    fmt_plot = 'plot'
+    fmt_aggr = 'aggr'
 
-def save_aggr(fig, metric_strings:MetricStrings):
-    __save_plot(fig, metric_strings, type_prefix='aggr')
-    return
-
-def save_plot(fig, metric_strings:MetricStrings):
-    __save_plot(fig, metric_strings, type_prefix='plot')
-    return
-
-def load_json(json_path):
-    """open and verify this is a json file"""
-    if json_path is None:
-        UI.error(f'While reading "{json_path}":\n'
-                 'No file path provided.')
-    try:
-        json_file = open(json_path, 'r')
-    except (FileNotFoundError, IOError):
-        UI.error(f'While reading "{json_path}":\n'
-                 'File does not exist or cannot be read.')
-    try:
-        j_dict = json.load(json_file)
-    except json.JSONDecodeError:
-        UI.error(f'While reading "{json_path}":\n'
-                 'File does not seem to be a valid JSON file.')
-    json_file.close()
-    return j_dict
-
-def missing_keys(met_dict):
-    """Verify that all first level keys are present"""
-    missing_keys = []
-    mk_str = ''
-    for k in st.metric_keys:
-        if k not in met_dict:
-            missing_keys.append(k)
-    if len(missing_keys) > 0:
-        missing_keys = [f' - "{k}"' for k in missing_keys]
-        mk_str = '\n'.join(missing_keys)
-    return mk_str
-
-def load_metric(metric_path):
-    met_dict = load_json(metric_path)
-    mk_str = missing_keys(met_dict)
-    if len(mk_str) > 0:
-        UI.error(f'While reading "{metric_path}:"\n'
-                 'File does not seem to be a (complete) metric file. '
-                 'Not all first-level keys present. Necessary keys:\n'
-                 f'{mk_str}')
-    # enable only the metric specified by the file
-    st.Plot.include = { met_dict['metric']['code'] }
-    return met_dict
+    @classmethod
+    def save(cls, mpl_fig, met_code, met_str:MetricStrings, aggr=False):
+        code = met_code
+        number = met_str.number
+        prefix = f'{st.Map.ID}.' if st.Map.ID else ''
+        fmt = cls.fmt_aggr if aggr else cls.fmt_plot
+        filename = f'{prefix}{fmt}_{number}_{code}.{st.Plot.format}'
+        UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
+        try:
+            fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
+                        pad_inches=st.Plot.img_border_pad)
+        except:
+            UI.nl()
+            UI.error(f'While trying to save {filename}')
+        UI.text(filename, indent=False)
+        return
 
 def command_line_args_parser():
     synopsis = ('MAP Analyzer, a tool to study the cache friendliness of '
@@ -466,15 +463,15 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
-        '-pl', '--plots', metavar='PLOTCODES', dest='plotcodes',
+        '-mc', '--metrics', metavar='CODES', dest='met_codes',
         type=str, default=None,
-        help=('Plots to obtain:\n'+
+        help=('Metrics to enable:\n'+
               '\n'.join(
-                  f'    {code:4} : {defin}'
-                  for code, defin in st.Plot.PLOTCODES.items()
+                  f'    {code.ljust(UI.metric_code_hpad)} : {defin}'
+                  for code, defin in st.ALL_METRIC_CODES.items()
               )+'\n'
               '    all  : Include all metrics\n'
-              'Format: "all" | PLOTCODE{,PLOTCODE}\n'
+              'Format: "all" | CODE{,CODE}\n'
               'Example: "MAP,CMR,CUR"')
     )
 
@@ -483,8 +480,7 @@ def command_line_args_parser():
         type=str, default=None,
         help=("Set a manual range for the X-axis. Useful to compare several "
               "individually produced plots.\n"
-              "Given that TLD is rotated, XRANGE restrict the Y-axis.\n"
-              "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
+              "Format: 'full' | CODE:MIN:MAX{,CODE:MIN:MAX}\n"
               "Example: 'TLD:10:20,CMR:0:310,CMMA:1000:2000'")
     )
 
@@ -493,8 +489,7 @@ def command_line_args_parser():
         type=str, default=None,
         help=("Set a manual range for the Y-axis. Useful to compare several "
               "individually produced plots.\n"
-              "Given that TLD is rotated, YRANGE restrict the X-axis.\n"
-              "Format: 'full' | PLOTCODE:MIN:MAX{,PLOTCODE:MIN:MAX}\n"
+              "Format: 'full' | CODE:MIN:MAX{,CODE:MIN:MAX}\n"
               "Example: 'TLD:0.3:0.7,CMR:20:30,CMMA:0:6000'")
     )
 
@@ -514,3 +509,37 @@ def command_line_args_parser():
 
     args = parser.parse_args()
     return args
+
+def sample_list(full_list, base=10, n=10):
+    """
+    return a list of ticks based on full_list. The idea is to find
+    nice numbers (multiples of powers of 10 or 2) and not having
+    more than n elements.
+    """
+    if full_list is None or len(full_list) == 0 or n == 0:
+        return []
+
+    # if two ticks, return the extremes.
+    if n == 2:
+        return [full_list[0], full_list[-1]]
+
+    if n >= len(full_list):
+        return full_list
+
+    # find a tick_step such that we print at most n ticks
+    tick_step = 1
+    tot_ticks = len(full_list)
+    factors = [1,2,2.5,5] if base==10 else [1]
+    for i in range(14):
+        found = False
+        for f in factors:
+            f_pow_base = int(f * (base ** i))
+            if int(tot_ticks / f_pow_base) <= (n-1):
+                tick_step = f_pow_base
+                found = True
+                break
+        if found:
+            break
+
+    tick_list = full_list[::tick_step]
+    return tick_list

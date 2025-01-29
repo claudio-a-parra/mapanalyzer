@@ -69,7 +69,7 @@ class Cache:
         self.blocks_in_cache = {}
         self.sets = [Set(st.Cache.asso) for _ in range(st.Cache.num_sets)]
         UI.warning('Commenting modules other than MAP and usage. '
-                   'Marked with "#!".')
+                   'Marked with "#!".', pre='TODO')
         return
 
     def __accesses(self, concurrent_access):

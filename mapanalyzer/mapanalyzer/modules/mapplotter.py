@@ -17,18 +17,21 @@ class Map(BaseModule):
     hue = 120
     palette = Palette.default(hue)
 
-    metrics = {
+    supported_metrics = {
         'MAP' :  MetricStrings(
-            title = 'MAP',
+            about  = 'Visual representation of Memory Access Pattern',
+            title  = 'MAP',
             subtit = None,
-            numb   = '00',
+            number = '00',
             xlab   = 'Time [access instr.]',
             ylab   = 'Space [bytes]',
         )
     }
+    supported_aggr_metrics = {}
 
     def __init__(self, shared_X=None):
-        self.enabled = any(m in st.Metrics.enabled for m in self.metrics.keys())
+        self.enabled = any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys())
         if not self.enabled:
             return
         self.X = [i for i in range(st.Map.time_size)]
@@ -122,7 +125,7 @@ class Map(BaseModule):
             return
 
         code = 'MAP'
-        met_str = self.metrics[code]
+        met_str = self.supported_metrics[code]
 
         # Create color maps based on thread and R/W access:
         #  -X : thread (X-1) read
@@ -133,7 +136,7 @@ class Map(BaseModule):
         #lig_val, sat_val, alp_val = [35,70], [45,75], 96
         thr_count = st.Map.thread_count
         thr_palette = Palette(
-            hue = th_count,
+            hue = thr_count,
             sat = [45, 75],
             lig = [35, 70],
             alp = [100]
@@ -159,24 +162,22 @@ class Map(BaseModule):
                         interpolation='none',
                         aspect='auto', zorder=2, extent=extent,
                         vmin=-thr_count, vmax=thr_count)
-        mpl_axes.invert_yaxis()
-
 
         # set plot limits
         real_xlim, real_ylim = self.setup_limits(
-            mpl_axes, code=code, xlims=xlims, xpad=X_pad,
-            ylims=ylims, ypad=Y_pad
+            mpl_axes, code=code, xlims=xlims, x_pad=X_pad,
+            ylims=ylims, y_pad=Y_pad, invert_y=True
         )
 
         # set ticks based on the real limits
         self.setup_ticks(
-            mpl_axes, realxlim=real_xlim, realylim=real_ylim,
-            tick_bases=(10, 2), # y-axis powers of two
+            mpl_axes, xlims=real_xlim, ylims=real_ylim,
+            bases=(10, 2), # y-axis powers of two
             bg_mode=bg_mode
         )
 
         # set grid of bytes and blocks (not mpl grids)
-        self.setup_grid(mpl_axes)
+        self.setup_grid(mpl_axes, bg_mode=bg_mode)
 
         # fade bytes used just for block-padding
         self.__fade_padding_bytes(mpl_axes)
@@ -188,55 +189,11 @@ class Map(BaseModule):
         self.setup_general(mpl_axes, met_str, bg_mode=bg_mode)
         return
 
-    def MAP_to_bg_plot(self, axes, draw_x_grid=False, draw_y_grid=False):
-        """to be called by other modules to superpose their own plots on
-        top of MAP"""
-        lig_val = [35,70]
-        sat_val = [45,75]
-        alp_val = 96
-
-        # Create color maps based on thread and R/W access:
-        #  -X : thread (X-1) read
-        #   X : thread (X-1) write
-        #   0 : no operation.
-        # Then, the palette must match the negative and positive values to the
-        # read/write colors of the thread.
-        thr_count = st.Map.thread_count
-        thr_palette = Palette(hue_count=thr_count,
-                              lightness=lig_val,
-                              saturation=sat_val,
-                              alpha=alp_val)
-        read_color = list(reversed(
-            [thr_palette[i][0] for i in range(thr_count)]
-        ))
-        write_color = [thr_palette[i][1] for i in range(thr_count)]
-        cmap = ListedColormap(read_color + ['#FFFFFF00'] + write_color)
-
-        # set plot limits
-        ymin = 0-0.5
-        ymax = st.Map.num_padded_bytes-0.5
-        extent = (self.X[0]-0.5, self.X[-1]+0.5, ymin, ymax)
-
-        # draw map
-        axes.imshow(
-            self.space_time, cmap=cmap, origin='lower',
-            interpolation='none',
-            aspect='auto', zorder=2, extent=extent,
-            vmin=-thr_count, vmax=thr_count
-        )
-        axes.invert_yaxis()
-
-        # delete all ticks and make bg solid
-        self.__setup_general(axes, clean=True)
-        self.__setup_X_axis(axes, clean=True)
-        self.__setup_Y_axis(axes, clean=True)
-        self.__draw_X_grid(axes, draw=draw_x_grid)
-        self.__draw_Y_grid(axes, draw=draw_y_grid)
-        self.__fade_padding_bytes(axes)
-        return
-
     def setup_grid(self, mpl_axes, draw_x='auto', draw_y='auto',
-                   byte_sep='auto'):
+                   byte_sep='auto', bg_mode=False):
+        if bg_mode:
+            mpl_axes.grid(False)
+            return
         self.__draw_X_grid(mpl_axes, draw=draw_x)
         self.__draw_Y_grid(mpl_axes, draw=draw_y, byte_sep=byte_sep)
         return

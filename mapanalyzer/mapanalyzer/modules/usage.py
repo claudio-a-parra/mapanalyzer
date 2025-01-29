@@ -12,20 +12,24 @@ class CacheUsage(BaseModule):
     hue = 120
     palette = Palette.default(hue)
 
-    metrics = {
+    supported_metrics = {
         'CUR' : MetricStrings(
-            title  = 'CUR',
+            about  = ('Percentage of valid bytes in the cache that are used '
+                      'before eviction.'),
+            title  = 'Cache Usage Ratio',
             subtit = 'higher is better',
-            numb   = '01',
+            number = '01',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Usage Rate [%]',
         )
     }
-    aggr_metrics = {
+    supported_aggr_metrics = {
         'CUR' : MetricStrings(
+            about  = ('Average of the percentage of valid bytes in the cache '
+                      'that are used before eviction.'),
             title  = 'Aggregated CUR',
             subtit = 'higher is better',
-            numb   = '01',
+            number = '01',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Usage Rate [%]',
         )
@@ -34,7 +38,8 @@ class CacheUsage(BaseModule):
 
     def __init__(self):
         # enable only if metric is included
-        self.enabled = any(m in st.Metrics.enabled for m in self.metrics.keys())
+        self.enabled = any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys())
         if not self.enabled:
             return
         self.X = [i for i in range(st.Map.time_size)]
@@ -69,15 +74,11 @@ class CacheUsage(BaseModule):
         }
 
     def dict_to_CUR(self, data):
-        class_name = self.__class__.__name__
-        my_code = 'MAP'
-        curr_fn = f'dict_to_{my_code}'
-        data_code = data['code']
-        if my_code != data_code:
-            UI.error(f'{class_name}.{curr_fn}(): {self.name} module '
-                     f'received some unknown "{data_code}" metric data rather '
-                     f'than its known "{my_code}" metric data.')
-
+        # check for malformed (no keys) dict.
+        all_keys = ['x', 'usage_ratio']
+        if not all(k in data for k in all_keys):
+            UI.error(f'While importing CUR. Not all necessary keys are '
+                     f'present ({",".join(all_keys)}).')
         self.X = data['x']
         self.usage_ratio = data['usage_ratio']
         return
@@ -86,8 +87,8 @@ class CacheUsage(BaseModule):
         if not self.enabled:
             return
 
-        code = 'CUR'
-        met_str = self.metrics[code]
+        metric_code = 'CUR'
+        met_str = self.supported_metrics[metric_code]
 
         # pad data series
         X_pad = 0.5
@@ -104,14 +105,14 @@ class CacheUsage(BaseModule):
 
         # set plot limits
         real_xlim, real_ylim = self.setup_limits(
-            mpl_axes, code=code, xlims=(self.X[0],self.X[-1]), xpad=X_pad,
-            ylims=(0,100), ypad='auto'
+            mpl_axes, metric_code, xlims=(self.X[0],self.X[-1]), x_pad=X_pad,
+            ylims=(0,100), y_pad='auto'
         )
 
         # set ticks based on the real limits
         self.setup_ticks(
-            mpl_axes, realxlim=real_xlim, realylim=real_ylim,
-            tick_bases=(10, 10),
+            mpl_axes, xlims=real_xlim, ylims=real_ylim,
+            bases=(10, 10),
             bg_mode=bg_mode
         )
 
@@ -119,27 +120,28 @@ class CacheUsage(BaseModule):
         self.setup_grid(mpl_axes, fn_axis='y')
 
         # insert text box with average usage
-        text = f'Avg: {sum(self.usage_ratio)/len(self.usage_ratio):.2f}%'
-        self.draw_textbox(mpl_axes, text)
+        if not bg_mode:
+            text = f'Avg: {sum(self.usage_ratio)/len(self.usage_ratio):.2f}%'
+            self.draw_textbox(mpl_axes, text)
 
         # set labels
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
         # title and bg color
-        self.setup_general(mpl_axes, met_str, bg_mode=bg_mode)
+        self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
         return
 
     @classmethod
-    def CUR_to_aggregated_plot(cls, metrics_list):
+    def CUR_to_aggregated_plot(cls, pdata_dicts):
         """Given a list of 'metric' dictionaries, aggregate their
         values in a meaningful manner"""
 
-        code = 'CUR'
-        met_str = cls.aggr_metrics
+        metric_code = 'CUR'
+        met_str = cls.supported_aggr_metrics[metric_code]
 
-        num_mets = len(metrics_list)
-        all_x = [m['x'] for m in metrics_list]
-        all_y = [m['usage_ratio'] for m in metrics_list]
+        total_pdatas = len(pdata_dicts)
+        all_x = [m['fg']['x'] for m in pdata_dicts]
+        all_y = [m['fg']['usage_ratio'] for m in pdata_dicts]
 
         fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
@@ -154,7 +156,7 @@ class CacheUsage(BaseModule):
         avg_width = 2
         one_color = palette[1][1][1][1]
         one_width = 0.5
-        for m in range(num_mets):
+        for m in range(total_pdatas):
             met_x = all_x[m]
             met_y = all_y[m]
             mpl_axes.step(
@@ -168,13 +170,32 @@ class CacheUsage(BaseModule):
 
         # Plot setup
         X_pad = 0.5
-        cls.__setup_general(mpl_axes, 'white', cls.aggr_met_str)
-        cls.__setup_axes(mpl_axes, cls.met_str.code, fn_axis='y',
-                         xlims=(X_min, X_max), xpad=X_pad,
-                         ylims=(0,100), ypad='auto', tick_bases=(10, 10),
-                         grid=True)
 
+        # set plot limits
+        real_xlim, real_ylim = cls.setup_limits(
+            mpl_axes, metric_code, xlims=(X_min,X_max), x_pad=X_pad,
+            ylims=(0,100), y_pad='auto'
+        )
 
-        PlotFile.save(fig, met_code=code, met_str=met_str, aggr=True)
-        save_aggr(fig, cls.aggr_met_str)
+        # set ticks based on the real limits
+        cls.setup_ticks(
+            mpl_axes, xlims=real_xlim, ylims=real_ylim,
+            bases=(10, 10)
+        )
+
+        # set grid
+        cls.setup_grid(mpl_axes, fn_axis='y')
+
+        # insert text box with average usage
+        # if not bg_mode:
+        #     text = f'Avg: {sum(self.usage_ratio)/len(self.usage_ratio):.2f}%'
+        #     self.draw_textbox(mpl_axes, text)
+
+        # set labels
+        cls.setup_labels(mpl_axes, met_str)
+
+        # title and bg color
+        cls.setup_general(mpl_axes, cls.palette.bg, met_str)
+
+        PlotFile.save(fig, metric_code, aggr=True)
         return

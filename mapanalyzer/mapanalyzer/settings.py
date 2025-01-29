@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from itertools import zip_longest
 
 from mapanalyzer.ui import UI
 
@@ -137,10 +138,10 @@ class Settings:
             return
 
         @classmethod
-        def from_dict(cls, cache_dict, file_path=None):
+        def from_dict(cls, cache_dict, pdata_file_path=None):
             # load data from the cache section of the metric file
             cls.__dict_to_basics(cache_dict)
-            cls.file_path = file_path
+            cls.file_path = pdata_file_path
 
             # compute derived values
             cls.__init_derived_values()
@@ -311,9 +312,18 @@ class Settings:
     class Metrics:
         ############################################################
         # DERIVED VALUES
-        # metrics enabled by the user
         initialized = False
+
+        # Metrics *enabled by the user*. Starts as string, then upgraded to set.
         enabled = 'all'
+
+        # Metrics *available in the tool*. All the metrics with some module
+        # supporting them. Check comments on Settings.Metrics.set_available()
+        # {code -> either module instance or class}
+        available = None
+
+        # code of the background metric.
+        bg = 'MAP'
 
         @classmethod
         def from_args(cls, args):
@@ -323,6 +333,19 @@ class Settings:
 
             # set values from the arguments
             cls.enabled = assg_val(cls.enabled, args.met_codes)
+            cls.bg = assg_val(cls.bg, args.bg_metric)
+
+            cls.__init_derived_values()
+            cls.initialized = True
+            return
+
+        @classmethod
+        def from_dict(cls, pdata_dict):
+            # set values from the dictionary
+            cls.enabled = pdata_dict['fg']['code']
+            cls.bg = None
+            if pdata_dict['bg'] is not None:
+                cls.bg = pdata_dict['bg']['code']
 
             cls.__init_derived_values()
             cls.initialized = True
@@ -330,26 +353,108 @@ class Settings:
 
         @classmethod
         def __init_derived_values(cls):
+            cls.bg = cls.__init_bg()
             cls.enabled = cls.__init_enabled()
             return
 
         @classmethod
+        def __init_bg(cls):
+            if cls.bg is None:
+                return None
+            if cls.bg.upper() == 'NONE':
+                return None
+            return cls.bg.upper()
+
+        @classmethod
         def __init_enabled(cls):
-            user_codes = [x.strip() for x in cls.enabled.upper().split(',')]
-            enabled = Settings.ALL_METRIC_CODES.keys() # default to all known codes
-            if len(user_codes) > 0 and 'ALL' not in user_codes:
-                enabled = set()
-                for ucod in user_codes:
-                    if ucod in Settings.ALL_METRIC_CODES.keys():
-                        enabled.add(ucod)
+            user_metric_codes = {
+                x.strip() for x in cls.enabled.upper().split(',')
+            }
+
+            # also enable the bg metric
+            if cls.bg is not None:
+                user_metric_codes.add(cls.bg.upper())
+            return user_metric_codes
+
+        @classmethod
+        def set_available(cls, available_modules,
+                          supp_metrics_name='supported_metrics'):
+            """
+            - If the tool is in simulation or plot mode, then at least one
+              instance of Modules is created. Modules.__init__() calls this
+              method with a list of module instances.
+              Also, supp_metrics_name=='supported_metrics', so that metrics are
+              searched in mod.supported_metrics.keys() (metrics that support
+              normal plotting).
+
+            - If the tool is in aggregate mode, then the class method
+              Modules.aggregate_and_plot() is called, which in turn calls this
+              method with a list of module Classes.
+              Also, supp_metrics_name=='supported_aggr_metrics', so that metrics
+              are searched in mod.supported_aggr_metric.keys() (metrics that
+              supports aggreagation plotting).
+
+            Metrics.available is sorted by the metric number, so that traversing
+            it 'makes sense' to the user.
+            """
+
+            num_met_mod = []
+            for module in available_modules:
+                # obtain the dictionary in which the metrics are keys.
+                try:
+                    supp_metrics_dict = getattr(module, supp_metrics_name)
+                except:
+                    if type(module) == type(type):
+                        mod_name = module.__name__
                     else:
-                        UI.warning(f'Unknown metric code "{ucod}". '
-                                   'Ignoring it.')
-            return enabled
+                        mod_name = module.__class__.__name__
+                    UI.error(f'It seems that module {mod_name} has not '
+                             f'defined the dictionary {supp_metrics_name} in '
+                             'which to search for its supported metrics.')
+
+                # add metrics' number, code, and module (instance or class)
+                for sp_met_code,sp_met_str in supp_metrics_dict.items():
+                    num_met_mod.append(
+                        (sp_met_str.number, sp_met_code, module)
+                    )
+
+            # sort by metric number and extract key,value for the dictionary
+            num_met_mod.sort()
+            _, sp_met_codes, sp_modules = zip(*num_met_mod)
+
+            # check that there are no duplicated metric codes
+            if len(sp_met_codes) != len(set(sp_met_codes)):
+                repeated = ''
+                idx = 0
+                for i,(smc,uniq) in enumerate(
+                        zip_longest(sp_met_codes, set(sp_met_codes))):
+                    if smc != uniq:
+                        repeated = smc
+                        idx = i
+                        break
+                sp_module = sp_modules[idx]
+                sp_module_other = sp_modules[idx-1]
+                if type(sp_module) == type(type):
+                    sp_module_name = sp_module.__name__
+                    sp_module_name_other = sp_module_other.__name__
+                else:
+                    sp_module_name = sp_module.__class__.__name__
+                    sp_module_name_other = sp_module_other.__class__.__name__
+                UI.error(
+                    f'The metric code "{repeated}" is not unique across all '
+                    'modules.\n'
+                    f'  {sp_module_name}.{supp_metrics_name}[\'{repeated}\']\n'
+                    f'  {sp_module_name_other}.{supp_metrics_name}'
+                    f'[\'{repeated}\']')
+
+            # create the {code -> module} dictionary
+            cls.available = {met:mod
+                             for met,mod in zip(sp_met_codes, sp_modules)}
+            return
 
         @classmethod
         def describe(cls):
-            attrs = ['enabled', 'initialized']
+            attrs = ['enabled', 'available', 'bg', 'initialized']
             vals = [getattr(cls, at) for at in attrs]
             UI.indent_in(title='METRICS SETTINGS')
             UI.columns((attrs, vals), sep=' : ')
@@ -553,10 +658,10 @@ class Settings:
             return
 
         @classmethod
-        def from_dict(cls, map_dict, met_file_path=None):
+        def from_dict(cls, map_dict, pdata_file_path=None):
             # load data from the map section of the metric file
             cls.__dict_to_basics(map_dict)
-            cls.file_path = met_file_path
+            cls.file_path = pdata_file_path
 
             # compute derived values
             cls.initd_from_dict = True

@@ -7,13 +7,14 @@ from mapanalyzer.settings import Settings as st
 from mapanalyzer.ui import UI
 
 class MetricStrings:
-    def __init__(self, title='Title', subtit='Subtitle', numb='00',
-                 xlab='X-axis', ylab='Y-axis'):
+    def __init__(self, about='About this metric', title='Title',
+                 subtit='Subtitle', number='00', xlab='X-axis', ylab='Y-axis'):
+        self.about = about
         self.title = title
         self.subtit= subtit
+        self.number = number
         self.xlab  = xlab
         self.ylab  = ylab
-        self.number = numb
         return
 
 class Palette:
@@ -94,7 +95,7 @@ class Palette:
             if hue < 1:
                 UI.error('Hue count cannot be less than 1.')
             step = 360/hue
-            hue_list = [(round(i*step)+hue0)%360 for i in range(hue)]
+            hue_list = [(round(i*step)+hue)%360 for i in range(hue)]
 
         # determine the list of saturation values
         if hasattr(sat, '__getitem__'):
@@ -127,7 +128,7 @@ class Palette:
             alp_list = [alp_off+i*step for i in range(1, alp+1)]
 
         self.fg = self.__hsl2rgb(hue_list[0], 75,  10, 100)
-        self.bg = self.__hsl2rgb(hue_list[0], 100, 100, 90)
+        self.bg = self.__hsl2rgb(hue_list[0], 100, 100, 60)
         self.col = [[[[self.__hsl2rgb(h,s,l,a)
                        for a in alp_list ]
                       for l in lig_list]
@@ -289,24 +290,38 @@ class PdataFile:
     }
 
     @classmethod
-    def save(cls, data:dict, met_code, met_str:MetricStrings):
-        code = met_code
+    def save(cls, data:dict, metric_code):
+        # obtain metrics strings
+        met_str = st.Metrics.available[metric_code].\
+            supported_metrics[metric_code]
+
+        # number for consistent sorting of output files
         number = met_str.number
-        map_id = st.Map.ID
+
+        # map ID computed from the input map file(s)
         prefix = f'{st.Map.ID}.' if st.Map.ID else ''
-        filename = f'{prefix}{cls.fmt_name}_{number}_{code}.{cls.ext}'
-        UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
+
+        # file extension
+        ext = cls.ext
+
+        # assembly the final file name
+        filename = f'{prefix}{cls.fmt_name}_{number}_{metric_code}.{cls.ext}'
+
+        UI.text(f'{metric_code.ljust(UI.metric_code_hpad)}: ', end='')
 
         # Verify data is a correctly formed pdata dictionary
         try:
             validate(instance=data, schema=cls.schema)
         except ValidationError as e:
+            module = st.Metrics.available[metric_code]
+            module_name = module.__class__.__name__
+            UI.nl()
             UI.error('The data being saved constitutes a malformed '
                      f'{cls.fmt_name} file:\n'
                      f'{e}\n'
-                     f'Please check that YourModule.{code}_to_dict() is '
-                     'storing the correct data with at least a \'code\' key '
-                     'mapping to a string.')
+                     f'Please check that {module_name}.{metric_code}_to_dict() '
+                     'stores the correct data with at least a key \'code\' '
+                     'mapping to the metric\'s code string.')
 
         # save file
         try:
@@ -314,7 +329,8 @@ class PdataFile:
                 json.dump(data, f)
         except Exception as e:
             UI.nl()
-            UI.error(f'While trying to save {filename}.\n\n{e}')
+            UI.error(f'While trying to save {filename}.\n\n'
+                     f'{e}')
         UI.text(filename, indent=False)
         return
 
@@ -349,19 +365,38 @@ class PlotFile:
     fmt_aggr = 'aggr'
 
     @classmethod
-    def save(cls, mpl_fig, met_code, met_str:MetricStrings, aggr=False):
-        code = met_code
+    def save(cls, mpl_fig, metric_code, aggr=False):
+        # set different components based on normal vs aggregation mode
+        if aggr:
+            fmt_name = cls.fmt_aggr
+            met_str = st.Metrics.available[metric_code].\
+                supported_aggr_metrics[metric_code]
+        else:
+            fmt_name = cls.fmt_plot
+            met_str = st.Metrics.available[metric_code].\
+                supported_metrics[metric_code]
+
+        # number for consistent sorting of output files
         number = met_str.number
+
+        # if there is a map ID, computed from the map file(s) given, use it
         prefix = f'{st.Map.ID}.' if st.Map.ID else ''
-        fmt = cls.fmt_aggr if aggr else cls.fmt_plot
-        filename = f'{prefix}{fmt}_{number}_{code}.{st.Plot.format}'
-        UI.text(f'{code.ljust(UI.metric_code_hpad)}: ', end='')
+
+        # image format (extension)
+        ext = st.Plot.format
+
+        # assembly the final file name
+        filename = f'{prefix}{fmt_name}_{number}_{metric_code}.{ext}'
+
+        # print UI message and actually save figure
+        UI.text(f'{metric_code.ljust(UI.metric_code_hpad)}: ', end='')
         try:
-            fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
-                        pad_inches=st.Plot.img_border_pad)
-        except:
+            mpl_fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
+                            pad_inches=st.Plot.img_border_pad)
+        except Exception as e:
             UI.nl()
-            UI.error(f'While trying to save {filename}')
+            UI.error(f'While trying to save {filename}:\n\n'
+                     f'{e}')
         UI.text(filename, indent=False)
         return
 
@@ -407,7 +442,7 @@ def command_line_args_parser():
         metavar='INPUT-FILE', dest='input_files', nargs='+',
         type=str, default=None,
         help=('List of input files. Depending on the analysis '
-              '"mode", they are either MAP or METRIC type.')
+              '"mode", they are either MAP or PDATA type.')
     )
 
     parser.add_argument(
@@ -417,15 +452,15 @@ def command_line_args_parser():
         help=(
             'Defines the operation mode of the tool:\n'
             'simulate  : Only run the cache simulation. You must provide a\n'
-            '            list of MAP files. Generates METRIC files.\n'
+            '            list of MAP files. Generates PDATA files.\n'
             'plot      : Plot already obtained metric data. One plot per\n'
-            '            input file. You must provide a list of METRIC files.\n'
+            '            input file. You must provide a list of PDATA files.\n'
             '            Generates PLOT files.\n'
             'sim-plot  : (default) Simulate cache and plot results. Generates\n'
-            '            METRIC and PLOT files.\n'
+            '            PDATA and PLOT files.\n'
             'aggregate : Plot the aggregation of multiple metric data files,\n'
             '            aggregating the ones of the same kind. You must\n'
-            '            provide a list of METRIC files.\n')
+            '            provide a list of PDATA files.\n')
     )
 
     parser.add_argument(
@@ -437,29 +472,29 @@ def command_line_args_parser():
     parser.add_argument(
         '-pw', '--plot-width', metavar='WIDTH', dest='plot_width',
         type=float, default=None,
-        help=("Width of the plots.\n"
-              "Format: integer")
+        help=('Width of the plots.\n'
+              'Format: <integer>')
     )
 
     parser.add_argument(
         '-ph', '--plot-height', metavar='HEIGHT', dest='plot_height',
         type=float, default=None,
-        help=("Height of the plots.\n"
-              "Format: integer")
+        help=('Height of the plots.\n'
+              'Format: <integer>')
     )
 
     parser.add_argument(
         '-dp', '--dpi', metavar='DPI', dest='dpi',
         type=int, default=None,
-        help=("Choose the DPI of the resulting plots.\n"
-              "Format: integer")
+        help=('Choose the DPI of the resulting plots.\n'
+              'Format: <integer>')
     )
 
     parser.add_argument(
         '-mr', '--max-res', metavar='MR', dest='max_res',
         type=str, default=None,
-        help=("The maximum resolution at which to show MAP.\n"
-              "Format: integer | 'auto'")
+        help=('The maximum resolution at which to show MAP.\n'
+              'Format: auto | <integer>')
     )
 
     parser.add_argument(
@@ -471,40 +506,52 @@ def command_line_args_parser():
                   for code, defin in st.ALL_METRIC_CODES.items()
               )+'\n'
               '    all  : Include all metrics\n'
-              'Format: "all" | CODE{,CODE}\n'
-              'Example: "MAP,CMR,CUR"')
+              'Format : all | <CODE>{,<CODE>}\n'
+              'Example: MAP,CMR,CUR')
     )
+
+    parser.add_argument(
+        '-bm', '--background-metric', metavar='BG', dest='bg_metric',
+        type=str, default=None,
+        help=('Metric to use in the background plot.\n'
+              'Format : none | <CODE>\n'
+              "Example: MAP")
+    )
+
+
 
     parser.add_argument(
         '-xr', '--x-ranges', metavar='XRANGES', dest='x_ranges',
         type=str, default=None,
-        help=("Set a manual range for the X-axis. Useful to compare several "
-              "individually produced plots.\n"
-              "Format: 'full' | CODE:MIN:MAX{,CODE:MIN:MAX}\n"
-              "Example: 'TLD:10:20,CMR:0:310,CMMA:1000:2000'")
+        help=('Set a manual range for the X-axis. Useful to compare several '
+              'individually produced plots.\n'
+              'Format : full | <CODE>:<MIN>:<MAX>{,<CODE>:<MIN>:<MAX>}\n'
+              '         Were <MIN> and <MAX> are numbers.\n'
+              'Example: TLD:10:20,CMR:0:310,CMMA:1000:2000')
     )
 
     parser.add_argument(
         '-yr', '--y-ranges', metavar='YRANGES', dest='y_ranges',
         type=str, default=None,
-        help=("Set a manual range for the Y-axis. Useful to compare several "
-              "individually produced plots.\n"
-              "Format: 'full' | CODE:MIN:MAX{,CODE:MIN:MAX}\n"
-              "Example: 'TLD:0.3:0.7,CMR:20:30,CMMA:0:6000'")
+        help=('Set a manual range for the Y-axis. Useful to compare several '
+              'individually produced plots.\n'
+              'Format : full | <CODE>:<MIN>:<MAX>{,<CODE>:<MIN>:<MAX>}\n'
+              '         Were <MIN> and <MAX> are numbers.\n'
+              'Example: TLD:0.3:0.7,CMR:20:30,CMMA:0:6000')
     )
 
     parser.add_argument(
         '-xo', '--x-tick-ori', metavar='ORI', dest='x_orient',
         choices=['h', 'v'], default=None,
-        help=("Orientation of the X-axis tick labels.\n"
-              "Format: 'h' | 'v'")
+        help=('Orientation of the X-axis tick labels.\n'
+              'Format: h | v')
     )
 
     parser.add_argument(
         '-fr', '--format', metavar='FORMAT', dest='format',
         choices=['png', 'pdf'], default=None,
-        help=("Choose the output format of the plots.\n"
-              "Format: 'pdf' | 'png'")
+        help=('Choose the output format of the plots.\n'
+              'Format: pdf | png')
     )
 
     args = parser.parse_args()

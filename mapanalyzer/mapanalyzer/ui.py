@@ -15,27 +15,28 @@ class UI:
         """Message has some parts:
         .------+-------------------------------------- indentation
         |      |
-        [!]     WARNING: the message I want to say\n
-         |         |              |                +-- end
-         |         |              +------------------- message
-         |         +---------------------------------- pre-message
-         +-------------------------------------------- symbol
+             [!]WARNING: the message I want to say\n
+              |    |              |                +-- end
+              |    |              +------------------- message
+              |    +---------------------------------- pre-message
+              +--------------------------------------- symbol
         """
         # determine indentation string.
         if indent and len(msg) > 0:
-            # indent
+            # if a manual indentation string has been given
             if len(ind_str) > 0:
                 pass
-            elif len(symb) < len(cls.ind):
-                ind_str = f'{symb}{cls.ind[len(symb):]}'
             else:
-                ind_str = symb
+                ind_str = cls.ind
         else:
             ind_str = ''
 
+        # make symbol bold
+        symb = f'{Style.BRIGHT}{symb}{Style.NORMAL}'
+
         # add ': ' to pre-message
-        if len(msg) != 0 and len(pre) != 0:
-            pre = f'{pre}: '
+        if len(msg) > 0 and len(pre) > 0:
+            pre = f'{Style.BRIGHT}{pre}{Style.NORMAL}: '
 
         # Add indentation to all lines of the message
         second_line_ind = ''
@@ -43,7 +44,7 @@ class UI:
         msg = f'\n{cls.ind}{second_line_ind}'.join(msg_lines)
 
         # print message
-        print(msg_color + f'{ind_str}{pre}{msg}' + Style.RESET_ALL,
+        print(msg_color + f'{ind_str}{symb}{pre}{msg}' + Style.RESET_ALL,
               file=out, end=end)
 
         if end != '\n':
@@ -76,7 +77,7 @@ class UI:
         return
 
     @classmethod
-    def error(cls, msg, symb='!! ', pre='ERROR', do_exit=True, code=1):
+    def error(cls, msg, symb='', pre='ERROR', do_exit=True, code=1):
         """print an error message to stderr and possibly exit with a
         given code"""
         cls.__color_msg(msg=msg, symb=symb, pre=pre, msg_color=Fore.RED,
@@ -90,7 +91,7 @@ class UI:
         return
 
     @classmethod
-    def warning(cls, msg, symb='! ', pre='WARNING'):
+    def warning(cls, msg, symb='', pre='WARNING'):
         """print a warning message to stderr"""
         cls.__color_msg(msg=msg, symb=symb, pre=pre, msg_color=Fore.YELLOW,
                         out=stderr)

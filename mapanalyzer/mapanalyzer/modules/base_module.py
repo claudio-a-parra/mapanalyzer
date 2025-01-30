@@ -144,7 +144,7 @@ class BaseModule:
             set_ticks(ticks)
 
     @classmethod
-    def setup_general(cls, mpl_axes, color, met_str, bg_mode=False):
+    def setup_general(cls, mpl_axes, bg_color, met_str, bg_mode=False):
         """ setup title and axes background color"""
         # set title only if in foreground mode
         title_string = ''
@@ -159,7 +159,11 @@ class BaseModule:
                            pad=st.Plot.img_title_vpad)
 
         # background color
-        mpl_axes.patch.set_facecolor(color)
+        mpl_axes.patch.set_facecolor(bg_color)
+
+        # Set the zorder of the spines
+        for spine in mpl_axes.spines.values():
+            spine.set_zorder(500)
 
         return
 

@@ -1,5 +1,6 @@
 from sys import stdout, stderr # to define where to write output
 from colorama import Fore, Style # for colored messages
+from itertools import zip_longest # to print columns of different lengths
 
 class UI:
     ############################################################
@@ -44,7 +45,7 @@ class UI:
         msg = f'\n{cls.ind}{second_line_ind}'.join(msg_lines)
 
         # print message
-        print(msg_color + f'{ind_str}{symb}{pre}{msg}' + Style.RESET_ALL,
+        print(f'{msg_color}{ind_str}{symb}{pre}{msg}{Style.RESET_ALL}',
               file=out, end=end)
 
         if end != '\n':
@@ -52,12 +53,13 @@ class UI:
         return
 
     @classmethod
-    def indent_in(cls, title='', symb=''):
+    def indent_in(cls, title='', left='', right='',
+                  bold=True):
         """Increase indentation with a possible title"""
         if title:
-            cls.__color_msg(msg=f'\n{title}', symb=symb,
-                            msg_color=f'{Style.BRIGHT}{Fore.GREEN}',
-                            out=stdout)
+            msg_str = f'{Style.BRIGHT}{left}{title}{right}{Style.NORMAL}'
+            cls.nl()
+            cls.__color_msg(msg=msg_str, msg_color=f'{Fore.GREEN}', out=stdout)
         cls.il += 1
         cls.ind = ' ' * (cls.il*cls.iw)
         return
@@ -139,7 +141,7 @@ class UI:
         return
 
     @classmethod
-    def columns(cls, cols, sep='', cols_width='auto'):
+    def columns_old(cls, cols, sep='', cols_width='auto'):
         """Print a table with columns. If cols_width is auto, then
         compute each column width, otherwise, use the values given
         in cols_width (array_like, with one integer per column of cols)"""
@@ -177,6 +179,45 @@ class UI:
             all_lines.append(line)
 
         # join rows and print them
+        table = '\n'.join(all_lines)
+        cls.__color_msg(msg=table)
+        return
+
+    @classmethod
+    def columns(cls, cols, sep='', cols_width='auto', header=False):
+        """Print a table with columns. If cols_width is auto, then
+        compute each column width, otherwise, use the values given
+        in cols_width (array_like, with one integer per column of cols)"""
+        if len(cols) == 0:
+            cls.error('UI.columns: Printing empty array.')
+
+        # if auto column width, then compute it. Otherwise, use the given one
+        if cols_width == 'auto':
+            cols_width = []
+            for col in cols:
+                col_width = 0
+                for text in col:
+                    col_width = max(col_width,len(str(text)))
+                cols_width.append(col_width)
+        else:
+            if len(cols_width) != len(cols):
+                cls.error(f'UI.columns(): number of columns '
+                          f'({len(cols)}) and number of column-width '
+                          f'values {len(cols_width)} is not the same.')
+
+        # Create rows
+        all_lines = []
+        for elems in zip_longest(*cols, fillvalue=''):
+            line_elems = [str(elem).ljust(cols_width[el_wd])
+                          for el_wd,elem in enumerate(elems)]
+            line = sep.join(line_elems)
+            all_lines.append(line)
+
+        # do we have headers?
+        if header:
+            all_lines[0] = f'{Style.BRIGHT}{all_lines[0]}{Style.NORMAL}'
+
+        # join lines and print them
         table = '\n'.join(all_lines)
         cls.__color_msg(msg=table)
         return

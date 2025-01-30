@@ -331,7 +331,7 @@ class Settings:
             def assg_val(current, new):
                 return new if new is not None else current
 
-            # set values from the arguments
+            # set raw values from the arguments
             cls.enabled = assg_val(cls.enabled, args.met_codes)
             cls.bg = assg_val(cls.bg, args.bg_metric)
 
@@ -360,21 +360,38 @@ class Settings:
         @classmethod
         def __init_bg(cls):
             if cls.bg is None:
-                return None
-            if cls.bg.upper() == 'NONE':
-                return None
-            return cls.bg.upper()
+                bg_metric = None
+            elif type(cls.bg) is str:
+                cls.bg = cls.bg.upper()
+                if cls.bg == 'NONE':
+                    bg_metric = None
+                elif cls.bg in Settings.ALL_METRIC_CODES:
+                    bg_metric = cls.bg
+                else:
+                    UI.error(f'Unknown background metric code ({cls.bg}).')
+            else:
+                UI.error(f'Unknown type ({type(cls.bg)}) given to '
+                         'st.Metrics.bg')
+            return bg_metric
 
         @classmethod
         def __init_enabled(cls):
-            user_metric_codes = {
-                x.strip() for x in cls.enabled.upper().split(',')
-            }
-
-            # also enable the bg metric
-            if cls.bg is not None:
-                user_metric_codes.add(cls.bg.upper())
-            return user_metric_codes
+            if type(cls.enabled) is str:
+                if cls.enabled.upper() == 'ALL':
+                    enabled_metrics = {
+                        m for m in Settings.ALL_METRIC_CODES.keys()}
+                else:
+                    enabled_metrics = {
+                        x.strip() for x in cls.enabled.upper().split(',')
+                    }
+            elif type(cls.enabled) is list:
+                enabled_metrics = {x for x in cls.enabled}
+            elif type(cls.enabled) is dict:
+                enabled_metrics = cls.enabled
+            else:
+                UI.error(f'Unknown type ({type(cls.enabled)}) given to '
+                         'st.Metrics.enabled.')
+            return enabled_metrics
 
         @classmethod
         def set_available(cls, available_modules,
@@ -672,24 +689,47 @@ class Settings:
         @classmethod
         def set_path_prefix(cls, input_files_paths):
             """If only one file was given, then, use the directory name:
-            If multiple files were given, then, use the common path."""
+            If multiple files were given, then, use the common path.
+            Temporarily set the cls.ID based on the common prefix of the paths
+            (without their dirnames). If cls.from_dict or cls.from_file are
+            later called, they update the ID based on that particular file"""
             if len(input_files_paths) == 0:
                 UI.error('No input files were given.')
             elif len(input_files_paths) == 1:
                 cls.path_prefix = os.path.dirname(input_files_paths[0])
             else:
                 cls.path_prefix = os.path.commonpath(input_files_paths)
+
+            # set temporary ID based on the difference between the common path
+            # among all paths (of a given character length) and the common
+            # prefix among them (at least as long as the common path)
+            common_prefix = os.path.commonprefix(input_files_paths)
+            basename = os.path.relpath(common_prefix, cls.path_prefix)
+
+            # keep removing awkward characters from end or beginning until
+            # the id is nice :)
+            unwanted = '/\\ _-~\t0'
+            almost_id = os.path.splitext(basename)[0].strip(unwanted)
+            almost_id_new = almost_id.strip(unwanted)
+            while almost_id != almost_id_new:
+                almost_id = almost_id_new
+                almost_id_new = almost_id.strip(unwanted)
+            cls.ID = almost_id
             return
 
         @classmethod
-        def generate_id(cls):
+        def __generate_id(cls):
             """
-            Determine a unique ID based on the input's path minus the stored
-            cls.path_prefix
+            Determine a unique ID based on cls.file_path minus the stored
+            cls.path_prefix.
             """
             relative_path = os.path.relpath(cls.file_path, cls.path_prefix)
             basename, _ = os.path.splitext(relative_path)
 
+            # if initialized from dictionary, then that dictionary came from
+            # a pdata file. Those files by default have an extra dot in their
+            # filename, and the string after that is metric-related, so discard
+            # it.
             if cls.initd_from_dict:
                 orig_map_prefix, _ = os.path.splitext(basename)
             else:
@@ -702,7 +742,7 @@ class Settings:
         @classmethod
         def __init_derived_values(cls):
             """Compute derived values from the basic ones"""
-            cls.ID = cls.generate_id()
+            cls.ID = cls.__generate_id()
             # compute padding bytes to make the memory chunk block-aligned.
             if not Settings.Cache.initialized:
                 UI.error('Cache settings must be initialized before MAP '
@@ -811,8 +851,11 @@ class Settings:
         tbox_font = 'monospace'
         tbox_font_size = 9
 
-        # Specific to MAP plot
-        fade_bytes_alpha = 0.1 # for bytes used to cache-align the block
+        # In MAP plot, fade bytes used to cache-align the block
+        fade_bytes_alpha = 0.1
+
+        # draw vertical lines denoting the executions ends in aggregation mode
+        aggr_last_x = True
 
         ############################################################
         # DERIVED VALUES
@@ -852,6 +895,7 @@ class Settings:
             cls.x_orient = assg_val(cls.x_orient, args.x_orient)
             cls.x_ranges = assg_val(cls.x_ranges, args.x_ranges)
             cls.y_ranges = assg_val(cls.y_ranges, args.y_ranges)
+            cls.aggr_last_x = assg_val(cls.aggr_last_x, args.aggr_last_x)
 
             cls.__init_derived_values()
             cls.initialized = True
@@ -863,7 +907,7 @@ class Settings:
             cls.y_ranges = cls.__init_ranges(cls.y_ranges)
             cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
                 cls.width, cls.height, cls.dpi, cls.max_map_res)
-            UI.warning('Hardcoded jump_line_width.')
+            UI.warning('Hardcoded jump_line_width.', pre='TODO')
             cls.jump_line_width = 1 #max(0.2,min(3,12*(width/data_X_size)))
             return
 

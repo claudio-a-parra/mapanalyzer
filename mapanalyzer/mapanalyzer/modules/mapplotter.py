@@ -30,12 +30,14 @@ class Map(BaseModule):
     supported_aggr_metrics = {}
 
     def __init__(self, shared_X=None):
+        # enable metric if user requested it or if used as background
         self.enabled = any(m in st.Metrics.enabled
                            for m in self.supported_metrics.keys())
+        self.enabled = self.enabled or st.Metrics.bg in self.supported_metrics
         if not self.enabled:
             return
-        self.X = [i for i in range(st.Map.time_size)]
 
+        # METRIC INTERNAL VARIABLES
         # select the resolution of the map time-space grid. If too large, pick
         # a value under max_res
         map_mat_rows = Map.__sub_resolution_between(
@@ -103,7 +105,6 @@ class Map(BaseModule):
     def MAP_to_dict(self):
         return {
             'code': 'MAP',
-            'x': self.X,
             'space_time': self.space_time
         }
 
@@ -116,7 +117,6 @@ class Map(BaseModule):
             UI.error(f'{class_name}.{curr_fn}(): {self.name} module '
                      f'received some unknown "{data_code}" metric data rather '
                      f'than its known "{my_code}" metric data.')
-        self.X = data['x']
         self.space_time = data['space_time']
         return
 
@@ -124,8 +124,8 @@ class Map(BaseModule):
         if not self.enabled:
             return
 
-        code = 'MAP'
-        met_str = self.supported_metrics[code]
+        metric_code = 'MAP'
+        met_str = self.supported_metrics[metric_code]
 
         # Create color maps based on thread and R/W access:
         #  -X : thread (X-1) read
@@ -152,7 +152,7 @@ class Map(BaseModule):
         X_pad = 0.5
         Y_pad = 0.5
         ylims = (0, st.Map.num_padded_bytes - 1)
-        xlims = (self.X[0], self.X[-1])
+        xlims = (0, st.Map.time_size - 1)
         # (left, right, bottom, top)
         extent = (xlims[0]-X_pad, xlims[1]+X_pad,
                   ylims[0]-Y_pad, ylims[1]+Y_pad)
@@ -165,7 +165,7 @@ class Map(BaseModule):
 
         # set plot limits
         real_xlim, real_ylim = self.setup_limits(
-            mpl_axes, code=code, xlims=xlims, x_pad=X_pad,
+            mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
             ylims=ylims, y_pad=Y_pad, invert_y=True
         )
 
@@ -186,7 +186,7 @@ class Map(BaseModule):
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
         # title and bg color
-        self.setup_general(mpl_axes, met_str, bg_mode=bg_mode)
+        self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
         return
 
     def setup_grid(self, mpl_axes, draw_x='auto', draw_y='auto',
@@ -201,10 +201,10 @@ class Map(BaseModule):
     def __draw_X_grid(self, axes, draw='auto'):
         if draw is False:
             return
-        if draw is True or len(self.X)<100:
+        if draw is True or st.Map.time_size <100:
             ymin,ymax = 0-0.5,st.Map.num_padded_bytes-0.5
             time_sep_lines = [i-0.5 for i in
-                              range(self.X[0],self.X[-1]+1)]
+                              range(0,st.Map.time_size)]
 
             axes.vlines(x=time_sep_lines, ymin=ymin, ymax=ymax,
                         color='k', linewidth=0.3333, alpha=0.2, zorder=1)

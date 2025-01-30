@@ -79,7 +79,8 @@ class Modules:
             metrics_list.append(metric_code)
             modules_list.append(module.__class__.__name__)
             descrip_list.append(module.supported_metrics[metric_code].about)
-        UI.columns((metrics_list, modules_list, descrip_list), sep='   ')
+        UI.columns((metrics_list, modules_list, descrip_list), sep='   ',
+                   header=True)
         UI.indent_out()
         return
 
@@ -93,8 +94,8 @@ class Modules:
             mod.finalize()
         return
 
-    def __export_single_pdata(self, metric_code, meta_data, cache_data, map_data,
-                              bg_data):
+    def __export_single_pdata(self, metric_code, meta_data, cache_data,
+                              map_data, bg_data):
         # find module of this metric and obtain data
         if metric_code not in st.Metrics.available:
             UI.error(
@@ -140,9 +141,9 @@ class Modules:
             bg_data = self.BG_to_dict()
 
         # for each enabled metric, save its pdata
-        for met in st.Metrics.enabled:
-            self.__export_single_pdata(met, meta_data, cache_data, map_data,
-                                       bg_data)
+        for metric_code in st.Metrics.enabled:
+            self.__export_single_pdata(metric_code, meta_data, cache_data,
+                                       map_data, bg_data)
 
         UI.indent_out()
         return

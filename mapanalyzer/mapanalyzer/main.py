@@ -66,6 +66,7 @@ def plot_mode(args):
 
 def aggregate_mode(args):
     pdata_paths = args.input_files
+    st.Map.set_path_prefix(pdata_paths)
     if len(pdata_paths) == 0:
         UI.error('In "aggregate" mode you must at least provide one PDATA '
                  'file.')

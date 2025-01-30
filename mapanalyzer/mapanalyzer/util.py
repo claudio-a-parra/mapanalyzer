@@ -400,6 +400,40 @@ class PlotFile:
         UI.text(filename, indent=False)
         return
 
+def sample_list(full_list, base=10, n=10):
+    """
+    return a list of ticks based on full_list. The idea is to find
+    nice numbers (multiples of powers of 10 or 2) and not having
+    more than n elements.
+    """
+    if full_list is None or len(full_list) == 0 or n == 0:
+        return []
+
+    # if two ticks, return the extremes.
+    if n == 2:
+        return [full_list[0], full_list[-1]]
+
+    if n >= len(full_list):
+        return full_list
+
+    # find a tick_step such that we print at most n ticks
+    tick_step = 1
+    tot_ticks = len(full_list)
+    factors = [1,2,2.5,5] if base==10 else [1]
+    for i in range(14):
+        found = False
+        for f in factors:
+            f_pow_base = int(f * (base ** i))
+            if int(tot_ticks / f_pow_base) <= (n-1):
+                tick_step = f_pow_base
+                found = True
+                break
+        if found:
+            break
+
+    tick_list = full_list[::tick_step]
+    return tick_list
+
 def command_line_args_parser():
     synopsis = ('MAP Analyzer, a tool to study the cache friendliness of '
                 'memory access patterns.')
@@ -518,7 +552,13 @@ def command_line_args_parser():
               "Example: MAP")
     )
 
-
+    parser.add_argument(
+        '-Lx', '--no-last-x', dest='aggr_last_x',
+        action='store_false',
+        help=('If set, do not include vertical lines (and an extra average '
+              'line) to denote the end of each execution contained in each '
+              'PDATA file during aggregation mode.\n')
+    )
 
     parser.add_argument(
         '-xr', '--x-ranges', metavar='XRANGES', dest='x_ranges',
@@ -557,36 +597,3 @@ def command_line_args_parser():
     args = parser.parse_args()
     return args
 
-def sample_list(full_list, base=10, n=10):
-    """
-    return a list of ticks based on full_list. The idea is to find
-    nice numbers (multiples of powers of 10 or 2) and not having
-    more than n elements.
-    """
-    if full_list is None or len(full_list) == 0 or n == 0:
-        return []
-
-    # if two ticks, return the extremes.
-    if n == 2:
-        return [full_list[0], full_list[-1]]
-
-    if n >= len(full_list):
-        return full_list
-
-    # find a tick_step such that we print at most n ticks
-    tick_step = 1
-    tot_ticks = len(full_list)
-    factors = [1,2,2.5,5] if base==10 else [1]
-    for i in range(14):
-        found = False
-        for f in factors:
-            f_pow_base = int(f * (base ** i))
-            if int(tot_ticks / f_pow_base) <= (n-1):
-                tick_step = f_pow_base
-                found = True
-                break
-        if found:
-            break
-
-    tick_list = full_list[::tick_step]
-    return tick_list

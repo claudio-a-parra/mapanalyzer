@@ -120,7 +120,7 @@ class Cache:
             writing = (access.event == 'W')
             if (p_tag,set_index) not in self.blocks_in_cache:
                 # MISS
-                #!self.modules.hitmiss.add_hm(access, (0,1)) # miss++
+                self.modules.missratio.probe(access, (0,1)) # miss++
 
                 # fetch block from main memory
                 fetched_block = Block(st.Cache.line_size, tag=p_tag,
@@ -153,7 +153,7 @@ class Cache:
             else:
                 # HIT
                 resident_block = self.blocks_in_cache[(p_tag,set_index)]
-                #!self.modules.hitmiss.add_hm(access, (1,0)) # hit++
+                self.modules.missratio.probe(access, (1,0)) # hit++
                 self.sets[set_index].touch_block(resident_block)
 
             # mark accessed bytes
@@ -162,7 +162,7 @@ class Cache:
             new_ab = resident_block.count_accessed()
             self.modules.usage.probe(delta_access=new_ab-old_ab)
 
-            # update address and reminding bytes to read for a potential new loop
+            # update address and reminding bytes to continue accessing memory
             addr += this_block_n_bytes
             n_bytes -= this_block_n_bytes
         return

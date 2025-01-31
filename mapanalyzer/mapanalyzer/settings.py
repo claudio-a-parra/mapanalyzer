@@ -377,16 +377,17 @@ class Settings:
         @classmethod
         def __init_enabled(cls):
             if type(cls.enabled) is str:
-                if cls.enabled.upper() == 'ALL':
+                cls.enabled = cls.enabled.upper()
+                if cls.enabled == 'ALL':
                     enabled_metrics = {
                         m for m in Settings.ALL_METRIC_CODES.keys()}
                 else:
                     enabled_metrics = {
-                        x.strip() for x in cls.enabled.upper().split(',')
+                        x.strip() for x in cls.enabled.split(',')
                     }
             elif type(cls.enabled) is list:
-                enabled_metrics = {x for x in cls.enabled}
-            elif type(cls.enabled) is dict:
+                enabled_metrics = {str(x).upper() for x in cls.enabled}
+            elif type(cls.enabled) is set:
                 enabled_metrics = cls.enabled
             else:
                 UI.error(f'Unknown type ({type(cls.enabled)}) given to '

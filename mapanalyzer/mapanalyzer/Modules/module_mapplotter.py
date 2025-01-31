@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 import sys
-from collections import deque
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-from itertools import combinations
-from math import prod
+from matplotlib.colors import ListedColormap # for axes.imshow() color map
+from itertools import combinations # for resolution finding
+from math import prod # for resolution finding
 
-from mapanalyzer.util import sample_list, MetricStrings, Palette
-from mapanalyzer.modules.base_module import BaseModule
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import MetricStrings, Palette
 from mapanalyzer.ui import UI
+
+from .base import BaseModule
 
 class Map(BaseModule):
     name = 'Mem Acc Pattern'
@@ -121,9 +120,6 @@ class Map(BaseModule):
         return
 
     def MAP_to_plot(self, mpl_axes, bg_mode=False):
-        if not self.enabled:
-            return
-
         metric_code = 'MAP'
         met_str = self.supported_metrics[metric_code]
 

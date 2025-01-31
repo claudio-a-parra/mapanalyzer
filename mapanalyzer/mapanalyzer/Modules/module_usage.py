@@ -1,14 +1,15 @@
 import matplotlib.pyplot as plt
 from itertools import zip_longest
 
-from mapanalyzer.modules.base_module import BaseModule
-from mapanalyzer.util import MetricStrings, Palette, PlotFile
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import MetricStrings, Palette, PlotFile
 from mapanalyzer.ui import UI
+
+from .base import BaseModule
 
 class CacheUsage(BaseModule):
     # Module info
-    name = 'Cache Usage Rate'
+    name = 'Cache Usage Ratio'
     about = 'Percentage of valid bytes in cache that are used before eviction'
     hue = 120
     palette = Palette.default(hue)
@@ -19,9 +20,9 @@ class CacheUsage(BaseModule):
                       'before eviction.'),
             title  = 'Cache Usage Ratio',
             subtit = 'higher is better',
-            number = '01',
+            number = '04',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Usage Rate [%]',
+            ylab   = 'Cache Usage Ratio [%]',
         )
     }
     supported_aggr_metrics = {
@@ -30,12 +31,11 @@ class CacheUsage(BaseModule):
                       'that are used before eviction.'),
             title  = 'Aggregated CUR',
             subtit = 'higher is better',
-            number = '01',
+            number = '04',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Usage Rate [%]',
+            ylab   = 'Cache Usage Ratio [%]',
         )
     }
-
 
     def __init__(self):
         # enable metric if user requested it or if used as background
@@ -87,9 +87,6 @@ class CacheUsage(BaseModule):
         return
 
     def CUR_to_plot(self, mpl_axes, bg_mode=False):
-        if not self.enabled:
-            return
-
         metric_code = 'CUR'
         met_str = self.supported_metrics[metric_code]
 
@@ -98,26 +95,23 @@ class CacheUsage(BaseModule):
         X = [self.X[0]-X_pad] + self.X + [self.X[-1]+X_pad]
         Y = [self.usage_ratio[0]] + self.usage_ratio + [self.usage_ratio[-1]]
 
-        # plot the usage rate
+        # plot the usage ratio
         mpl_axes.fill_between(
             X, -1, Y, step='mid', zorder=2,
             color=self.palette[0][0][0][0],
             facecolor=self.palette[1][1][1][1],
-            linewidth=st.Plot.linewidth
-        )
+            linewidth=st.Plot.linewidth)
 
         # set plot limits
         real_xlim, real_ylim = self.setup_limits(
             mpl_axes, metric_code, xlims=(self.X[0],self.X[-1]), x_pad=X_pad,
-            ylims=(0,100), y_pad='auto'
-        )
+            ylims=(0,100), y_pad='auto')
 
         # set ticks based on the real limits
         self.setup_ticks(
             mpl_axes, xlims=real_xlim, ylims=real_ylim,
             bases=(10, 10),
-            bg_mode=bg_mode
-        )
+            bg_mode=bg_mode)
 
         # set grid
         self.setup_grid(mpl_axes, fn_axis='y')
@@ -232,7 +226,8 @@ class CacheUsage(BaseModule):
         cls.setup_grid(mpl_axes, fn_axis='y')
 
         # insert text box with average usage
-        text = (f'Avg: {sum(Y_average)/len(Y_average):.2f}%\n'
+        text = (r'Avg$^{2}$: '
+                f'{sum(Y_average)/len(Y_average):.2f}%\n'
                 f'{total_pdatas} executions')
         cls.draw_textbox(mpl_axes, text)
 

@@ -4,9 +4,11 @@ setup(
     name="mapanalyzer",
     version="1.0",
     packages=find_packages(),
+    python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "mapanalyzer=mapanalyzer.main:main_wrapper",  # Maps `mapanalyzer` command to `main()` function in `main.py`
+            #cli 'mapanalyzer' -> mapanalyzer/main.py:main()
+            "mapanalyzer=mapanalyzer.main:main",
         ],
     },
     install_requires=[

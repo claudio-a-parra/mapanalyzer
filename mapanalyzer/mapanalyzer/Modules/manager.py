@@ -3,22 +3,24 @@ import matplotlib.pyplot as plt
 
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import MetricStrings, PdataFile, PlotFile
-from mapanalyzer.modules.mapplotter import Map
-#! from mapanalyzer.modules.locality import Locality
-#! from mapanalyzer.modules.hitmiss import HitMiss
-#! from mapanalyzer.modules.cost import Cost
-from mapanalyzer.modules.usage import CacheUsage
-#! from mapanalyzer.modules.alias import Aliasing
-#! from mapanalyzer.modules.eviction import EvictionDuration
 from mapanalyzer.ui import UI
 
-class Modules:
+from mapanalyzer.Modules.module_mapplotter import Map
+#! from mapanalyzer.Modules.module_locality import Locality
+from mapanalyzer.Modules.module_missratio import MissRatio
+#! from mapanalyzer.Modules.module_memaccess import MemAccess
+from mapanalyzer.Modules.module_usage import CacheUsage
+#! from mapanalyzer.Modules.module_aliasing import Aliasing
+#! from mapanalyzer.Modules.module_eviction import EvictionDuration
+
+
+class Manager:
     # list of available classes
     available_module_classes = [
         Map,
         #Locality,
-        #HitMiss,
-        #Cost,
+        MissRatio,
+        #MemAccess,
         CacheUsage,
         #Aliasing,
         #EvictionDuration
@@ -27,9 +29,11 @@ class Modules:
     def __init__(self):
         # List of available modules
         self.map = Map()
+        self.missratio = MissRatio()
         self.usage = CacheUsage()
         self.available_module_instances = [
             self.map,
+            self.missratio,
             self.usage
         ]
 
@@ -201,10 +205,12 @@ class Modules:
                 UI.error(f'Importing {pdata_path}. Foreground data is empty. '
                          '(json_file.metrics.fg == NULL)')
             metric_code = metric_data['code']
+
             if metric_code not in st.Metrics.available:
-                UI.error(f'Metric code "{metric_code}" not supported by '
-                         'available modules.\n'
-                         f'{pdata_path}.metrics.{k}.code == {metric_code}.\n')
+                UI.error(f'Cannot import pdata file "{pdata_path}". Metric '
+                         'code "{metric_code}" not supported by any available '
+                         'module.\n'
+                         f'{pdata_path}.metrics.{k}.code: {metric_code}.\n')
             st.Metrics.available[metric_code].import_data(
                 metric_code, metric_data)
         return
@@ -212,7 +218,10 @@ class Modules:
     def plot_from_dict(self, pdata_dict, pdata_path):
         UI.indent_in(title='PLOTTING METRICS')
 
-        # import metrics_dict to module
+        # enable the fg and bg metrics
+        # st.Metrics.from_dict(pdata_dict)
+
+        # import metrics_dicts to their fg and bg modules
         self.__import_single_pdata(pdata_dict, pdata_path)
 
         # export the plot

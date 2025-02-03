@@ -77,13 +77,14 @@ class CacheUsage(BaseModule):
         }
 
     def dict_to_CUR(self, data):
-        # check for malformed (no keys) dict.
-        all_keys = ['x', 'usage_ratio']
-        if not all(k in data for k in all_keys):
-            UI.error(f'While importing CUR. Not all necessary keys are '
-                     f'present ({",".join(all_keys)}).')
-        self.X = data['x']
-        self.usage_ratio = data['usage_ratio']
+        try:
+            self.X = data['x']
+            self.usage_ratio = data['usage_ratio']
+        except:
+            class_name = self.__class__.__name__
+            UI.error(f'{class_name}.dict_to_CUR(): Malformed data.')
+        return
+
         return
 
     def CUR_to_plot(self, mpl_axes, bg_mode=False):
@@ -128,12 +129,13 @@ class CacheUsage(BaseModule):
         self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
         return
 
+
     @classmethod
     def CUR_to_aggregated_plot(cls, pdata_dicts):
         """Given a list of 'metric' dictionaries, aggregate their
         values in a meaningful manner"""
         # metric info
-        metric_code = 'CUR'
+        metric_code = pdata_dicts[0]['fg']['code']
         met_str = cls.supported_aggr_metrics[metric_code]
 
         # extract data from dictionaries and create figure
@@ -147,54 +149,55 @@ class CacheUsage(BaseModule):
         # PLOT INDIVIDUAL METRICS AND THEIR AVERAGE
         pal = Palette(
             hue = (cls.hue, cls.hue),
-            sat = (100, 60),
-            lig = (20, 70),
-            alp = (100,60))
-        avg_color = pal[0][0][0][0]
-        avg_width = 1.5
-        one_color = pal[1][1][1][1]
+            # (individual, average)
+            sat = (60, 100),
+            lig = (70,  20),
+            alp = (20, 100))
+        one_color = pal[0][0][0][0]
         one_width = 0.5
+        avg_color = pal[1][1][1][1]
+        avg_width = 1.5
 
-        for met_idx in range(total_pdatas):
-            met_x = all_X[met_idx]
-            met_y = all_Y[met_idx]
-            mpl_axes.step(met_x, met_y, where='mid', zorder=4,
+        for x,y in zip(all_X,all_Y):
+            # mpl_axes.step(x, y, where='mid', zorder=4,
+            #               color=one_color, linewidth=one_width)
+            mpl_axes.plot(x, y, zorder=4,
                           color=one_color, linewidth=one_width)
 
+
+        #####################################
+        # PLOT MOVING AVERAGE OF METRICS
         # find range large enough to fit all plots
         X_min = min(m[0] for m in all_X)
         X_max = max(m[-1] for m in all_X)
         X = list(range(X_min, X_max+1))
 
-        # PLOT MOVING AVERAGE OF METRICS
         all_ith_ys_list = list(zip_longest(*all_Y, fillvalue=None))
-        Y_average = [0] * len(X)
+        Y_avg = [0] * len(X)
         for x,ith_ys in zip(X,all_ith_ys_list):
             valid_ys = [y for y in ith_ys if y is not None]
             ys_avg = sum(valid_ys) / len(valid_ys)
-            Y_average[x] = ys_avg
+            Y_avg[x] = ys_avg
 
-        # plot black shadow to popup the avg line
-        # mpl_axes.step(X, Y_average, where='mid', zorder=5,
-        #               color='#000000', linewidth=avg_width*1.5)
-
-        mpl_axes.step(X, Y_average, where='mid', zorder=6,
+        # mpl_axes.step(X, Y_avg, where='mid', zorder=6,
+        #               color=avg_color, linewidth=avg_width)
+        mpl_axes.plot(X, Y_avg, zorder=6,
                       color=avg_color, linewidth=avg_width)
 
 
         #####################################
-        # PLOT LAST X OF EACH METRIC AND AVERAGE
+        # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
         if st.Plot.aggr_last_x:
             pal = Palette(
-                hue = (0, cls.hue),
+                hue = (cls.hue, 0),
                 sat = (50, 50),
-                lig = (85, 93),
+                lig = (93, 75),
                 alp = (100,100))
-            avg_color = pal[0][0][0][0]
-            avg_width = 0.75
-            one_color = pal[1][1][1][1]
+            one_color = pal[0][0][0][0]
             one_width = 0.5
-            last_Xs = sorted([x[-1] for x in all_X])
+            avg_color = pal[1][1][1][1]
+            avg_width = 1.25
+            last_Xs = [x[-1] for x in all_X]
             mpl_axes.vlines(last_Xs, ymin=0, ymax=100, colors=one_color,
                             linestyles='solid', linewidth=one_width,
                             zorder=2)
@@ -223,12 +226,16 @@ class CacheUsage(BaseModule):
         )
 
         # set grid
-        cls.setup_grid(mpl_axes, fn_axis='y')
+        if st.Plot.aggr_last_x:
+            axis='y'
+        else:
+            axis='xy'
+        cls.setup_grid(mpl_axes, axis=axis, fn_axis='y')
 
         # insert text box with average usage
-        text = (r'Avg$^{2}$: '
-                f'{sum(Y_average)/len(Y_average):.2f}%\n'
-                f'{total_pdatas} executions')
+        text = [f'{total_pdatas} executions.',
+                rf'Avg$^{2}$: {sum(Y_avg)/len(Y_avg):.2f}%']
+        text = '\n'.join(text)
         cls.draw_textbox(mpl_axes, text)
 
         # set labels

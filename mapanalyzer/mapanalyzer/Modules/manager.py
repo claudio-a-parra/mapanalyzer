@@ -5,13 +5,13 @@ from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import MetricStrings, PdataFile, PlotFile
 from mapanalyzer.ui import UI
 
-from mapanalyzer.Modules.module_mapplotter import Map
-#! from mapanalyzer.Modules.module_locality import Locality
-from mapanalyzer.Modules.module_missratio import MissRatio
-#! from mapanalyzer.Modules.module_memaccess import MemAccess
-from mapanalyzer.Modules.module_usage import CacheUsage
-#! from mapanalyzer.Modules.module_aliasing import Aliasing
-#! from mapanalyzer.Modules.module_eviction import EvictionDuration
+from .module_mapplotter import Map
+#! from .module_locality import Locality
+from .module_missratio import MissRatio
+#! from .module_memaccess import MemAccess
+from .module_usage import CacheUsage
+#! from .module_aliasing import Aliasing
+#! from .module_eviction import EvictionDuration
 
 
 class Manager:
@@ -26,7 +26,7 @@ class Manager:
         #EvictionDuration
     ]
 
-    def __init__(self):
+    def __init__(self, enabled_list=None):
         # List of available modules
         self.map = Map()
         self.missratio = MissRatio()
@@ -39,53 +39,24 @@ class Manager:
 
         # inform st.Metrics about the available modules
         st.Metrics.set_available(self.available_module_instances)
-
-        # If a background metric (let's say "BG") was defined, search its
-        # module for the methods BG_to_dict() and BG_to_plot().
-        self.BG_to_dict = None
-        self.BG_to_plot = None
-
-        if st.Metrics.bg is not None:
-            to_dict_fname = f'{st.Metrics.bg}_to_dict'
-            to_plot_fname = f'{st.Metrics.bg}_to_plot'
-            try:
-                self.BG_to_dict = getattr(st.Metrics.available[st.Metrics.bg],
-                                          to_dict_fname)
-            except:
-                bg_class_name = st.Metrics.available[st.Metrics.bg].__class__.\
-                    __name__
-                UI.warning(f'Module {bg_class_name} seems to support the '
-                           f'metric {st.Metrics.bg}:\n'
-                           f'    (\'{st.Metrics.bg}\' in '
-                           f'{bg_class_name}.metrics == True)\n'
-                           f'But it does not implement the {to_dict_fname} '
-                           'method. No background PDATA will be saved.')
-            try:
-                self.BG_to_plot = getattr(st.Metrics.available[st.Metrics.bg],
-                                          to_plot_fname)
-            except:
-                bg_class_name = st.Metrics.available[st.Metrics.bg].__class__.\
-                    __name__
-                UI.warning(f'Module {bg_class_name} seems to support the '
-                           f'"{st.Metrics.bg}" metric:\n'
-                           f'    (\'{st.Metrics.bg}\' in '
-                           f'{bg_class_name}.metrics == True)\n'
-                           f'But it does not implement the {to_plot_fname} '
-                           'method. No background PLOTS will be drawn.')
         return
 
     def describe(self):
-        UI.indent_in(title='MAPANALYZER METRICS')
+        enabled_list = ['ENABLED']
         metrics_list = ['METRIC']
         modules_list = ['MODULE']
         descrip_list = ['DESCRIPTION']
         for metric_code,module in st.Metrics.available.items():
+            if metric_code in st.Metrics.enabled or \
+               metric_code == st.Metrics.bg:
+                enabled_list.append('[X]')
+            else:
+                enabled_list.append('[ ]')
             metrics_list.append(metric_code)
             modules_list.append(module.__class__.__name__)
             descrip_list.append(module.supported_metrics[metric_code].about)
-        UI.columns((metrics_list, modules_list, descrip_list), sep='   ',
-                   header=True)
-        UI.indent_out()
+        UI.columns((enabled_list, metrics_list, modules_list, descrip_list),
+                   sep='   ', header=True)
         return
 
     def commit(self, time):
@@ -103,12 +74,11 @@ class Manager:
         # find module of this metric and obtain data
         if metric_code not in st.Metrics.available:
             UI.error(
-                f'Cannot export data from metric "{metric_code}". Couldn\'t '
-                'find an available module that supports such code.\n'
-                f'If you think the metric code is correct, please make sure '
-                'the module to which it belongs is registered in '
-                'Modules.available_module_classes and '
-                'Modules.available_module_instances', do_exit=False)
+                f'While exporting data for "{metric_code}" metric code. There '
+                'is no module that supports this metric code. If such module '
+                'actually exists, make sure its ".supported_metrics" '
+                f'dictionary contains an entry for "{metric_code}".',
+                do_exit=False)
             return
         module = st.Metrics.available[metric_code]
         fg_data = module.export_data(metric_code)
@@ -132,69 +102,82 @@ class Manager:
         return
 
     def export_all_pdatas(self):
-        UI.indent_in(title='EXPORTING PDATAS')
-
         # obtain common elements
         meta_data = st.to_dict()
         cache_data = st.Cache.to_dict()
         map_data = st.Map.to_dict()
 
-        # If a background module was found, get its data
+        # find the method that generates the bg data
+        BG_to_dict = None
+        if st.Metrics.bg is not None:
+            to_dict_fname = f'{st.Metrics.bg}_to_dict'
+            try:
+                BG_to_dict = getattr(st.Metrics.available[st.Metrics.bg],
+                                     to_dict_fname)
+            except:
+                bg_class_name = st.Metrics.available[st.Metrics.bg].__class__.\
+                    __name__
+                UI.warning(f'{bg_class_name}.{BG_to_dict}() not implemented.'
+                           ' No background data will be saved.')
         bg_data = None
-        if self.BG_to_dict is not None:
-            bg_data = self.BG_to_dict()
+        if BG_to_dict is not None:
+            bg_data = BG_to_dict()
 
         # for each enabled metric, save its pdata
         for metric_code in st.Metrics.enabled:
             self.__export_single_pdata(metric_code, meta_data, cache_data,
                                        map_data, bg_data)
-
-        UI.indent_out()
         return
 
     def __export_single_plot(self, metric_code):
         # find module of this metric code and obtain data
         if metric_code not in st.Metrics.available:
             UI.error(
-                f'Cannot export plot from metric "{metric_code}". Couldn\'t '
-                'find an available module that supports that code.\n'
-                'If you think the metric code is correct, please make '
-                'sure the module to which it belongs is registered in '
-                'Modules.available_module_instances, and that the module '
-                'itself registers the metric in its '
-                '"supported_aggr_metrics" dictionary.', do_exit=False)
+                f'While exporting plot for "{metric_code}" metric code. There '
+                'is no module that supports this metric code. If such module '
+                'actually exists, make sure its ".supported_metrics" '
+                f'dictionary contains an entry for "{metric_code}".',
+                do_exit=False)
             return
-        module = st.Metrics.available[metric_code]
 
-        # If there is a background plotter, then create two sets of axes
-        if self.BG_to_plot is not None:
+        # find the method that generates bg plot. If none, create a simple plot
+        # with only one set of axes. Also use a simple plot if fg=bg.
+        BG_to_plot = None
+        if st.Metrics.bg is not None:
+            to_plot_fname = f'{st.Metrics.bg}_to_plot'
+            try:
+                BG_to_plot = getattr(st.Metrics.available[st.Metrics.bg],
+                                     to_plot_fname)
+            except:
+                bg_class_name = st.Metrics.available[st.Metrics.bg].__class__.\
+                    __name__
+                UI.warning(f'{bg_class_name}.{BG_to_plot}() not implemented.'
+                           ' No background plot will be saved.')
+        if BG_to_plot is not None and st.Metrics.bg != metric_code:
             fig,bg_axes = plt.subplots(
                 facecolor='white',
                 figsize=(st.Plot.width,st.Plot.height))
             fg_axes = fig.add_axes(bg_axes.get_position())
             # draw background plot
-            self.BG_to_plot(bg_axes, bg_mode=True)
+            BG_to_plot(bg_axes, bg_mode=True)
         else:
             fig,fg_axes = plt.subplots(
                 facecolor='white',
                 figsize=(st.Plot.width, st.Plot.height))
 
         # draw foreground plot
-        module.export_plot(metric_code, fg_axes)
+        fg_module = st.Metrics.available[metric_code]
+        fg_module.export_plot(metric_code, fg_axes)
         PlotFile.save(fig, metric_code)
         return
 
     def export_all_plots(self):
-        UI.indent_in(title='EXPORTING PLOTS')
-
         # for each enabled metric, save its plot
         for metric_code in st.Metrics.enabled:
             self.__export_single_plot(metric_code)
-
-        UI.indent_out()
         return
 
-    def __import_single_pdata(self, pdata_dict, pdata_path):
+    def __import_single_pdata(self, pdata_dict):
         # import fg and bg data:
         keys = ['fg', 'bg']
         for k in keys:
@@ -202,69 +185,52 @@ class Manager:
             if k == 'bg' and metric_data is None:
                 continue
             if k == 'fg' and metric_data is None:
-                UI.error(f'Importing {pdata_path}. Foreground data is empty. '
-                         '(json_file.metrics.fg == NULL)')
+                UI.error(f'While improting pdata file. Foreground data is '
+                         'empty.\n'
+                         f'.metrics.{k} = NULL)')
             metric_code = metric_data['code']
 
             if metric_code not in st.Metrics.available:
-                UI.error(f'Cannot import pdata file "{pdata_path}". Metric '
-                         'code "{metric_code}" not supported by any available '
+                UI.error(f'While importing pdata file. Metric code '
+                         f'"{metric_code}" not supported by any available '
                          'module.\n'
-                         f'{pdata_path}.metrics.{k}.code: {metric_code}.\n')
+                         f'.metrics.{k}.code = {metric_code}.\n')
             st.Metrics.available[metric_code].import_data(
                 metric_code, metric_data)
+
         return
 
-    def plot_from_dict(self, pdata_dict, pdata_path):
-        UI.indent_in(title='PLOTTING METRICS')
-
-        # enable the fg and bg metrics
-        # st.Metrics.from_dict(pdata_dict)
-
+    def plot_from_dict(self, pdata_dict):
         # import metrics_dicts to their fg and bg modules
-        self.__import_single_pdata(pdata_dict, pdata_path)
+        self.__import_single_pdata(pdata_dict)
 
         # export the plot
         fg_metric_code = pdata_dict['fg']['code']
         self.__export_single_plot(fg_metric_code)
-
-        UI.indent_out()
         return
 
     @classmethod
-    def aggregate_by_metric(cls, classified_pdata_dicts):
-        UI.indent_in(title='AGGREGATING SAME-CODE METRICS')
+    def aggregate_same_metric(cls, metric_code, pdata_dicts):
+        # remove bg metric from all pdata dicts
+        for pd_d in pdata_dicts:
+            pd_d['bg'] = None
 
-        # inform st.Metrics about the available modules
-        st.Metrics.set_available(cls.available_module_classes,
-                                 supp_metrics_name='supported_aggr_metrics')
+        # check that the module actually can aggregate the data
+        if metric_code not in st.Metrics.available:
+            UI.warning(
+                f'Cannot aggregate metric "{metric_code}". '
+                'Couldn\'t find an available module that supports '
+                'aggregation on that code.\n'
+                'If you think the metric code is correct, please make '
+                'sure the module to which it belongs is registered in\n'
+                'Modules.available_module_classes, and that the module '
+                'itself registers the metric in its '
+                '"supported_aggr_metrics" dictionary.\n'
+                f'Ignoring {len(pdata_dicts)} input files with foreground '
+                f'code "{metric_code}".')
+            return
 
-        # One aggregation per foreground metric code
-        for metric_code, pdata_dicts in classified_pdata_dicts.items():
-            # remove bg metric from all pdata dicts, and inform st.Metrics of
-            # the user enabled metrics (all dicts have the same, so we just
-            # pick) the first one
-            for pd_d in pdata_dicts:
-                pd_d['bg'] = None
-            st.Metrics.from_dict(pdata_dicts[0])
-
-            # check that the module actually can aggregate the data
-            if metric_code not in st.Metrics.available:
-                UI.warning(
-                    f'Cannot aggregate metric "{metric_code}". '
-                    'Couldn\'t find an available module that supports '
-                    'aggregation on that code.\n'
-                    'If you think the metric code is correct, please make '
-                    'sure the module to which it belongs is registered in\n'
-                    'Modules.available_module_classes, and that the module '
-                    'itself registers the metric in its '
-                    '"supported_aggr_metrics" dictionary.\n'
-                    f'Ignoring {len(pdata_dicts)} input files with foreground '
-                    f'code "{metric_code}".')
-                continue
-
-            # obtain module and pass the list of pdata dictionaries
-            AggrModuleClass = st.Metrics.available[metric_code]
-            AggrModuleClass.export_aggregated_plot(pdata_dicts)
-        UI.indent_out()
+        # obtain module and pass the list of pdata dictionaries
+        AggrModuleClass = st.Metrics.available[metric_code]
+        AggrModuleClass.export_aggregated_plot(pdata_dicts)
         return

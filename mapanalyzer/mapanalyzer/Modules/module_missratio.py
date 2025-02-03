@@ -1,6 +1,6 @@
-import sys
 from collections import deque
 import matplotlib.pyplot as plt
+from itertools import zip_longest
 
 # to serialize and de-serialize ThreadMissRatio
 import json
@@ -15,7 +15,7 @@ class ThreadMissRatio:
     def __init__(self):
         self.hit_count = 0
         self.miss_count = 0
-        self.miss_ratio = [-1] * st.Map.time_size
+        self.miss_ratio = [0] * st.Map.time_size
         return
 
     def update_counters(self, hm):
@@ -23,7 +23,10 @@ class ThreadMissRatio:
         self.miss_count += hm[1]
 
     def commit(self, current_time):
-        miss_ratio = 100*self.miss_count / (self.hit_count+self.miss_count)
+        if self.hit_count + self.miss_count == 0:
+           miss_ratio = 0
+        else:
+            miss_ratio = 100*self.miss_count / (self.hit_count+self.miss_count)
         self.miss_ratio[current_time] = miss_ratio
         return
 
@@ -156,6 +159,21 @@ class MissRatio(BaseModule):
         X_pad = 0.5
         X = [self.X[0]-X_pad] + self.X + [self.X[-1]+X_pad]
 
+
+        #####################################
+        # CREATE PALETTE FOR THREADS
+        thread_to_color = {}
+        for thr_id in self.thread_miss_ratio.keys():
+            thread_to_color[int(thr_id)] = ''
+        pal = Palette(
+            hue = len(thread_to_color),
+            sat = st.Plot.p_sat,
+            lig = st.Plot.p_lig,
+            alp = st.Plot.p_alp)
+        for i,t_id in enumerate(thread_to_color):
+            thread_to_color[t_id] = (pal[i][0][0][0],pal[i][1][1][1])
+
+
         # create palette for the number of threads found
         self.palette = Palette(
             hue = len(self.thread_miss_ratio),
@@ -167,8 +185,7 @@ class MissRatio(BaseModule):
         for thr,thr_mr in self.thread_miss_ratio.items():
             Y = [thr_mr.miss_ratio[0]] + thr_mr.miss_ratio + \
                 [thr_mr.miss_ratio[-1]]
-            line_color = self.palette[thr][0][0][0]
-            face_color = self.palette[thr][1][1][1]
+            line_color,face_color = thread_to_color[thr]
             mpl_axes.fill_between(X, -1, Y, step='mid', zorder=2,
                                   color=line_color, facecolor=face_color,
                                   linewidth=st.Plot.linewidth)
@@ -196,12 +213,12 @@ class MissRatio(BaseModule):
                 avg = sum(thr_mr)/len(thr_mr)
                 text = f'Avg: {avg:.2f}%'
             else:
-                text = 'Avg:\n'
+                text = ''
                 thr_str_len = len(str(num_thrs))
                 for thr,thr_mr_obj in self.thread_miss_ratio.items():
                     thr_mr = thr_mr_obj.miss_ratio
                     avg = sum(thr_mr)/len(thr_mr)
-                    text += f't{str(thr).ljust(thr_str_len)}: {avg:.2f}\n'
+                    text += f'Avg t{str(thr).ljust(thr_str_len)}: {avg:.2f}%\n'
                 text = text[:-1]
             self.draw_textbox(mpl_axes, text)
 
@@ -210,4 +227,160 @@ class MissRatio(BaseModule):
 
         # title and bg color
         self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
+        return
+
+
+    @classmethod
+    def CMR_to_aggregated_plot(cls, pdata_dicts):
+        """Given a list of 'metric' dictionaries, aggregate their
+        values in a meaningful manner"""
+        # metric info
+        metric_code = pdata_dicts[0]['fg']['code']
+        met_str = cls.supported_aggr_metrics[metric_code]
+
+        # extract data from dictionaries and create figure
+        total_pdatas = len(pdata_dicts)
+        all_pdatas_X = [m['fg']['x'] for m in pdata_dicts]
+        all_pdatas_cmr = [m['fg']['thread_miss_ratio'] for m in pdata_dicts]
+        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # obtain the set of all threads ever seen across all pdatas.
+        thread_ids = set()
+        for pdata_cmr in all_pdatas_cmr:
+            for thr in pdata_cmr.keys():
+                thread_ids.add(int(thr))
+
+
+        #####################################
+        # CREATE PALETTE FOR THREADS
+        thread_to_color = {thr:'' for thr in thread_ids}
+        pal = Palette(
+            hue = len(thread_to_color),
+            # (individual, average)
+            sat = (60, 100),
+            lig = (70, 20),
+            alp = (10, 100))
+        for i,t_id in enumerate(thread_to_color):
+            thread_to_color[t_id] = (pal[i][0][0][0], pal[i][1][1][1])
+
+
+        #####################################
+        # PLOT INDIVIDUAL METRICS
+        # for each pdata, plot all threads, each with their own color
+        one_width = 0.5
+        for pdata_X,pdata_cmr in zip(all_pdatas_X, all_pdatas_cmr):
+            for thr,thr_cmr in pdata_cmr.items():
+                thr = int(thr)
+                thr_color = thread_to_color[thr][0]
+                # mpl_axes.step(pdata_X, thr_cmr, where='mid', zorder=4,
+                #           color=thr_color, linewidth=one_width)
+
+                mpl_axes.plot(pdata_X, thr_cmr, zorder=4,
+                          color=thr_color, linewidth=one_width)
+
+
+        #####################################
+        # PLOT MOVING AVERAGE OF METRICS (FOR EACH THREAD)
+        # find range large enough to fit all plots
+        X_min = min(m[0] for m in all_pdatas_X)
+        X_max = max(m[-1] for m in all_pdatas_X) - X_min
+        full_X = list(range(X_min, X_max+1))
+
+        # collect the cmrs of each thread across all pdatas
+        all_threads_cmr = {t:[] for t in thread_ids}
+        for pdata_cmr in all_pdatas_cmr:
+            for thr,thr_cmr in pdata_cmr.items():
+                thr = int(thr)
+                # extend this thread's cmr to cover the whole full_X axis
+                ext_thr_cmr = [m for _,m in
+                               zip_longest(full_X, thr_cmr, fillvalue=None)]
+                all_threads_cmr[thr].append(ext_thr_cmr)
+
+        # obtain the average of each thread
+        all_threads_cmr_avg = {t:None for t in thread_ids}
+        for thr,thr_cmr in all_threads_cmr.items():
+            this_thread_all_ith_cmrs = list(zip(*thr_cmr))
+            thread_cmr_avg = [0 for _ in full_X]
+            for x,ith_cmrs in zip(full_X,this_thread_all_ith_cmrs):
+                valid_ys = [y for y in ith_cmrs if y is not None]
+                ys_avg = sum(valid_ys) / len(valid_ys)
+                thread_cmr_avg[x] = ys_avg
+            all_threads_cmr_avg[thr] = thread_cmr_avg
+
+        # plot average of each thread
+        avg_width = 1.5
+        for thr,thr_cmr_avg in all_threads_cmr_avg.items():
+            thr_color = thread_to_color[thr][1]
+            # mpl_axes.step(full_X, thr_cmr_avg, where='mid', zorder=4,
+            #               color=thr_color, linewidth=avg_width)
+
+            mpl_axes.plot(full_X, thr_cmr_avg, zorder=4,
+                          color=thr_color, linewidth=avg_width)
+
+
+        #####################################
+        # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
+        if st.Plot.aggr_last_x:
+            pal = Palette(
+                hue = (cls.hue, 0),
+                sat = (50, 50),
+                lig = (93, 75),
+                alp = (100,100))
+            one_color = pal[0][0][0][0]
+            one_width = 0.5
+            avg_color = pal[1][1][1][1]
+            avg_width = 1.25
+            last_Xs = [x[-1] for x in all_pdatas_X]
+            mpl_axes.vlines(last_Xs, ymin=0, ymax=100, colors=one_color,
+                            linestyles='solid', linewidth=one_width,
+                            zorder=2)
+
+            # PLOT AVG OF LAST X
+            last_X_avg = sum(last_Xs)/len(last_Xs)
+            mpl_axes.vlines([last_X_avg], ymin=0, ymax=100, colors=avg_color,
+                            linestyles='solid', linewidth=avg_width,
+                            zorder=3)
+
+
+
+
+
+
+        #####################################
+        # SETUP PLOT VISUALS
+        # set plot limits
+        X_pad = 0.5
+        real_xlim, real_ylim = cls.setup_limits(
+            mpl_axes, metric_code, xlims=(X_min,X_max), x_pad=X_pad,
+            ylims=(0,100), y_pad='auto'
+        )
+
+        # set ticks based on the real limits
+        cls.setup_ticks(
+            mpl_axes, xlims=real_xlim, ylims=real_ylim,
+            bases=(10, 10)
+        )
+
+        # set grid
+        if st.Plot.aggr_last_x:
+            axis='y'
+        else:
+            axis='xy'
+        cls.setup_grid(mpl_axes, axis=axis, fn_axis='y')
+
+        # insert text box with average per thread
+        text = [f'{total_pdatas} executions.']
+        for thr,thr_cmr_avg in all_threads_cmr_avg.items():
+            txt = rf'thr{thr} avg$^{2}$: {sum(thr_cmr_avg)/len(thr_cmr_avg):.2f}%'
+            text.append(txt)
+        text = '\n'.join(text)
+        cls.draw_textbox(mpl_axes, text)
+
+        # set labels
+        cls.setup_labels(mpl_axes, met_str)
+
+        # title and bg color
+        cls.setup_general(mpl_axes, cls.palette.bg, met_str)
+
+        PlotFile.save(fig, metric_code, aggr=True)
         return

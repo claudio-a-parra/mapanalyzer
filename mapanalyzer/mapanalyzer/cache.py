@@ -205,7 +205,6 @@ class Cache:
         """Run the simulation sending concurrent accesses to the cache
         in batches. At the end, flush the cache and send a last commit
         to the cache."""
-        UI.indent_in('SIMULATING CACHE')
         # check cache alignment of the allocated memory
         _,_,byte = st.AddrFmt.split(st.Map.start_addr)
         if byte != 0:
@@ -237,5 +236,4 @@ class Cache:
 
         # signal to all modules that the simulation has finished
         self.modules.finalize()
-        UI.indent_out()
         return

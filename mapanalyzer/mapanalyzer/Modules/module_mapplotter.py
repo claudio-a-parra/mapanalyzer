@@ -48,6 +48,9 @@ class Map(BaseModule):
         # cols: whole memory snapshot at a given instruction time
         # rows: byte (space) state across all instructions
         self.space_time = [[0] * map_mat_cols for _ in range(map_mat_rows)]
+
+        # set of threads found
+        self.threads = set()
         return
 
     def probe(self, access):
@@ -57,6 +60,7 @@ class Map(BaseModule):
             return
         # negative: read access, positive: write access
         # abs value: thread ID + 1 (to leave 0 for no-op)
+        self.threads.add(access.thread)
         access_code = access.thread + 1
         if access.event == 'R':
             access_code *= -1
@@ -104,45 +108,46 @@ class Map(BaseModule):
     def MAP_to_dict(self):
         return {
             'code': 'MAP',
+            'threads': list(self.threads),
             'space_time': self.space_time
         }
 
     def dict_to_MAP(self, data):
-        class_name = self.__class__.__name__
-        my_code = 'MAP'
-        curr_fn = f'dict_to_{my_code}'
-        data_code = data['code']
-        if my_code != data_code:
-            UI.error(f'{class_name}.{curr_fn}(): {self.name} module '
-                     f'received some unknown "{data_code}" metric data rather '
-                     f'than its known "{my_code}" metric data.')
-        self.space_time = data['space_time']
+        try:
+            self.threads = {int(t) for t in data['threads']}
+            self.space_time = data['space_time']
+        except:
+            class_name = self.__class__.__name__
+            UI.error(f'{class_name}.dict_to_MAP(): Malformed data.')
         return
 
     def MAP_to_plot(self, mpl_axes, bg_mode=False):
         metric_code = 'MAP'
         met_str = self.supported_metrics[metric_code]
 
-        # Create color maps based on thread and R/W access:
+
+        #####################################
+        # CREATE PALETTE BASED ON R/W ACCESS AND THREAD ID
         #  -X : thread (X-1) read
         #   X : thread (X-1) write
         #   0 : no operation.
         # Then, the palette must match the negative and positive values to the
         # read/write colors of the thread.
-        #lig_val, sat_val, alp_val = [35,70], [45,75], 96
-        thr_count = st.Map.thread_count
-        thr_palette = Palette(
-            hue = thr_count,
+        pal = Palette(
+            hue = len(self.threads),
             sat = [45, 75],
             lig = [35, 70],
-            alp = [100]
+            alp = [100,100]
         )
-        read_colors =  [thr_palette[i][0][0][0] for i in range(thr_count)]
-        write_colors = [thr_palette[i][1][1][0] for i in range(thr_count)]
         transparent = '#FFFFFF00'
-        color_map = ListedColormap(
-            list(reversed(read_colors)) + [transparent] + write_colors
-        )
+        read_colors = [transparent] * (max(self.threads)+1)
+        write_colors = [transparent] * (max(self.threads)+1)
+        for i,thr in enumerate(self.threads):
+            read_colors[thr] = pal[i][0][0][0]
+            write_colors[thr] = pal[i][1][1][1]
+        color_list = list(reversed(read_colors)) + [transparent] + write_colors
+        color_map = ListedColormap(color_list)
+
 
         # define and pad the extent of the image
         X_pad = 0.5
@@ -157,7 +162,7 @@ class Map(BaseModule):
         mpl_axes.imshow(self.space_time, cmap=color_map, origin='lower',
                         interpolation='none',
                         aspect='auto', zorder=2, extent=extent,
-                        vmin=-thr_count, vmax=thr_count)
+                        vmin=-max(self.threads)-1, vmax=max(self.threads)+1)
 
         # set plot limits
         real_xlim, real_ylim = self.setup_limits(
@@ -177,7 +182,6 @@ class Map(BaseModule):
 
         # fade bytes used just for block-padding
         self.__fade_padding_bytes(mpl_axes)
-
         # set labels
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
@@ -260,6 +264,7 @@ class Map(BaseModule):
                 X, 0-0.5, st.Map.left_pad-0.5,
                 facecolor='k', alpha=fade_bytes_alpha,
                 zorder=0)
+
         if st.Map.right_pad > 0:
             X = [xmin, xmax]
             axes.fill_between(

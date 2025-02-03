@@ -69,11 +69,20 @@ class BaseModule:
         return
 
     @classmethod
-    def setup_grid(cls, mpl_axes, fn_axis='y', bg_mode=False):
+    def setup_grid(cls, mpl_axes, axis='both', fn_axis='y', bg_mode=False):
+        """setup plot grid for main and secondary axes. fn_axis determines
+        which one is the main (dependent variable) axis. axis determines
+        which axis gets to draw a grid"""
+        # if bg_mode, don't draw anything.
         if bg_mode:
             mpl_axes.grid(False)
             return
-        """setup grid"""
+        # sanitize axis parameter
+        if axis == 'both':
+            axis = 'xy'
+        elif axis not in 'xy':
+            UI.error(f'Module.setup_grid(): Incorrect axis=\'{axis}\' '
+                     'parameter value')
         ax_names = ('x', 'y')
         # Values associated to either the independent or function axes.
         # If the function axis is X, then reverse axes meanings.
@@ -87,8 +96,9 @@ class BaseModule:
 
         # set grid in x and y
         for ax,ga,gs,gw in zip(ax_names, ax_grd_a, ax_grd_s, ax_grd_w):
-            mpl_axes.grid(axis=ax, which='both', zorder=1, alpha=ga,
-                          linestyle=gs, linewidth=gw)
+            if ax in axis:
+                mpl_axes.grid(axis=ax, which='both', zorder=1, alpha=ga,
+                              linestyle=gs, linewidth=gw)
         return
 
     @classmethod

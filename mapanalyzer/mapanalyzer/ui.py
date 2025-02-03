@@ -58,7 +58,6 @@ class UI:
         """Increase indentation with a possible title"""
         if title:
             msg_str = f'{Style.BRIGHT}{left}{title}{right}{Style.NORMAL}'
-            cls.nl()
             cls.__color_msg(msg=msg_str, msg_color=f'{Fore.GREEN}', out=stdout)
         cls.il += 1
         cls.ind = ' ' * (cls.il*cls.iw)
@@ -141,49 +140,6 @@ class UI:
         return
 
     @classmethod
-    def columns_old(cls, cols, sep='', cols_width='auto'):
-        """Print a table with columns. If cols_width is auto, then
-        compute each column width, otherwise, use the values given
-        in cols_width (array_like, with one integer per column of cols)"""
-        if len(cols) == 0:
-            cls.error('UI.columns: Printing empty array.')
-
-        # Check columns equal length
-        cols_len = [len(c) for c in cols]
-        if min(cols_len) != max(cols_len):
-            cls.error('UI.columns: Trying to print a table with columns of '
-                      'different length.')
-
-        # if auto column width, then compute it. Otherwise, use the given one
-        if cols_width == 'auto':
-            cols_width = []
-            for col in cols:
-                col_width = 0
-                for text in col:
-                    text = str(text)
-                    if col_width < len(text):
-                        col_width = len(text)
-                cols_width.append(col_width)
-        else:
-            if len(cols_width) != len(cols):
-                cls.error('UI.columns: number of columns and number of '
-                          'column-width values is not the same.')
-
-        # Create rows
-        rows = len(cols[0])
-        all_lines = []
-        for r in range(rows):
-            row_elems = [f'{str(col[r]).ljust(cols_width[c])}'
-                         for c,col in enumerate(cols)]
-            line = sep.join(row_elems)
-            all_lines.append(line)
-
-        # join rows and print them
-        table = '\n'.join(all_lines)
-        cls.__color_msg(msg=table)
-        return
-
-    @classmethod
     def columns(cls, cols, sep='', cols_width='auto', header=False):
         """Print a table with columns. If cols_width is auto, then
         compute each column width, otherwise, use the values given
@@ -219,5 +175,6 @@ class UI:
 
         # join lines and print them
         table = '\n'.join(all_lines)
+
         cls.__color_msg(msg=table)
         return

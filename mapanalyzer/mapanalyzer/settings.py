@@ -57,7 +57,6 @@ class Settings:
 
         ############################################################
         #### BASIC VALUES
-        file_path = None
         arch = 64
         cache_size = 32768
         line_size = 64
@@ -127,7 +126,6 @@ class Settings:
                                  'See mapanalyzer --help.')
 
                     # apply values
-                    cls.file_path = filename
                     for key,val in name_vals.items():
                         setattr(cls, cls.key_map[key], val)
 
@@ -138,10 +136,9 @@ class Settings:
             return
 
         @classmethod
-        def from_dict(cls, cache_dict, pdata_file_path=None):
+        def from_dict(cls, cache_dict):
             # load data from the cache section of the metric file
             cls.__dict_to_basics(cache_dict)
-            cls.file_path = pdata_file_path
 
             # compute derived values
             cls.__init_derived_values()
@@ -185,11 +182,6 @@ class Settings:
 
         @classmethod
         def describe(cls):
-            if cls.file_path is None:
-                fname = ' (Default Values)'
-            else:
-                fname = f' ({cls.file_path})'
-            UI.indent_in(title=f'CACHE PARAMETERS{fname}')
             names = [
                 'Address Size',
                 'Cache Size',
@@ -208,7 +200,6 @@ class Settings:
                 f'{cls.asso}-way'
             ]
             UI.columns((names, vals), sep=' : ')
-            UI.indent_out()
             return
 
 
@@ -314,85 +305,80 @@ class Settings:
         # DERIVED VALUES
         initialized = False
 
-        # Metrics *enabled by the user*. Starts as string, then upgraded to set.
-        enabled = 'all'
+        # Metrics *enabled by the user*. Initialized to set of metric codes.
+        enabled = None
 
         # Metrics *available in the tool*. All the metrics with some module
         # supporting them. Check comments on Settings.Metrics.set_available()
-        # {code -> either module instance or class}
+        # {code -> either module instance or module class}
         available = None
 
         # code of the background metric.
-        bg = 'MAP'
+        bg = None
+        bg_user_set = None
 
         @classmethod
         def from_args(cls, args):
-            # assign only if new value is not None
-            def assg_val(current, new):
-                return new if new is not None else current
-
-            # set raw values from the arguments
-            cls.enabled = assg_val(cls.enabled, args.met_codes)
-            cls.bg = assg_val(cls.bg, args.bg_metric)
-
-            cls.__init_derived_values()
+            # initialize each argument
+            # assg_val(cls.enabled, args.met_codes)
+            cls.enabled = cls.__init_enabled(args.met_codes)
+            cls.bg = cls.__init_bg(args.bg_metric,
+                                   list(Settings.ALL_METRIC_CODES.keys()),
+                                   'MAP')
+            cls.bg_user_set = args.bg_metric
             cls.initialized = True
             return
 
         @classmethod
         def from_dict(cls, pdata_dict):
             # set values from the dictionary
-            cls.enabled = pdata_dict['fg']['code']
-            cls.bg = None
-            if pdata_dict['bg'] is not None:
-                cls.bg = pdata_dict['bg']['code']
+            cls.enabled = cls.__init_enabled(pdata_dict['fg']['code'])
 
-            cls.__init_derived_values()
+            # get pdata bg metric (if any)
+            pdata_bg = None
+            if pdata_dict['bg'] is not None:
+                pdata_bg = pdata_dict['bg']['code']
+
+            # use the pdata bg unless user explicitly has set bg
+            user_bg = pdata_bg
+            if cls.bg_user_set:
+                user_bg = cls.bg
+
+            cls.bg = cls.__init_bg(user_bg, [pdata_bg], None)
             cls.initialized = True
             return
 
         @classmethod
-        def __init_derived_values(cls):
-            cls.bg = cls.__init_bg()
-            cls.enabled = cls.__init_enabled()
+        def __init_enabled(cls, fg_codes):
+            # if nothing or 'all' specified, enable them all
+            if fg_codes is None or fg_codes.upper() == 'ALL':
+                return [m.upper() for m in Settings.ALL_METRIC_CODES.keys()]
+
+            # otherwise parse whatever was given
+            return {m.strip().upper() for m in fg_codes.split(',')}
+
+        @classmethod
+        def __init_bg(cls, bg_code, bg_options, fallback_code):
+            # If omitted or explicitly asked for 'none', set to None.
+            if bg_code is None or bg_code.upper() == 'NONE':
+                return None
+
+            # if not omitted, check that it exists in the options
+            bg_code = bg_code.upper()
+            if bg_code in bg_options:
+                return bg_code
+
+            # if it doesn't exist in the options, use fallback
+            opts = ', '.join([str(o) for o in bg_options])
+            UI.warning(f'Background metric "{bg_code}" not available. '
+                       f'Only "{opts}" metrics are available. Setting bg metric '
+                       f'to "{str(fallback_code)}"')
+            if fallback_code is None or fallback_code in bg_options:
+                return fallback_code
+
+            UI.error(f'Fallback background metric "{str(fallback_code)}" not '
+                     'available.')
             return
-
-        @classmethod
-        def __init_bg(cls):
-            if cls.bg is None:
-                bg_metric = None
-            elif type(cls.bg) is str:
-                cls.bg = cls.bg.upper()
-                if cls.bg == 'NONE':
-                    bg_metric = None
-                elif cls.bg in Settings.ALL_METRIC_CODES:
-                    bg_metric = cls.bg
-                else:
-                    UI.error(f'Unknown background metric code ({cls.bg}).')
-            else:
-                UI.error(f'Unknown type ({type(cls.bg)}) given to '
-                         'st.Metrics.bg')
-            return bg_metric
-
-        @classmethod
-        def __init_enabled(cls):
-            if type(cls.enabled) is str:
-                cls.enabled = cls.enabled.upper()
-                if cls.enabled == 'ALL':
-                    enabled_metrics = {
-                        m for m in Settings.ALL_METRIC_CODES.keys()}
-                else:
-                    enabled_metrics = {
-                        x.strip() for x in cls.enabled.split(',')
-                    }
-            elif type(cls.enabled) is list:
-                enabled_metrics = {str(x).upper() for x in cls.enabled}
-            elif type(cls.enabled) is set:
-                enabled_metrics = cls.enabled
-            else:
-                UI.error(f'Unknown type ({type(cls.enabled)}) given to '
-                         'st.Metrics.enabled.')
-            return enabled_metrics
 
         @classmethod
         def set_available(cls, available_modules,
@@ -709,7 +695,7 @@ class Settings:
 
             # keep removing awkward characters from end or beginning until
             # the id is nice :)
-            unwanted = '/\\ _-~\t0'
+            unwanted = '/\\ _-~\t'
             almost_id = os.path.splitext(basename)[0].strip(unwanted)
             almost_id_new = almost_id.strip(unwanted)
             while almost_id != almost_id_new:
@@ -744,6 +730,10 @@ class Settings:
         def __init_derived_values(cls):
             """Compute derived values from the basic ones"""
             cls.ID = cls.__generate_id()
+            cls.__init_mem_padding()
+
+        @classmethod
+        def __init_mem_padding(cls):
             # compute padding bytes to make the memory chunk block-aligned.
             if not Settings.Cache.initialized:
                 UI.error('Cache settings must be initialized before MAP '
@@ -754,11 +744,14 @@ class Settings:
             cls.right_pad = (Settings.Cache.line_size-1) - \
                 (cls.end_addr & (Settings.Cache.line_size-1))
             cls.aligned_end_addr = cls.end_addr + cls.right_pad
+            # cls.num_padded_bytes = (cls.end_addr+cls.right_pad) - \
+            #     (cls.start_addr - cls.left_pad + 1)
             cls.num_padded_bytes = (cls.end_addr+cls.right_pad) - \
-                (cls.start_addr - cls.left_pad + 1)
+                (cls.start_addr - cls.left_pad) + 1
             cls.num_blocks = cls.num_padded_bytes // Settings.Cache.line_size
             cls.first_real_tag = cls.start_addr >> \
                 (Settings.Cache.bits_set + Settings.Cache.bits_off)
+            return
 
         @classmethod
         def __dict_to_basics(cls, map_dict):
@@ -794,18 +787,22 @@ class Settings:
             return ret_str[:-1]
 
         @classmethod
-        def describe(cls):
-            if cls.file_path is None:
-                fname = ' (No MAP file)'
+        def describe(cls, dbg=False):
+            if not dbg:
+                names = ['First Address', 'Memory Size', 'Maximum Time',
+                         'Thread Count', 'Event Count']
+                vals = [f'0x{cls.start_addr:X}', f'{cls.mem_size} bytes',
+                        cls.time_size-1, cls.thread_count, cls.event_count]
             else:
-                fname = f' ({cls.file_path})'
-            UI.indent_in(title=f'MEMORY ACCESS PATTERN{fname}')
-            names = ['First Address', 'Memory Size', 'Maximum Time',
-                     'Thread Count', 'Event Count']
-            vals = [f'0x{cls.start_addr:X}', f'{cls.mem_size} bytes',
-                    cls.time_size-1, cls.thread_count, cls.event_count]
+                names = ['file_path', 'start_addr', 'end_addr', 'mem_size',
+                         'owner_thread', 'slice_size', 'thread_count',
+                         'event_count', 'time_size', 'initialized',
+                         'initd_from_dict', 'path_prefix', 'ID',
+                         'aligned_start_addr', 'left_pad', 'right_pad',
+                         'aligned_end_addr', 'num_padded_bytes',
+                         'num_blocks', 'first_real_tag']
+                vals = [getattr(cls,n) for n in names]
             UI.columns((names, vals), sep=' : ')
-            UI.indent_out()
             return
 
 
@@ -821,7 +818,7 @@ class Settings:
         img_title_vpad = 6 # padding between the plot and its title
 
         # Ticks (independent_variable, function_variable)
-        ticks_max_count = (11, 11)
+        ticks_max_count = (30,33) #(11, 11)
         max_xtick_count = 11
         max_ytick_count = 11
         max_map_ytick_count = 11
@@ -847,7 +844,7 @@ class Settings:
         grid_max_blocks = 48
 
         # Text boxes
-        tbox_bg = '#FFFFFF88'
+        tbox_bg = '#FFFFFFCC'
         tbox_border = '#CC000000' # transparent
         tbox_font = 'monospace'
         tbox_font_size = 9

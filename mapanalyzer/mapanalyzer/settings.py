@@ -823,7 +823,6 @@ class Settings:
         max_ytick_count = 11
         max_map_ytick_count = 11
 
-
         x_orient = 'v'
 
         # line width and palette parameters (line, area_filling)
@@ -863,6 +862,9 @@ class Settings:
         x_ranges = 'full'
         y_ranges = 'full'
 
+        # textbox horizontal and vertical offsets, {CODE -> (horiz,vert)}
+        textbox_offsets = None
+
         # Specific to MAP plot.
         # min_map_res is only used if the native resolution is too large (above
         # this maximum), and by trying to find a "nice" lower resolution, the
@@ -893,6 +895,8 @@ class Settings:
             cls.x_orient = assg_val(cls.x_orient, args.x_orient)
             cls.x_ranges = assg_val(cls.x_ranges, args.x_ranges)
             cls.y_ranges = assg_val(cls.y_ranges, args.y_ranges)
+            cls.textbox_offsets = assg_val(cls.textbox_offsets,
+                                           args.textbox_offsets)
             cls.aggr_last_x = assg_val(cls.aggr_last_x, args.aggr_last_x)
 
             cls.__init_derived_values()
@@ -903,6 +907,7 @@ class Settings:
         def __init_derived_values(cls):
             cls.x_ranges = cls.__init_ranges(cls.x_ranges)
             cls.y_ranges = cls.__init_ranges(cls.y_ranges)
+            cls.textbox_offsets = cls.__init_textbox_offsets()
             cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
                 cls.width, cls.height, cls.dpi, cls.max_map_res)
             UI.warning('Hardcoded jump_line_width.', pre='TODO')
@@ -928,6 +933,33 @@ class Settings:
 
                     ranges[met_code] = (min_val, max_val)
             return ranges
+
+        @classmethod
+        def __init_textbox_offsets(cls):
+            user_tboff = cls.textbox_offsets
+            if user_tboff is None:
+                return {}
+            user_tb_off = str(user_tboff)
+            user_offsets = [o.strip() for o in user_tboff.split(',')]
+            offsets = {}
+            for off in user_offsets:
+                try:
+                    met_code, hor_val, ver_val = off.split(':')
+                    hor_val = float(hor_val)
+                    ver_val = float(ver_val)
+                except ValueError:
+                    UI.error(f'Textbox Offsets with wrong format "{off}".')
+                if hor_val < 0 or hor_val > 1:
+                    UI.error(f'Horizontal textbox offset value out of range '
+                             '(0,1).')
+                if ver_val < 0 or ver_val > 1:
+                    UI.error(f'Vertical textbox offset value out of range '
+                             '(0,1).')
+                if met_code not in Settings.ALL_METRIC_CODES.keys():
+                    UI.error(f'Invalid metric code "{met_code}".')
+
+                offsets[met_code] = (hor_val, ver_val)
+            return offsets
 
         @classmethod
         def __init_map_resolution(cls, width, height, dpi, max_res):

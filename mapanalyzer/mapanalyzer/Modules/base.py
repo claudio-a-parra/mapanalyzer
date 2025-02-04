@@ -178,9 +178,28 @@ class BaseModule:
         return
 
     @classmethod
-    def draw_textbox(cls, mpl_axes, text, ha='right', va='top'):
-        mpl_axes.text(0.98, 0.98, text, transform=mpl_axes.transAxes,
-                      ha=ha, va=va, zorder=1000,
+    def draw_textbox(cls, mpl_axes, text, metric_code):
+        # get the offset of the textbox from the user options
+        h_off,v_off=0.98, 0.98
+        if metric_code in st.Plot.textbox_offsets:
+            h_off,v_off = st.Plot.textbox_offsets[metric_code]
+
+        # pick the anchor point of the textbox based on the horizontal
+        # and vertical offsets
+        if h_off > 0.667:
+            hor_anchor = 'right'
+        elif h_off < 0.333:
+            hor_anchor = 'left'
+        else:
+            hor_anchor = 'center'
+        if v_off > 0.667:
+            vert_anchor = 'top'
+        elif v_off < 0.333:
+            vert_anchor = 'bottom'
+        else:
+            vert_anchor = 'center'
+        mpl_axes.text(h_off, v_off, text, transform=mpl_axes.transAxes,
+                      ha=hor_anchor, va=vert_anchor, zorder=1000,
                       bbox=dict(facecolor=st.Plot.tbox_bg,
                                 edgecolor=st.Plot.tbox_border,
                                 boxstyle="square,pad=0.2"),

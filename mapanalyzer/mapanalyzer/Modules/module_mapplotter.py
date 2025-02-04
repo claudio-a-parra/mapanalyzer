@@ -7,7 +7,6 @@ from math import prod # for resolution finding
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import MetricStrings, Palette
 from mapanalyzer.ui import UI
-
 from .base import BaseModule
 
 class Map(BaseModule):
@@ -107,9 +106,9 @@ class Map(BaseModule):
 
     def MAP_to_dict(self):
         return {
-            'code': 'MAP',
-            'threads': list(self.threads),
-            'space_time': self.space_time
+            'code' : 'MAP',
+            'threads' : list(self.threads),
+            'space_time' : self.space_time
         }
 
     def dict_to_MAP(self, data):

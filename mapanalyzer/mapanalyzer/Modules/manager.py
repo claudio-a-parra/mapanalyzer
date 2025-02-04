@@ -8,7 +8,7 @@ from mapanalyzer.ui import UI
 from .module_mapplotter import Map
 #! from .module_locality import Locality
 from .module_missratio import MissRatio
-#! from .module_memaccess import MemAccess
+from .module_memaccess import MemAccess
 from .module_usage import CacheUsage
 #! from .module_aliasing import Aliasing
 #! from .module_eviction import EvictionDuration
@@ -20,20 +20,22 @@ class Manager:
         Map,
         #Locality,
         MissRatio,
-        #MemAccess,
+        MemAccess,
         CacheUsage,
         #Aliasing,
         #EvictionDuration
     ]
 
-    def __init__(self, enabled_list=None):
+    def __init__(self):
         # List of available modules
         self.map = Map()
         self.missratio = MissRatio()
+        self.memaccess = MemAccess()
         self.usage = CacheUsage()
         self.available_module_instances = [
             self.map,
             self.missratio,
+            self.memaccess,
             self.usage
         ]
 

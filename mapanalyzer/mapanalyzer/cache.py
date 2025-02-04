@@ -126,7 +126,7 @@ class Cache:
                 fetched_block = Block(st.Cache.line_size, tag=p_tag,
                                             dirty=writing)
                 #!self.modules.aliasing.fetch(set_index, access.time)
-                #!self.modules.cost.add_access('r') # read
+                self.modules.memaccess.probe('r') # read
 
                 # add fetched block to the cache
                 self.blocks_in_cache[(p_tag,set_index)] = fetched_block
@@ -144,8 +144,7 @@ class Cache:
                         delta_valid=-st.Cache.line_size)
                     if evicted_block.dirty:
                         # WRITE DIRTY BLOCK
-                        #!self.modules.cost.add_access('w') # write
-                        pass #!
+                        self.modules.memaccess.probe('w') # write
                     else:
                         # DROP CLEAN BLOCK
                         pass
@@ -185,7 +184,7 @@ class Cache:
 
 
                 if evicted_block.dirty:
-                    #!self.modules.cost.add_access('w')
+                    self.modules.memaccess.probe('w')
                     pass #!
                 evicted_block = s.pop_lru_block() # get next evicted block
         return

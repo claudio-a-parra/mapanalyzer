@@ -1,46 +1,59 @@
-import sys
 import matplotlib.pyplot as plt
+from itertools import zip_longest
 
-
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import MetricStrings, Palette, PlotFile
+from mapanalyzer.ui import UI
+from .base import BaseModule
 
-class Cost:
-    def __init__(self, shared_X=None, hue=180):
-        self.tool_name = 'Main Mem. Access'
-        self.tool_about = ('Distribution of main memory read and write operations.')
-        self.ps = PlotStrings(
+class MemAccess(BaseModule):
+    # Module info
+    name = 'Main Mem. Access'
+    about = 'Cumulative distribution of main memory read/write operations'
+    hue = 180
+    palette = Palette.default(hue)
+
+    supported_metrics = {
+        'CMMA' : MetricStrings(
+            about  = ('Cumulative distribution of main memory read/write '
+                      'operations'),
             title  = 'CMMA',
-            code   = 'CMMA',
+            subtit = 'lower is better',
+            number = '03',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cumulative Main Memory Access [count]',
-            suffix = '_plot-04-access-count',
-            subtit = 'lower is better'
+            ylab   = 'Cache blocks read/written in Main Memory [count]',
         )
-        self.enabled = self.ps.code in st.plot.include
+    }
+    supported_aggr_metrics = {
+        'CMMA' : MetricStrings(
+            about  = ('Average of cumulative main memory access.'),
+            title  = 'Aggregated CMMA',
+            subtit = 'lower is better',
+            number = '03',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Cache blocks read/written in Main Memory [count]',
+        )
+    }
+    def __init__(self, shared_X=None, hue=180):
+        # enable metric if user requested it or if used as background
+        self.enabled = any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys())
+        self.enabled = self.enabled or st.Metrics.bg in self.supported_metrics
         if not self.enabled:
             return
 
-        self.X = shared_X if shared_X is not None else \
-            [i for i in range(st.map.time_size)]
-        self.axes = None
-        self.tool_palette = Palette(hue=[hue,(hue+180)%360],
-                                    lightness=st.plot.pal_lig,
-                                    saturation=st.plot.pal_sat,
-                                    alpha=st.plot.pal_alp)
-
+        # METRIC INTERNAL VARIABLES
         self.read = 0
-        self.read_dist = [0] * len(self.X)
+        self.read_dist = [0 for _ in range(st.Map.time_size)]
         self.write = 0
-        self.write_dist = [0] * len(self.X)
+        self.write_dist = [0 for _ in range(st.Map.time_size)]
         self.last_time = 0
-
         return
 
-    def add_access(self, rw):
+    def probe(self, rw):
+        """Adds to read or write counter"""
         if not self.enabled:
             return
-        """Adds to read or write counter"""
         if rw == 'r':
             self.read += 1
         else:
@@ -62,125 +75,262 @@ class Cost:
         self.write_dist[time] = self.write
         self.last_time = time
 
-    def describe(self, ind=''):
-        if not self.enabled:
-            return
-        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
+    def finalize(self):
+        # no post-simulation computation to be done
         return
 
-    def plot_setup_X(self):
-        # Data range based on data
-        X_padding = 0.5
-        # add tails at start/end of X for cosmetic purposes.
-        X = [self.X[0]-X_padding] + self.X + [self.X[-1]+X_padding]
-        self.axes.set_xlim(X[0], X[-1])
+    def CMMA_to_dict(self):
+        return {
+            'code' : 'CMMA',
+            'read_dist' : self.read_dist,
+            'write_dist' : self.write_dist,
+            'mem_size' : st.Map.mem_size,
+            'line_size' : st.Cache.line_size
+        }
 
-        # Axis details: label, ticks and grid
-        self.axes.set_xlabel(self.ps.xlab)
-        rot = -90 if st.plot.x_orient == 'v' else 0
-        self.axes.tick_params(axis='x',
-                              top=False, bottom=True,
-                              labeltop=False, labelbottom=True,
-                              rotation=rot, width=st.plot.grid_other_width)
-        x_ticks = create_up_to_n_ticks(self.X, base=10, n=st.plot.max_xtick_count)
-        self.axes.set_xticks(x_ticks)
-        # self.axes.grid(axis='x', which='both',
-        #           zorder=1,
-        #           alpha=st.plot.grid_main_alpha,
-        #           linestyle=st.plot.grid_other_style,
-        #           linewidth=st.plot.grid_other_width)
-        return X
-
-    def plot_setup_Y(self):
-        # Data range based on data and user input
-        Y_min = min(self.read_dist[0], self.write_dist[0])
-        Y_max = self.read_dist[-1] + self.write_dist[-1]
-        if self.ps.code in st.plot.y_ranges:
-            Y_min = int(st.plot.y_ranges[self.ps.code][0])
-            Y_max = int(st.plot.y_ranges[self.ps.code][1])
-        Y_padding = (Y_max - Y_min)/200
-        self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
-        # add tails at start/end of Y for cosmetic purposes.
-        # Y_rwd starts at write height, that's why we add read+write.
-        Y_rwd = [self.read_dist[0]+self.write_dist[0]] \
-            + [self.read_dist[i] + self.write_dist[i] for i in range(len(self.read_dist))] \
-            + [self.read_dist[-1]+self.write_dist[-1]]
-        Y_wd = [self.write_dist[0]] + self.write_dist + [self.write_dist[-1]]
-
-        # Axis details: spine, label, ticks, and grid
-        #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
-        self.axes.set_ylabel(self.ps.ylab)
-        self.axes.tick_params(axis='y',
-                              left=True, labelleft=True,
-                              right=False, labelright=False,
-                              width=st.plot.grid_main_width)
-        y_ticks = create_up_to_n_ticks(range(Y_min, Y_max+1), base=10,
-                                       n=st.plot.max_ytick_count)
-        self.axes.set_yticks(y_ticks)
-        self.axes.grid(axis='y', which='both', #color=self.tool_palette.fg,
-                       zorder=1,
-                       alpha=st.plot.grid_main_alpha,
-                       linewidth=st.plot.grid_main_width,
-                       linestyle=st.plot.grid_main_style)
-        return (Y_rwd,Y_wd)
-
-    def draw_textbox(self):
-        # insert text box with total number of accesses
-        tot_read = self.read_dist[-1]
-        tot_write = self.write_dist[-1]
-        text = \
-            f'mm.R: {tot_read:,}\n'+\
-            f'mm.W: {tot_write:,}'
-        self.axes.text(0.98, 0.02, text, transform=self.axes.transAxes,
-                       ha='right', va='bottom',
-                       bbox=dict(facecolor=st.plot.tbox_bg , edgecolor=st.plot.tbox_border,
-                                 boxstyle="square,pad=0.2"),
-                       fontdict=dict(family=st.plot.tbox_font, size=st.plot.tbox_font_size),
-                       zorder=1000)
+    def dict_to_CMMA(self, data):
+        try:
+            self.read_dist = data['read_dist']
+            self.write_dist = data['write_dist']
+        except:
+            class_name = self.__class__.__name__
+            UI.error(f'{class_name}.dict_to_CMMA(): Malformed data.')
         return
 
-    def plot_setup_general(self):
-        # background color
-        self.axes.patch.set_facecolor(self.tool_palette.bg)
-        # setup title
-        title_string = f'{self.ps.title}: {st.plot.prefix}'
-        if self.ps.subtit:
-            title_string += f'. ({self.ps.subtit})'
-        self.axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
+    def CMMA_to_plot(self, mpl_axes, bg_mode=False):
+        metric_code = 'CMMA'
+        met_str = self.supported_metrics[metric_code]
+
+        # create data series
+        X = [i for i in range(st.Map.time_size)]
+        #Y_rw = [r+w for r,w in zip(self.read_dist, self.write_dist)]
+        Y_r = self.read_dist
+        Y_w = self.write_dist
+
+        # create color palette
+        pal = Palette(
+            # two colors (for read and write), starting from self.hue
+            hue = 2, h_off = self.hue,
+            # (line, face)
+            sat = st.Plot.p_sat,
+            lig = st.Plot.p_lig,
+            alp = st.Plot.p_alp)
+
+        # plot read line (above write line)
+        read_line_color = pal[0][0][0][0]
+        read_line_width = 1.25
+        mpl_axes.plot(X, Y_r, zorder=3, color=read_line_color,
+                      linewidth=read_line_width, label='Read Access')
+
+        # plot write line (below read line)
+        write_line_color = pal[1][0][0][0]
+        write_line_width = 1.25
+        mpl_axes.plot(X, Y_w, zorder=3, color=write_line_color,
+                      linewidth=write_line_width, label='Write Access')
+
+        # plot horizontal line with the size of the observed memory segment.
+        # This size is in "blocks", as that is what this metric counts.
+        mem_size = st.Map.mem_size // st.Cache.line_size
+        pal = Palette(
+            hue = [120],
+            sat = [50],
+            lig = [75],
+            alp = [100])
+        mem_size_color = pal[0][0][0][0]
+        mem_size_line_width = 1.25
+        mpl_axes.axhline(y=mem_size, color=mem_size_color, zorder=2,
+                         linestyle='solid', linewidth=mem_size_line_width,
+                         label='Memory Size')
+
+        ###########################################
+        # PLOT VISUALS
+        # set plot limits
+        X_pad = 0.5
+        Y_max = max(Y_r[-1], Y_w[-1])
+        real_xlim, real_ylim = self.setup_limits(
+            mpl_axes, metric_code, xlims=(X[0],X[-1]), x_pad=X_pad,
+            ylims=(0,Y_max), y_pad='auto')
+
+        # set ticks based on the real limits
+        self.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
+                         bases=(10, 10), bg_mode=bg_mode)
+
+        # set grid
+        self.setup_grid(mpl_axes, fn_axis='y')
+
+        # insert text box with total read/write count
+        if not bg_mode:
+            text = (f'Total Read : {self.read_dist[-1]}\n'
+                    f'Total Write: {self.write_dist[-1]}')
+            self.draw_textbox(mpl_axes, text, h_off=0.02)
+
+        # set labels
+        self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
+
+        # title and bg color
+        self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
         return
 
-    def plot(self, bottom_tool=None):
-        if not self.enabled:
-            return
+    @classmethod
+    def CMMA_to_aggregated_plot(cls, pdata_dicts):
+        """Given a list of pdata dictionaries, aggregate their
+        values in a meaningful manner"""
+        # metric info
+        metric_code = pdata_dicts[0]['fg']['code']
+        met_str = cls.supported_aggr_metrics[metric_code]
 
-        # create two set of axes: for the map (bottom) and the tool
-        fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        self.axes = fig.add_axes(bottom_axes.get_position())
+        # extract data from dictionaries and create figure
+        total_pdatas = len(pdata_dicts)
+        all_read = [m['fg']['read_dist'] for m in pdata_dicts]
+        all_write = [m['fg']['write_dist'] for m in pdata_dicts]
+        all_mem_size = [m['fg']['mem_size'] for m in pdata_dicts]
+        all_line_size = [m['fg']['line_size'] for m in pdata_dicts]
+        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
-        # plot map
-        if bottom_tool is not None:
-            bottom_tool.plot(axes=bottom_axes)
 
-        # Setup axes and obtain data ranges
-        X = self.plot_setup_X()
-        Y_rwd,Y_wd = self.plot_setup_Y()
+        #####################################
+        # CREATE COLOR PALETTE
+        pal = Palette(
+            # two colors (read and write) starting from cls.hue
+            hue = 2, h_off=cls.hue,
+            # (individual, average)
+            sat = (60, 100),
+            lig = (70,  30),
+            alp = (20, 100))
+        read_one_color = pal[0][0][0][0]
+        read_avg_color = pal[0][1][1][1]
+        write_one_color = pal[1][0][0][0]
+        write_avg_color = pal[1][1][1][1]
+        one_line_width = 0.5
+        avg_line_width = 1.5
 
-        i = 0 # plot read plot (above write plot)
-        self.axes.fill_between(X, Y_wd, Y_rwd, step='mid', zorder=2,
-                               color=self.tool_palette[i][0],
-                               facecolor=self.tool_palette[i][1],
-                               linewidth=st.plot.linewidth)
 
-        i = 1 # plot write plot (below read plot)
-        self.axes.fill_between(X, -1, Y_wd, step='mid', zorder=2,
-                               color=self.tool_palette[i][0],
-                               facecolor=self.tool_palette[i][1],
-                               linewidth=st.plot.linewidth)
+        #####################################
+        # PLOT INDIVIDUAL METRICS
+        R_max,W_max = 0,0
+        X_min,X_max = 0,0
+        for pdata_r,pdata_w in zip(all_read,all_write):
+            W = pdata_w
+            R = pdata_r
+            X = [i for i in range(len(pdata_r))]
+            mpl_axes.plot(X, W, zorder=4, color=write_one_color,
+                          linewidth=one_line_width)
+            mpl_axes.plot(X, R, zorder=4, color=read_one_color,
+                          linewidth=one_line_width)
+            R_max = max(R[-1], R_max)
+            W_max = max(W[-1], W_max)
+            X_max = max(X[-1], X_max)
 
-        # finish plot setup
-        self.draw_textbox()
-        self.plot_setup_general()
 
-        # save image
-        save_fig(fig, self.ps.code, self.ps.suffix)
+        #####################################
+        # PLOT MOVING AVERAGE OF METRICS
+        # create a range large enough to fit all pdatas
+        super_X = list(range(X_min, X_max+1))
+        # obtain all i-th operations
+        all_ith_reads = list(zip_longest(*all_read, fillvalue=None))
+        all_ith_writes = list(zip_longest(*all_write, fillvalue=None))
+        R_avg = [0] * len(super_X)
+        W_avg = [0] * len(super_X)
+
+        # compute average read and write accesses
+        for sx,ith_reads,ith_writes in zip(super_X,all_ith_reads,
+                                           all_ith_writes):
+            valid_r = [r for r in ith_reads if r is not None]
+            r_avg = sum(valid_r) / len(valid_r)
+            R_avg[sx] = r_avg
+
+            valid_w = [w for w in ith_writes if w is not None]
+            w_avg = sum(valid_w) / len(valid_w)
+            W_avg[sx] = w_avg
+
+        # plot average read and write
+        mpl_axes.plot(super_X, R_avg, zorder=6, color=read_avg_color,
+                      linewidth=avg_line_width, label='Average Read Access')
+        mpl_axes.plot(super_X, W_avg, zorder=6, color=write_avg_color,
+                      linewidth=avg_line_width, label='Average Write Access')
+
+
+        #####################################
+        # AVERAGE MEMORY SIZE
+        # plot horizontal line with the size of the observed memory segment.
+        # This size is in "blocks", as that is what this metric counts.
+        all_mem_size_in_blocks = [mz//cl for mz,cl in
+                                  zip(all_mem_size,all_line_size)]
+        avg_mem_size = sum(all_mem_size_in_blocks)/len(all_mem_size_in_blocks)
+        pal = Palette(
+            hue = [120],
+            sat = [50],
+            lig = [75],
+            alp = [100])
+        mem_size_color = pal[0][0][0][0]
+        mem_size_line_width = 1.5
+        mpl_axes.axhline(y=avg_mem_size, color=mem_size_color, zorder=3,
+                         linestyle='solid', linewidth=mem_size_line_width,
+                         label='Average Memory Size')
+
+
+        #####################################
+        # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
+        if st.Plot.aggr_last_x:
+            pal = Palette(
+                # (individual, avg)
+                hue = (0,0),
+                sat = (0, 50),
+                lig = (93, 75),
+                alp = (100,100))
+            one_color = pal[0][0][0][0]
+            one_width = 0.5
+            avg_color = pal[1][1][1][1]
+            avg_width = 1.25
+            last_Xs = [len(r)-1 for r in all_read]
+            ymax = max(R_max,W_max)*1.2
+            ymin = 0 - max(R_max,W_max)*0.2
+            # plot all last-X
+            mpl_axes.vlines(last_Xs, ymin=ymin, ymax=ymax,
+                            colors=one_color, linestyles='solid',
+                            linewidth=one_width, zorder=2)
+
+            # plot avg across all last-X
+            last_X_avg = sum(last_Xs)/len(last_Xs)
+            mpl_axes.vlines([last_X_avg], ymin=ymin, ymax=ymax,
+                            colors=avg_color, linestyles='solid',
+                            linewidth=avg_width, zorder=3)
+            last_X_text = f'Avg Execution duration: {last_X_avg:.0f}'
+
+
+        #####################################
+        # SETUP PLOT VISUALS
+        # set plot limits
+        X_pad = 0.5
+        real_xlim, real_ylim = cls.setup_limits(
+            mpl_axes, metric_code, xlims=(X_min,X_max), x_pad=X_pad,
+            ylims=(0,max(R_max, W_max)), y_pad='auto'
+        )
+
+        # set ticks based on the real limits
+        cls.setup_ticks(
+            mpl_axes, xlims=real_xlim, ylims=real_ylim,
+            bases=(10, 10)
+        )
+
+        # set grid
+        axis = 'y' if st.Plot.aggr_last_x else 'xy'
+        cls.setup_grid(mpl_axes, axis=axis, fn_axis='y')
+
+        # insert text box with average usage
+        text = [f'Executions: {total_pdatas}']
+        if st.Plot.aggr_last_x:
+            text.append(last_X_text)
+        text.append(f'Max Avg Total Read Access : {max(R_avg):.0f}')
+        text.append(f'Max Avg Total Write Access: {max(W_avg):.0f}')
+        text = '\n'.join(text)
+        cls.draw_textbox(mpl_axes, text, metric_code)
+
+        # set labels
+        cls.setup_labels(mpl_axes, met_str)
+
+        # title and bg color
+        cls.setup_general(mpl_axes, cls.palette.bg, met_str)
+
+        PlotFile.save(fig, metric_code, aggr=True)
         return

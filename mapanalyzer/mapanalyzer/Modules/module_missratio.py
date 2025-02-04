@@ -2,13 +2,9 @@ from collections import deque
 import matplotlib.pyplot as plt
 from itertools import zip_longest
 
-# to serialize and de-serialize ThreadMissRatio
-import json
-
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import MetricStrings, Palette, PlotFile
 from mapanalyzer.ui import UI
-
 from .base import BaseModule
 
 class ThreadMissRatio:
@@ -131,28 +127,27 @@ class MissRatio(BaseModule):
 
     def CMR_to_dict(self):
         return {
-            'code': 'CMR',
-            'x': self.X,
-            'thread_miss_ratio': {t: tms.miss_ratio
+            'code' : 'CMR',
+            'x' : self.X,
+            'thread_miss_ratio' : {t: tms.miss_ratio
                                   for t,tms in self.thread_miss_ratio.items()}
         }
 
     def dict_to_CMR(self, data):
-        # check for malformed (no keys) dict.
-        all_keys = ['x', 'thread_miss_ratio']
-        if not all(k in data for k in all_keys):
-            UI.error(f'While importing CMR. Not all necessary keys are '
-                     f'present ({",".join(all_keys)}).')
-        self.X = data['x']
-        self.thread_miss_ratio = {}
-        for t,tmr_list in data['thread_miss_ratio'].items():
-            t = int(t)
-            tmr_list = [float(i) for i in tmr_list]
-            self.thread_miss_ratio[t] = ThreadMissRatio.from_list(tmr_list)
+        try:
+            self.X = data['x']
+            self.thread_miss_ratio = {}
+            for t,tmr_list in data['thread_miss_ratio'].items():
+                t = int(t)
+                tmr_list = [float(i) for i in tmr_list]
+                self.thread_miss_ratio[t] = ThreadMissRatio.from_list(tmr_list)
+        except:
+            class_name = self.__class__.__name__
+            UI.error(f'{class_name}.dict_to_CMR(): Malformed data.')
         return
 
     def CMR_to_plot(self, mpl_axes, bg_mode=False):
-        metric_code='CMR'
+        metric_code = 'CMR'
         met_str = self.supported_metrics[metric_code]
 
         # pad data series
@@ -196,10 +191,8 @@ class MissRatio(BaseModule):
             ylims=(0,100), y_pad='auto')
 
         # set ticks based on the real limits
-        self.setup_ticks(
-            mpl_axes, xlims=real_xlim, ylims=real_ylim,
-            bases=(10, 10),
-            bg_mode=bg_mode)
+        self.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
+                         bases=(10, 10), bg_mode=bg_mode)
 
         # set grid
         self.setup_grid(mpl_axes, fn_axis='y')
@@ -218,7 +211,7 @@ class MissRatio(BaseModule):
                 for thr,thr_mr_obj in self.thread_miss_ratio.items():
                     thr_mr = thr_mr_obj.miss_ratio
                     avg = sum(thr_mr)/len(thr_mr)
-                    text += f'Avg t{str(thr).ljust(thr_str_len)}: {avg:.2f}%\n'
+                    text += f'Avg t{str(thr).ljust(thr_str_len)} CMR: {avg:.2f}%\n'
                 text = text[:-1]
             self.draw_textbox(mpl_axes, text)
 
@@ -232,7 +225,7 @@ class MissRatio(BaseModule):
 
     @classmethod
     def CMR_to_aggregated_plot(cls, pdata_dicts):
-        """Given a list of 'metric' dictionaries, aggregate their
+        """Given a list of pdata dictionaries, aggregate their
         values in a meaningful manner"""
         # metric info
         metric_code = pdata_dicts[0]['fg']['code']
@@ -262,19 +255,17 @@ class MissRatio(BaseModule):
             alp = (10, 100))
         for i,t_id in enumerate(thread_to_color):
             thread_to_color[t_id] = (pal[i][0][0][0], pal[i][1][1][1])
+        one_width = 0.5
+        avg_width = 1.5
 
 
         #####################################
         # PLOT INDIVIDUAL METRICS
         # for each pdata, plot all threads, each with their own color
-        one_width = 0.5
         for pdata_X,pdata_cmr in zip(all_pdatas_X, all_pdatas_cmr):
             for thr,thr_cmr in pdata_cmr.items():
                 thr = int(thr)
                 thr_color = thread_to_color[thr][0]
-                # mpl_axes.step(pdata_X, thr_cmr, where='mid', zorder=4,
-                #           color=thr_color, linewidth=one_width)
-
                 mpl_axes.plot(pdata_X, thr_cmr, zorder=4,
                           color=thr_color, linewidth=one_width)
 
@@ -308,12 +299,8 @@ class MissRatio(BaseModule):
             all_threads_cmr_avg[thr] = thread_cmr_avg
 
         # plot average of each thread
-        avg_width = 1.5
         for thr,thr_cmr_avg in all_threads_cmr_avg.items():
             thr_color = thread_to_color[thr][1]
-            # mpl_axes.step(full_X, thr_cmr_avg, where='mid', zorder=4,
-            #               color=thr_color, linewidth=avg_width)
-
             mpl_axes.plot(full_X, thr_cmr_avg, zorder=4,
                           color=thr_color, linewidth=avg_width)
 
@@ -322,8 +309,9 @@ class MissRatio(BaseModule):
         # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
         if st.Plot.aggr_last_x:
             pal = Palette(
-                hue = (cls.hue, 0),
-                sat = (50, 50),
+                # (individual, avg)
+                hue = (0, 0),
+                sat = (0, 50),
                 lig = (93, 75),
                 alp = (100,100))
             one_color = pal[0][0][0][0]
@@ -331,19 +319,18 @@ class MissRatio(BaseModule):
             avg_color = pal[1][1][1][1]
             avg_width = 1.25
             last_Xs = [x[-1] for x in all_pdatas_X]
-            mpl_axes.vlines(last_Xs, ymin=0, ymax=100, colors=one_color,
+            ymax = 120
+            ymin = -20
+            mpl_axes.vlines(last_Xs, ymin=ymin, ymax=ymax, colors=one_color,
                             linestyles='solid', linewidth=one_width,
                             zorder=2)
 
-            # PLOT AVG OF LAST X
+            # plot avg across all last-X
             last_X_avg = sum(last_Xs)/len(last_Xs)
-            mpl_axes.vlines([last_X_avg], ymin=0, ymax=100, colors=avg_color,
+            mpl_axes.vlines([last_X_avg], ymin=ymin, ymax=ymax, colors=avg_color,
                             linestyles='solid', linewidth=avg_width,
                             zorder=3)
-
-
-
-
+            last_X_text = f'Avg Execution duration: {last_X_avg:.0f}'
 
 
         #####################################
@@ -362,19 +349,19 @@ class MissRatio(BaseModule):
         )
 
         # set grid
-        if st.Plot.aggr_last_x:
-            axis='y'
-        else:
-            axis='xy'
+        axis = 'y' if st.Plot.aggr_last_x else 'xy'
         cls.setup_grid(mpl_axes, axis=axis, fn_axis='y')
 
         # insert text box with average per thread
-        text = [f'{total_pdatas} executions.']
+        text = [f'Executions: {total_pdatas}']
+        if st.Plot.aggr_last_x:
+            text.append(last_X_text)
         for thr,thr_cmr_avg in all_threads_cmr_avg.items():
-            txt = rf'thr{thr} avg$^{2}$: {sum(thr_cmr_avg)/len(thr_cmr_avg):.2f}%'
+            txt = (rf'Avg$^{2}$ thr{thr} CMR: '
+                   f'{sum(thr_cmr_avg)/len(thr_cmr_avg):.2f}%')
             text.append(txt)
         text = '\n'.join(text)
-        cls.draw_textbox(mpl_axes, text)
+        cls.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels
         cls.setup_labels(mpl_axes, met_str)

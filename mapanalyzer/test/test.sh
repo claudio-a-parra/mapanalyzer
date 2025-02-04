@@ -178,9 +178,11 @@ tree_flag(){
 }
 
 clear
-#create_maps 100 1000
-#simulate --metrics CMR,CUR --cache cache.conf || exit 1
-#plot     --metrics MAP                 -pw 8 -ph 8 --dpi 400 || exit 1
-aggregate --metrics CMR,CUR -Lx --plot-width 12 --plot-height 12 --dpi 600 || exit 1
+
+#create_maps 50 5000
+#simulate  --metrics CMMA,CUR,CMR --cache cache.conf || exit 1
+#plot      --metrics MAP,CMR,CMMA,CUR             -pw  8 -ph  8 --dpi 400 || exit 1
+aggregate --metrics CMMA,CUR,CMR --textbox-offsets \'CMMA:0.02:0.98, CUR:0.98:0.8, CMR:0.98:0.8\' -pw 12 -ph 12 --dpi 300 || exit 1
 #view plot
+
 echo -e "\n\nTEST: Done"

@@ -93,9 +93,9 @@ class Palette:
             hue_list = [i%360 for i in hue]
         else:
             if hue < 1:
-                UI.error('Hue count cannot be less than 1.')
+                UI.error('Hue count (hue=) cannot be less than 1.')
             step = 360/hue
-            hue_list = [(round(i*step)+hue)%360 for i in range(hue)]
+            hue_list = [(round(i*step)+h_off)%360 for i in range(hue)]
 
         # determine the list of saturation values
         if hasattr(sat, '__getitem__'):
@@ -393,6 +393,7 @@ class PlotFile:
         try:
             mpl_fig.savefig(filename, dpi=st.Plot.dpi, bbox_inches='tight',
                             pad_inches=st.Plot.img_border_pad)
+            plt.close(mpl_fig)
         except Exception as e:
             UI.nl()
             UI.error(f'While trying to save {filename}:\n\n'
@@ -585,6 +586,17 @@ def command_line_args_parser():
         choices=['h', 'v'], default=None,
         help=('Orientation of the X-axis tick labels.\n'
               'Format: h | v')
+    )
+
+    parser.add_argument(
+        '-to', '--textbox-offsets', metavar='OFFSETS', dest='textbox_offsets',
+        type=str, default=None,
+        help=('Set the horizontal and vertical offset for text boxes in the '
+              'plots. The range goes from 0 to 1 (left to right and bottom to '
+              'top).\n'
+              'Format : <CODE>:<HORIZ>:<VERT>{,<CODE>:<HORIZ>:<VERT>}\n'
+              '         Were 0 < HORIZ,VERT < 1.\n'
+              'Example: CUR:0.02:0.98,CMMA:0.9:0.9')
     )
 
     parser.add_argument(

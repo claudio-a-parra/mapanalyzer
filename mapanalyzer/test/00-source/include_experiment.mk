@@ -1,34 +1,33 @@
 # binary arguments
-binary_args = EXAMPLE_ARGUMENTS
-
-algorithm = EXAMPLE_ALGORITHM
-source = main.c
+algorithm ?= EXAMPLE_ALGORITHM
+source ?= main.c
 #ccopts = -g -Og -Wall
-ccopts = -Wall
-cclibs =
-binary = $(algorithm)
+ccopts ?= -Wall
+cclibs ?=
+binary ?= $(algorithm)
+binary_args ?= EXAMPLE_ARGUMENTS
 
 # access pattern filename
-access_pattern = $(algorithm)-VARIANT_EXAMPLE.map
+access_pattern ?= $(algorithm)-VARIANT_EXAMPLE.map
 
 # mapanalyzer options
-MPL_PW = 5
-MPL_PH = 3.5
-MPL_DPI = 300
-MPL_MRES = auto
-MPL_FMT = pdf
-MPL_CACHE = ./cache.conf
+MPL_PW ?= 5
+MPL_PH ?= 3.5
+MPL_DPI ?= 300
+MPL_MRES ?= auto
+MPL_FMT ?= pdf
+MPL_CACHE ?= ./cache.conf
 # include all plots
-MPL_PLOTS = all
+MPL_PLOTS ?= all
 # orientation of X tick labels
-MPL_XTORI = v
+MPL_XTORI ?= v
 # range for X and Y axes
-MPL_XRANGES = full
-MPL_YRANGES = full
+MPL_XRANGES ?= full
+MPL_YRANGES ?= full
 
-EXPORT_DIR = __EXPORT
-DIAG_ODGs := $(wildcard *.odg)
-DIAG_PDFs := $(patsubst %.odg,diagram-%.pdf,$(DIAG_ODGs))
+EXPORT_DIR ?= __EXPORT
+DIAG_ODGs ?= $(wildcard *.odg)
+DIAG_PDFs ?= $(patsubst %.odg,diagram-%.pdf,$(DIAG_ODGs))
 
 define HELP_ABOUT
     What is this experiment about.
@@ -71,7 +70,7 @@ define HELP_TARGETS
     endef
 export HELP_TARGETS
 
-SHELL := /bin/bash
+SHELL ?= /bin/bash
 
 .PHONY: help all export bin map plot diag clean view
 

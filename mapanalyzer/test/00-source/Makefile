@@ -1,4 +1,3 @@
-include include_experiment.mk
 
 # CONVERGENT RANDOM
 # source = conv-rand.c
@@ -9,7 +8,8 @@ include include_experiment.mk
 # access_pattern = $(algorithm)-$(LIST_LEN)-$(SEED).map
 
 # QUICKSORT
-source = quicksort_pthread.c
+source := quicksort_pthread.c
+algorithm := quicksort_pthread
 LIST_LEN = 100
 SEED = 0
 cclibs = -lm -lpthread
@@ -19,7 +19,6 @@ access_pattern = $(algorithm)-$(LIST_LEN)-$(SEED).map
 #-------------------------
 
 
-algorithm = ${source%.c}
 define HELP_ABOUT
 	TESTING
 endef
@@ -29,3 +28,5 @@ define HELP_VARIABLES
 	SEED: ($(SEED)) seed for random number generator.
 endef
 export HELP_VARIABLES
+
+include include_experiment.mk

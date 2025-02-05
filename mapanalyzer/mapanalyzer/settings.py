@@ -825,8 +825,15 @@ class Settings:
 
         x_orient = 'v'
 
-        # line width and palette parameters (line, area_filling)
-        linewidth = 0.25
+        # line widths for simple and aggregated plots. Individual and average
+        # for the curves, or the vertical lines
+        p_lw = 1.25
+        p_aggr_ind_lw = 0.5
+        p_aggr_avg_lw = 1.25
+        p_aggr_ind_vlw = 0.5
+        p_aggr_avg_vlw = 1.25
+
+        # default color values
         p_hue = (0,0)
         p_sat = (50,75)
         p_lig = (60,75)

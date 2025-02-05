@@ -66,6 +66,11 @@ class Palette:
         )
 
     @staticmethod
+    def from_hsla(hsla_tuple):
+        return Palette.__hsl2rgb(hsla_tuple[0], hsla_tuple[1],
+                                 hsla_tuple[2], hsla_tuple[3])
+
+    @staticmethod
     def __hsl2rgb(h, s, l, a):
         try:
             h,s,l = float(h),float(s),float(l)

@@ -1,47 +1,66 @@
-import sys
 from collections import deque
 import matplotlib.pyplot as plt
+from itertools import zip_longest
 
-from mapanalyzer.util import AddrFmt, create_up_to_n_ticks, PlotStrings, save_fig, Palette, hsl2rgb
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import MetricStrings, Palette, PlotFile
+from mapanalyzer.ui import UI
+from .base import BaseModule
 
+class Locality(BaseModule):
+    # Module info
+    name = 'Locality'
+    about = 'Spatial and Temporal Locality Degree.'
+    hue = 325
+    palette = Palette.default(hue)
 
-class Locality:
-    def __init__(self, shared_X=None, hue=325):
-        self.tool_name = 'Locality'
-        self.tool_about = ('Spacial and Temporal Locality Degree.')
-        self.psLs = PlotStrings(
+    supported_metrics = {
+        'SLD' : MetricStrings(
+            about  = ('Spatial Locality Degree.') ,
             title  = 'SLD',
-            code   = 'SLD',
+            subtit = 'higher is better',
+            number = '02',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Spacial Locality Degree',
-            suffix = '_plot-01-locality-Ls',
-            subtit = ''
-        )
-        self.psLt = PlotStrings(
+            ylab   = 'Spatial Locality Degree',
+        ),
+        'TLD' : MetricStrings(
+            about  = ('Temporal Locality Degree.') ,
             title  = 'TLD',
-            code   = 'TLD',
-            xlab   = 'Temporal Locality Degree',
-            ylab   = 'Space [blocks]',
-            suffix = '_plot-02-locality-Lt',
-            subtit = ''
+            subtit = 'higher is better',
+            number = '02',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Temporal Locality Degree',
         )
-        self.enabledLs = self.psLs.code in st.plot.include
-        self.enabledLt = self.psLt.code in st.plot.include
-        self.enabled = self.enabledLs or self.enabledLt
+    }
+    supported_aggr_metrics = {
+        'SLD' : MetricStrings(
+            about  = ('Average Spatial Locality Degree.') ,
+            title  = 'Aggregated SLD',
+            subtit = 'higher is better',
+            number = '02',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Spatial Locality Degree',
+        ),
+        'TLD' : MetricStrings(
+            about  = ('Average Temporal Locality Degree.') ,
+            title  = 'Aggregated TLD',
+            subtit = 'higher is better',
+            number = '02',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Temporal Locality Degree',
+        )
+    }
+
+    def __init__(self):
+        # enable metric if user requested it or if used as background
+        self.enabled = (any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys()) or
+                        st.Metrics.bg in self.supported_metrics)
         if not self.enabled:
             return
 
-        self.X = shared_X if shared_X is not None else \
-            [i for i in range(st.map.time_size)]
-        # line and filling colors
-        self.tool_palette = Palette(hue=hue,
-                                    lightness=st.plot.pal_lig,
-                                    saturation=st.plot.pal_sat,
-                                    alpha=st.plot.pal_alp)
-        self.axes = None
-
-        ## SPATIAL LOCALITY ACROSS TIME
+        #####################################
+        # SPATIAL LOCALITY ACROSS TIME
         # time window chronological access: keeps the temporal order of accesses.
         # (access offset, size)
         self.tw_chro_acc = deque()
@@ -53,13 +72,14 @@ class Locality:
         # Spatial Locality vector
         self.Ls = [0] * st.map.time_size
 
+        #####################################
         ## TEMPORAL LOCALITY ACROSS SPACE
         self.space_by_blocks = {} #block->list of block access times
         self.Lt = [0] * st.map.num_blocks
         return
 
 
-    def add_access(self, time, thread, event, size, addr):
+    def probe(self, time, thread, event, size, addr):
         if not self.enabled:
             return
         ## SPACIAL LOCALITY ACROSS TIME

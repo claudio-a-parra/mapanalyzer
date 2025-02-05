@@ -21,7 +21,7 @@ class MemAccess(BaseModule):
             subtit = 'lower is better',
             number = '03',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache blocks read/written in Main Memory [count]',
+            ylab   = 'Cache Blocks Accessed in Main Memory [count]',
         )
     }
     supported_aggr_metrics = {
@@ -31,14 +31,14 @@ class MemAccess(BaseModule):
             subtit = 'lower is better',
             number = '03',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache blocks read/written in Main Memory [count]',
+            ylab   = 'Cache Blocks Accessed in Main Memory [count]',
         )
     }
     def __init__(self, shared_X=None, hue=180):
         # enable metric if user requested it or if used as background
-        self.enabled = any(m in st.Metrics.enabled
-                           for m in self.supported_metrics.keys())
-        self.enabled = self.enabled or st.Metrics.bg in self.supported_metrics
+        self.enabled = (any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys()) or
+                        st.Metrics.bg in self.supported_metrics)
         if not self.enabled:
             return
 
@@ -103,50 +103,48 @@ class MemAccess(BaseModule):
 
         # create data series
         X = [i for i in range(st.Map.time_size)]
-        #Y_rw = [r+w for r,w in zip(self.read_dist, self.write_dist)]
         Y_r = self.read_dist
         Y_w = self.write_dist
 
-        # create color palette
-        pal = Palette(
-            # two colors (for read and write), starting from self.hue
-            hue = 2, h_off = self.hue,
-            # (line, face)
-            sat = st.Plot.p_sat,
-            lig = st.Plot.p_lig,
-            alp = st.Plot.p_alp)
 
-        # plot read line (above write line)
-        read_line_color = pal[0][0][0][0]
-        read_line_width = 1.25
-        mpl_axes.plot(X, Y_r, zorder=3, color=read_line_color,
-                      linewidth=read_line_width, label='Read Access')
+        #####################################
+        ## CREATE COLOR PALETTE FOR READ AND WRITE
+        # two colors (for read and write), starting from self.hue
+        pal = Palette(hue=2, h_off=self.hue,
+                      # (line, _)
+                      sat=st.Plot.p_sat,
+                      lig=st.Plot.p_lig,
+                      alp=st.Plot.p_alp)
+        read_color = pal[0][0][0][0]
+        write_color = pal[1][0][0][0]
+        line_width = st.Plot.p_lw
 
-        # plot write line (below read line)
-        write_line_color = pal[1][0][0][0]
-        write_line_width = 1.25
-        mpl_axes.plot(X, Y_w, zorder=3, color=write_line_color,
-                      linewidth=write_line_width, label='Write Access')
 
-        # plot horizontal line with the size of the observed memory segment.
+        #####################################
+        ## PLOT READ AND WRITE
+        mpl_axes.plot(X, Y_r, zorder=3, color=read_color,
+                      linewidth=line_width, label='Read Access')
+        mpl_axes.plot(X, Y_w, zorder=3, color=write_color,
+                      linewidth=line_width, label='Write Access')
+
+
+        #####################################
+        ## PLOT MEMORY SEGMENT SIZE
+        # horizontal line with the size of the observed memory segment.
         # This size is in "blocks", as that is what this metric counts.
         mem_size = st.Map.mem_size // st.Cache.line_size
-        pal = Palette(
-            hue = [120],
-            sat = [50],
-            lig = [75],
-            alp = [100])
-        mem_size_color = pal[0][0][0][0]
-        mem_size_line_width = 1.25
+        mem_size_color = Palette.from_hsla((120,50,75,100))
+        mem_size_line_width = st.Plot.p_lw
         mpl_axes.axhline(y=mem_size, color=mem_size_color, zorder=2,
                          linestyle='solid', linewidth=mem_size_line_width,
                          label='Memory Size')
+
 
         ###########################################
         # PLOT VISUALS
         # set plot limits
         X_pad = 0.5
-        Y_max = max(Y_r[-1], Y_w[-1])
+        Y_max = max(max(Y_r), max(Y_w))
         real_xlim, real_ylim = self.setup_limits(
             mpl_axes, metric_code, xlims=(X[0],X[-1]), x_pad=X_pad,
             ylims=(0,Y_max), y_pad='auto')
@@ -162,7 +160,7 @@ class MemAccess(BaseModule):
         if not bg_mode:
             text = (f'Total Read : {self.read_dist[-1]}\n'
                     f'Total Write: {self.write_dist[-1]}')
-            self.draw_textbox(mpl_axes, text, h_off=0.02)
+            self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
@@ -196,13 +194,13 @@ class MemAccess(BaseModule):
             # (individual, average)
             sat = (60, 100),
             lig = (70,  30),
-            alp = (20, 100))
-        read_one_color = pal[0][0][0][0]
+            alp = (10, 100))
+        read_ind_color = pal[0][0][0][0]
         read_avg_color = pal[0][1][1][1]
-        write_one_color = pal[1][0][0][0]
+        write_ind_color = pal[1][0][0][0]
         write_avg_color = pal[1][1][1][1]
-        one_line_width = 0.5
-        avg_line_width = 1.5
+        ind_line_width = st.Plot.p_aggr_ind_lw
+        avg_line_width = st.Plot.p_aggr_avg_lw
 
 
         #####################################
@@ -213,10 +211,10 @@ class MemAccess(BaseModule):
             W = pdata_w
             R = pdata_r
             X = [i for i in range(len(pdata_r))]
-            mpl_axes.plot(X, W, zorder=4, color=write_one_color,
-                          linewidth=one_line_width)
-            mpl_axes.plot(X, R, zorder=4, color=read_one_color,
-                          linewidth=one_line_width)
+            mpl_axes.plot(X, W, zorder=4, color=write_ind_color,
+                          linewidth=ind_line_width)
+            mpl_axes.plot(X, R, zorder=4, color=read_ind_color,
+                          linewidth=ind_line_width)
             R_max = max(R[-1], R_max)
             W_max = max(W[-1], W_max)
             X_max = max(X[-1], X_max)
@@ -257,45 +255,21 @@ class MemAccess(BaseModule):
         all_mem_size_in_blocks = [mz//cl for mz,cl in
                                   zip(all_mem_size,all_line_size)]
         avg_mem_size = sum(all_mem_size_in_blocks)/len(all_mem_size_in_blocks)
-        pal = Palette(
-            hue = [120],
-            sat = [50],
-            lig = [75],
-            alp = [100])
-        mem_size_color = pal[0][0][0][0]
-        mem_size_line_width = 1.5
+        mem_size_color = Palette.from_hsla((120,50,75,100))
+        mem_size_line_width = st.Plot.p_aggr_avg_lw
         mpl_axes.axhline(y=avg_mem_size, color=mem_size_color, zorder=3,
                          linestyle='solid', linewidth=mem_size_line_width,
-                         label='Average Memory Size')
+                         label='Average Memory Block Size')
+        avg_mem_size_text = f'Avg Memory size [blocks]: {avg_mem_size:.0f}'
 
 
         #####################################
         # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
         if st.Plot.aggr_last_x:
-            pal = Palette(
-                # (individual, avg)
-                hue = (0,0),
-                sat = (0, 50),
-                lig = (93, 75),
-                alp = (100,100))
-            one_color = pal[0][0][0][0]
-            one_width = 0.5
-            avg_color = pal[1][1][1][1]
-            avg_width = 1.25
             last_Xs = [len(r)-1 for r in all_read]
             ymax = max(R_max,W_max)*1.2
             ymin = 0 - max(R_max,W_max)*0.2
-            # plot all last-X
-            mpl_axes.vlines(last_Xs, ymin=ymin, ymax=ymax,
-                            colors=one_color, linestyles='solid',
-                            linewidth=one_width, zorder=2)
-
-            # plot avg across all last-X
-            last_X_avg = sum(last_Xs)/len(last_Xs)
-            mpl_axes.vlines([last_X_avg], ymin=ymin, ymax=ymax,
-                            colors=avg_color, linestyles='solid',
-                            linewidth=avg_width, zorder=3)
-            last_X_text = f'Avg Execution duration: {last_X_avg:.0f}'
+            last_X_text = cls.draw_last_Xs(mpl_axes, last_Xs, (ymin,ymax))
 
 
         #####################################
@@ -323,7 +297,7 @@ class MemAccess(BaseModule):
             text.append(last_X_text)
         text.append(f'Max Avg Total Read Access : {max(R_avg):.0f}')
         text.append(f'Max Avg Total Write Access: {max(W_avg):.0f}')
-        text = '\n'.join(text)
+        text.append(avg_mem_size_text)
         cls.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

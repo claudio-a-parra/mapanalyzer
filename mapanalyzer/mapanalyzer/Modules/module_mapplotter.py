@@ -29,9 +29,9 @@ class Map(BaseModule):
 
     def __init__(self, shared_X=None):
         # enable metric if user requested it or if used as background
-        self.enabled = any(m in st.Metrics.enabled
-                           for m in self.supported_metrics.keys())
-        self.enabled = self.enabled or st.Metrics.bg in self.supported_metrics
+        self.enabled = (any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys()) or
+                        st.Metrics.bg in self.supported_metrics)
         if not self.enabled:
             return
 

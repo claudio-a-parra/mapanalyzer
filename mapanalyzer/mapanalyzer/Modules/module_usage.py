@@ -38,9 +38,9 @@ class CacheUsage(BaseModule):
 
     def __init__(self):
         # enable metric if user requested it or if used as background
-        self.enabled = any(m in st.Metrics.enabled
-                           for m in self.supported_metrics.keys())
-        self.enabled = self.enabled or st.Metrics.bg in self.supported_metrics
+        self.enabled = (any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys()) or
+                        st.Metrics.bg in self.supported_metrics)
         if not self.enabled:
             return
 
@@ -88,21 +88,32 @@ class CacheUsage(BaseModule):
         metric_code = 'CUR'
         met_str = self.supported_metrics[metric_code]
 
-        # pad data series
-        X_pad = 0.5
-        X = [self.X[0]-X_pad] + self.X + [self.X[-1]+X_pad]
-        Y = [self.usage_ratio[0]] + self.usage_ratio + [self.usage_ratio[-1]]
+        # create data serieas
+        X = range(len(self.usage_ratio))
+        Y = self.usage_ratio
 
-        # plot the usage ratio
-        mpl_axes.fill_between(
-            X, -1, Y, step='mid', zorder=2,
-            color=self.palette[0][0][0][0],
-            facecolor=self.palette[1][1][1][1],
-            linewidth=st.Plot.linewidth)
+
+        #####################################
+        ## CREATE COLOR PALETTE FOR READ AND WRITE
+        # two colors (for read and write), starting from self.hue
+        pal = Palette(hue=[self.hue],
+                      # (line, _)
+                      sat=st.Plot.p_sat,
+                      lig=st.Plot.p_lig,
+                      alp=st.Plot.p_alp)
+        line_color = pal[0][0][0][0]
+        line_width = st.Plot.p_lw
+
+
+        #####################################
+        ## PLOT USAGE RATIO
+        mpl_axes.plot(X, Y, zorder=2, color=line_color, linewidth=line_width)
+
 
         ###########################################
         # PLOT VISUALS
         # set plot limits
+        X_pad = 0.5
         real_xlim, real_ylim = self.setup_limits(
             mpl_axes, metric_code, xlims=(self.X[0],self.X[-1]), x_pad=X_pad,
             ylims=(0,100), y_pad='auto')
@@ -117,7 +128,7 @@ class CacheUsage(BaseModule):
         # insert text box with average usage
         if not bg_mode:
             text = f'Avg Usage: {sum(self.usage_ratio)/len(self.usage_ratio):.2f}%'
-            self.draw_textbox(mpl_axes, text)
+            self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
@@ -148,20 +159,19 @@ class CacheUsage(BaseModule):
             hue = (cls.hue, cls.hue),
             # (individual, average)
             sat = (60, 100),
-            lig = (70,  20),
+            lig = (70,  30),
             alp = (10, 100))
-        one_color = pal[0][0][0][0]
-        one_width = 0.5
+        ind_color = pal[0][0][0][0]
         avg_color = pal[1][1][1][1]
-        avg_width = 1.5
+        ind_line_width = st.Plot.p_aggr_ind_lw
+        avg_line_width = st.Plot.p_aggr_avg_lw
+
 
         #####################################
         # PLOT INDIVIDUAL METRICS
         for x,y in zip(all_X,all_Y):
-            # mpl_axes.step(x, y, where='mid', zorder=4,
-            #               color=one_color, linewidth=one_width)
-            mpl_axes.plot(x, y, zorder=4,
-                          color=one_color, linewidth=one_width)
+            mpl_axes.plot(x, y, zorder=4, color=ind_color,
+                          linewidth=ind_line_width)
 
 
         #####################################
@@ -177,37 +187,15 @@ class CacheUsage(BaseModule):
             valid_ys = [y for y in ith_ys if y is not None]
             ys_avg = sum(valid_ys) / len(valid_ys)
             Y_avg[x] = ys_avg
-        mpl_axes.plot(super_X, Y_avg, zorder=6,
-                      color=avg_color, linewidth=avg_width)
+        mpl_axes.plot(super_X, Y_avg, zorder=6, color=avg_color,
+                      linewidth=avg_line_width)
 
 
         #####################################
         # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
         if st.Plot.aggr_last_x:
-            pal = Palette(
-                hue = (cls.hue, 0),
-                # (individual, average)
-                sat = (0, 50),
-                lig = (93, 75),
-                alp = (100,100))
-            one_color = pal[0][0][0][0]
-            one_width = 0.5
-            avg_color = pal[1][1][1][1]
-            avg_width = 1.25
             last_Xs = [x[-1] for x in all_X]
-            ymax = 120
-            ymin = -20
-            mpl_axes.vlines(last_Xs, ymin=ymin, ymax=ymax, colors=one_color,
-                            linestyles='solid', linewidth=one_width,
-                            zorder=2)
-
-            # PLOT AVG OF LAST X
-            last_X_avg = sum(last_Xs)/len(last_Xs)
-            mpl_axes.vlines([last_X_avg], ymin=ymin, ymax=ymax, colors=avg_color,
-                            linestyles='solid', linewidth=avg_width,
-                            zorder=3)
-            last_X_text = f'Avg Execution duration: {last_X_avg:.0f}'
-
+            last_X_text = cls.draw_last_Xs(mpl_axes, last_Xs, (-20,120))
 
 
         #####################################
@@ -233,8 +221,7 @@ class CacheUsage(BaseModule):
         text = [f'Executions: {total_pdatas}']
         if st.Plot.aggr_last_x:
             text.append(last_X_text)
-        text.append(rf'Avg$^{2}$ CUR: {sum(Y_avg)/len(Y_avg):.2f}%')
-        text = '\n'.join(text)
+        text.append(rf'Avg2 CUR: {sum(Y_avg)/len(Y_avg):.2f}%')
         cls.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

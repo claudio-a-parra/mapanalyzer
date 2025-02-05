@@ -140,7 +140,8 @@ class UI:
         return
 
     @classmethod
-    def columns(cls, cols, sep='', cols_width='auto', header=False):
+    def columns(cls, cols, sep='', cols_width='auto', cols_align='l',
+                header=False, get_str=False):
         """Print a table with columns. If cols_width is auto, then
         compute each column width, otherwise, use the values given
         in cols_width (array_like, with one integer per column of cols)"""
@@ -157,17 +158,40 @@ class UI:
                 cols_width.append(col_width)
         else:
             if len(cols_width) != len(cols):
-                cls.error(f'UI.columns(): number of columns '
-                          f'({len(cols)}) and number of column-width '
-                          f'values {len(cols_width)} is not the same.')
+                cls.error(f'UI.columns(): cols_width is not \'auto\'. Then, '
+                          f'the number of columns ({len(cols)}) and number of '
+                          f'cols_width values {len(cols_width)} is not the '
+                          'same.')
+
+
+        if cols_align == 'l':
+            cols_align = 'l' * len(cols)
+        elif cols_align == 'r':
+            cols_align = ['r' for _ in cols]
+        else:
+            if len(cols_align) != len(cols):
+                cls.error(f'UI.columns(): cols_align is not \'l\' or \'r\'. '
+                          f'Then, the number of columns ({len(cols)}) and '
+                          f'number of cols_align values {len(cols_align)} '
+                          'is not the same.')
 
         # Create rows
         all_lines = []
         for elems in zip_longest(*cols, fillvalue=''):
-            line_elems = [str(elem).ljust(cols_width[el_wd])
-                          for el_wd,elem in enumerate(elems)]
-            line = sep.join(line_elems)
-            all_lines.append(line)
+            # compose line
+            line_elems = []
+            for i,el in enumerate(elems):
+                if cols_align[i] == 'l':
+                    elem = str(el).ljust(cols_width[i])
+                elif cols_align[i] == 'r':
+                    elem = str(el).rjust(cols_width[i])
+                else:
+                    cls.error('UI.columns(): Unknown value in '
+                              f'cols_align[{i}] = {cols_align[i]}.')
+
+                line_elems.append(elem)
+            line_text = sep.join(line_elems)
+            all_lines.append(line_text)
 
         # do we have headers?
         if header:
@@ -176,5 +200,7 @@ class UI:
         # join lines and print them
         table = '\n'.join(all_lines)
 
-        cls.__color_msg(msg=table)
-        return
+        if not get_str:
+            cls.__color_msg(msg=table)
+
+        return table

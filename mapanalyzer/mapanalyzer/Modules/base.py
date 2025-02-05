@@ -150,7 +150,16 @@ class BaseModule:
                                      ax_bases, ax_mtick):
             mpl_axes.tick_params(axis=ax, rotation=rt, width=wd)
             set_ticks = getattr(mpl_axes, f'set_{ax}ticks')
-            ticks = sample_list(range(lm[0], lm[1]+1), base=bs, n=mt)
+            if type(lm[0]) is float or type(lm[1]) is float:
+                # create a list of floats
+                resolution = 3
+                step = 1/(10**resolution)
+                rdiff = round(lm[1] - lm[0] + step, resolution)
+                list_len = int(rdiff / step)
+                full_list = [i*step for i in range(list_len+1)]
+            else:
+                full_list = range(lm[0], lm[1]+1)
+            ticks = sample_list(full_list, base=bs, n=mt)
             set_ticks(ticks)
 
     @classmethod
@@ -198,6 +207,22 @@ class BaseModule:
             vert_anchor = 'bottom'
         else:
             vert_anchor = 'center'
+
+        # join lines of text
+        if type(text) is str:
+            text = text.split('\n')
+        text_cols = [[], []]
+        for line in text:
+            line_parts = line.split(':')
+            if len(line_parts) != 2:
+                l0,l1 = line.strip(),''
+            else:
+                l0,l1 = line_parts[0].strip(),line_parts[1].strip()
+            text_cols[0].append(l0)
+            text_cols[1].append(l1)
+        text = UI.columns(text_cols, sep='  ', cols_align='lr', get_str=True)
+
+        # draw the text box
         mpl_axes.text(h_off, v_off, text, transform=mpl_axes.transAxes,
                       ha=hor_anchor, va=vert_anchor, zorder=1000,
                       bbox=dict(facecolor=st.Plot.tbox_bg,
@@ -206,6 +231,32 @@ class BaseModule:
                       fontdict=dict(family=st.Plot.tbox_font,
                                     size=st.Plot.tbox_font_size))
         return
+
+    @classmethod
+    def draw_last_Xs(cls, mpl_axes, last_Xs, ylims):
+        pal = Palette(
+            # (individual, avg)
+            hue = (0, 0),
+            sat = (0, 50),
+            lig = (93, 75),
+            alp = (100,100))
+        ind_color = pal[0][0][0][0]
+        avg_color = pal[1][1][1][1]
+        ind_line_width = st.Plot.p_aggr_ind_vlw
+        avg_line_width = st.Plot.p_aggr_avg_vlw
+        ymax = ylims[0]
+        ymin = ylims[1]
+
+        # plot individual last_Xs and average
+        mpl_axes.vlines(last_Xs, ymin=ymin, ymax=ymax, colors=ind_color,
+                        linestyles='solid', linewidth=ind_line_width,
+                        zorder=2)
+        last_X_avg = sum(last_Xs)/len(last_Xs)
+        mpl_axes.vlines([last_X_avg], ymin=ymin, ymax=ymax,
+                        colors=avg_color, linestyles='solid',
+                        linewidth=avg_line_width, zorder=3)
+
+        return f'Avg Exec Duration: {last_X_avg:.0f}'
 
     def export_plot(self, metric_code, mpl_axes, bg_mode=False):
         fn_name = f'{metric_code}_to_plot'

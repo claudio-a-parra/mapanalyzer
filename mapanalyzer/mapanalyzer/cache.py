@@ -112,9 +112,8 @@ class Cache:
             else:
                 this_block_n_bytes = n_bytes
 
-            #!self.modules.locality.add_access(
-            #!    access.time, access.thread, access.event,
-            #!    this_block_n_bytes, addr)
+            #!self.modules.locality.probe(access.time, access.thread,
+            #!                            access.event, this_block_n_bytes, addr)
 
             # access this_block
             writing = (access.event == 'W')

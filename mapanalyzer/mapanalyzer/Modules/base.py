@@ -70,19 +70,22 @@ class BaseModule:
 
     @classmethod
     def setup_grid(cls, mpl_axes, axis='both', fn_axis='y', bg_mode=False):
-        """setup plot grid for main and secondary axes. fn_axis determines
-        which one is the main (dependent variable) axis. axis determines
-        which axis gets to draw a grid"""
+        """setup plot grid for main and secondary axes.
+        fn_axis {x,y}        : determines which one is the main (dependent
+                               variable) axis.
+        axis {both,xy,x,y}   : determines which axis gets to draw a grid.
+        """
         # if bg_mode, don't draw anything.
         if bg_mode:
             mpl_axes.grid(False)
             return
         # sanitize axis parameter
-        if axis == 'both':
+        if axis in ('both', 'xy', 'yx'):
             axis = 'xy'
         elif axis not in 'xy':
             UI.error(f'Module.setup_grid(): Incorrect axis=\'{axis}\' '
                      'parameter value')
+
         ax_names = ('x', 'y')
         # Values associated to either the independent or function axes.
         # If the function axis is X, then reverse axes meanings.
@@ -115,8 +118,8 @@ class BaseModule:
             # obtain ranges for this axis
             ax_ranges = getattr(st.Plot, f'{ax}_ranges')
             if metric_code in ax_ranges:
-                lmin = int(ax_ranges[metric_code][0])
-                lmax = int(ax_ranges[metric_code][1])
+                lmin = ax_ranges[metric_code][0]
+                lmax = ax_ranges[metric_code][1]
 
             # set limits for this axis
             set_lim = getattr(mpl_axes, f'set_{ax}lim')
@@ -156,11 +159,54 @@ class BaseModule:
                 step = 1/(10**resolution)
                 rdiff = round(lm[1] - lm[0] + step, resolution)
                 list_len = int(rdiff / step)
-                full_list = [i*step for i in range(list_len+1)]
+                full_list = [lm[0]+i*step for i in range(list_len+1)]
             else:
                 full_list = range(lm[0], lm[1]+1)
+
             ticks = sample_list(full_list, base=bs, n=mt)
             set_ticks(ticks)
+        return
+
+    @classmethod
+    def setup_manual_grid(cls, mpl_axes, axis='both', hlines=None, xlims=None,
+                            vlines=None, ylims=None, main_axis='y'):
+        if axis == 'both':
+            axis = 'xy'
+        grid_color = '#BFBFBF60' # apparently the default color
+
+        # If plotting vertical lines (across the X axis)
+        if 'x' in axis:
+            if not vlines or not ylims:
+                UI.error(f'Cannot call __setup_manual_grid() with axis=x, and '
+                         'vlines or ylims None.')
+
+            # select 'main' or 'other' style
+            if main_axis == 'x':
+                sty,wid = st.Plot.grid_style[0],st.Plot.grid_width[0]
+            else:
+                sty,wid = st.Plot.grid_style[1],st.Plot.grid_width[1]
+
+            mpl_axes.vlines(x=vlines, ymin=ylims[0], ymax=ylims[1],
+                            color=grid_color, linestyle=sty, linewidth=wid,
+                            zorder=1)
+
+
+        # If plotting horizontal lines (across the Y axis)
+        if 'y' in axis:
+            if not hlines or not xlims:
+                UI.error(f'Cannot call __setup_manual_grid() with axis=y, and '
+                         'hlines or ylims None.')
+
+            # select 'main' or 'other' style
+            if main_axis == 'y':
+                sty,wid = st.Plot.grid_style[0],st.Plot.grid_width[0]
+            else:
+                sty,wid = st.Plot.grid_style[1],st.Plot.grid_width[1]
+
+            mpl_axes.hlines(y=hlines, xmin=xlims[0], xmax=xlims[1],
+                            color=grid_color, linestyle=sty, linewidth=wid,
+                            zorder=1)
+        return
 
     @classmethod
     def setup_general(cls, mpl_axes, bg_color, met_str, bg_mode=False):
@@ -220,7 +266,7 @@ class BaseModule:
                 l0,l1 = line_parts[0].strip(),line_parts[1].strip()
             text_cols[0].append(l0)
             text_cols[1].append(l1)
-        text = UI.columns(text_cols, sep='  ', cols_align='lr', get_str=True)
+        text = UI.columns(text_cols, sep=': ', cols_align='lr', get_str=True)
 
         # draw the text box
         mpl_axes.text(h_off, v_off, text, transform=mpl_axes.transAxes,
@@ -257,6 +303,32 @@ class BaseModule:
                         linewidth=avg_line_width, zorder=3)
 
         return f'Avg Exec Duration: {last_X_avg:.0f}'
+
+    @classmethod
+    def draw_last_Ys(cls, mpl_axes, last_Ys, xlims):
+        pal = Palette(
+            # (individual, avg)
+            hue = (0, 0),
+            sat = (0, 50),
+            lig = (93, 75),
+            alp = (100,100))
+        ind_color = pal[0][0][0][0]
+        avg_color = pal[1][1][1][1]
+        ind_line_width = st.Plot.p_aggr_ind_vlw
+        avg_line_width = st.Plot.p_aggr_avg_vlw
+        xmax = xlims[0]
+        xmin = xlims[1]
+
+        # plot individual last_Ys and average
+        mpl_axes.hlines(last_Ys, xmin=xmin, xmax=xmax, colors=ind_color,
+                        linestyles='solid', linewidth=ind_line_width,
+                        zorder=2)
+        last_Y_avg = sum(last_Ys)/len(last_Ys)
+        mpl_axes.hlines([last_Y_avg], xmin=xmin, xmax=xmax,
+                        colors=avg_color, linestyles='solid',
+                        linewidth=avg_line_width, zorder=3)
+
+        return f'Avg Memory Size [blocks]: {last_Y_avg:.0f}'
 
     def export_plot(self, metric_code, mpl_axes, bg_mode=False):
         fn_name = f'{metric_code}_to_plot'

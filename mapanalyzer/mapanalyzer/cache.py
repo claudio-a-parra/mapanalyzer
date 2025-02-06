@@ -68,8 +68,7 @@ class Cache:
         self.modules = modules
         self.blocks_in_cache = {}
         self.sets = [Set(st.Cache.asso) for _ in range(st.Cache.num_sets)]
-        UI.warning('Commenting modules other than MAP and usage. '
-                   'Marked with "#!".', pre='TODO')
+        UI.warning('Commenting some modules. Marked with "#!".', pre='TODO')
         return
 
     def __accesses(self, concurrent_access):
@@ -112,8 +111,8 @@ class Cache:
             else:
                 this_block_n_bytes = n_bytes
 
-            #!self.modules.locality.probe(access.time, access.thread,
-            #!                            access.event, this_block_n_bytes, addr)
+            self.modules.locality.probe(access.time, access.thread,
+                                        access.event, this_block_n_bytes, addr)
 
             # access this_block
             writing = (access.event == 'W')

@@ -4,6 +4,9 @@ maps_dir=01-maps
 pdata_dir=02-pdata
 plot_dir=03-plots
 aggr_dir=04-aggr
+common_opts=(-pw 8 -ph 8 --dpi 400 --cache cache.conf)
+
+set -e
 
 clean_all(){
     rm -rf ./$maps_dir/*
@@ -49,43 +52,65 @@ create_maps(){
     tree_flag
 }
 
-simulate(){
+mtest(){
+    local mode="$1"
+    shift
     local command_options="$@"
-    # create json files
+
+    # clear whatever byproduct there is in current dir
+    rm -rf ./*.json ./*.png ./*.pdf
+
+    # select the input directory based on the mode
+    if [[ "$mode" = "simulate" || "$mode" == "sim-plot" ]]; then
+        input_data=$maps_dir/'*.map'
+    else
+        input_data=$pdata_dir/'*.json'
+    fi
+
+    # run mapanalyzer
     if ls ./$maps_dir/*.map &>/dev/null; then
-        local command=(mapanalyzer --mode simulate $command_options
-                       -- ./$maps_dir/'*.map')
+        local command=(mapanalyzer --mode $mode $command_options
+                       ${common_opts[@]} -- ./$input_data)
         echo "${command[@]}"
         eval "${command[@]}"
     else
-        echo -e "\n\nTEST.simulate($command_options): MAP files not " \
-            "found in ./$maps_dir/"
+        echo -e "\n\nTEST.mtest(--mode $mode $command_options): MAP files " \
+            "not found in ./$maps_dir/"
         tree_flag
         exit 1
     fi
+    tree_flag
 
     # move json files to a separated folder
-    mkdir -p ./$pdata_dir
-    rm -rf ./$pdata_dir/*
-    if ls ./*.json &>/dev/null; then
-        mv ./*.json ./$pdata_dir/
-    else
-        echo -e "\n\nTEST.simulate($command_options): JSON files not " \
-            "created!"
-        tree_flag
-        exit 1
-    fi
-
-    if [[ "$mode" = "sim-plot" ]]; then
-        # move plot files to a separated folder
-        mkdir -p ./$plot_dir
-        rm -rf ./$plot_dir/*
-        if ls ./*.png &>/dev/null; then
-            mv ./*.png ./$plot_dir/
-        elif ls ./*.pdf &>/dev/null; then
-            mv ./*.pdf ./$plot_dir/
+    if [[ "$mode" = "simulate" || "$mode" = "sim-plot" ]]; then
+        mkdir -p ./$pdata_dir
+        rm -rf ./$pdata_dir/*
+        if ls ./*.json &>/dev/null; then
+            mv ./*.json ./$pdata_dir/
         else
-            echo -e "\n\nTEST.simulate($command_options): PLOT files " \
+            echo -e "\n\nTEST.mtest(--mode $mode $command_options): JSON files not " \
+                "created!"
+            tree_flag
+            exit 1
+        fi
+    fi
+    tree_flag
+
+    # move plot files to a separated folder
+    if [[ "$mode" = "sim-plot" || "$mode" = "plot" || "$mode" = "aggregate" ]]; then
+        fig_dir=$plot_dir
+        if [[ "$mode" = "aggregate" ]]; then
+            fig_dir=$aggr_dir
+        fi
+
+        mkdir -p ./$fig_dir
+        rm -rf ./$fig_dir/*
+        if ls ./*.png &>/dev/null; then
+            mv ./*.png ./$fig_dir/
+        elif ls ./*.pdf &>/dev/null; then
+            mv ./*.pdf ./$fig_dir/
+        else
+            echo -e "\n\nTEST.mtest(--mode $mode $command_options): PLOT files " \
                 "not created!"
             tree_flag
             exit 1
@@ -94,83 +119,12 @@ simulate(){
     tree_flag
 }
 
-plot(){
-    local command_options="$@"
-    # create plots
-    if ls ./$pdata_dir/*.json &>/dev/null; then
-        local command=(mapanalyzer --mode plot $command_options
-                       -- ./$pdata_dir/'*.json')
-        echo "${command[@]}"
-        eval "${command[@]}"
-    else
-        echo -e "\n\nTEST.plot($command_options): JSON files not found in ./$pdata_dir/"
-        tree_flag
-        exit 1
-    fi
-
-    # move plot files to a separated folder
-    mkdir -p ./$plot_dir
-    rm -rf ./$plot_dir/*
-    if ls ./*.png &>/dev/null; then
-        mv ./*.png ./$plot_dir/
-    elif ls ./*.pdf &>/dev/null; then
-        mv ./*.pdf ./$plot_dir/
-    else
-        echo -e "\n\nTEST.plot($command_options): PLOT files not created!"
-        tree_flag
-        exit 1
-    fi
-    tree_flag
-}
-
-aggregate(){
-    local command_options="$@"
-    # aggregate plots
-    if ls ./$pdata_dir/*.json &>/dev/null; then
-        local command=(mapanalyzer --mode aggregate $command_options
-                       ./$pdata_dir/'*.json')
-        echo "${command[@]}"
-        eval "${command[@]}"
-    else
-        echo -e "\n\nTEST.agreggate($command_options): JSON files not found in ./$pdata_dir/"
-        tree_flag
-        exit 1
-    fi
-
-    # move plot files to a separated folder
-    mkdir -p ./$aggr_dir
-    rm -rf ./$aggr_dir/*
-    if ls ./*.png &>/dev/null; then
-        mv ./*.png ./$aggr_dir/
-    elif ls ./*.pdf &>/dev/null; then
-        mv ./*.pdf ./$aggr_dir/
-    else
-        echo -e "\n\nTEST.aggregate($command_options): PLOT files not created!"
-        tree_flag
-        exit 1
-    fi
-    tree_flag
-}
-
 view(){
-    if [[ "$1" = "plot" ]]; then
-        which_dir=$plot_dir
-    elif [[ "$1" = "aggr" ]]; then
-        which_dir=$aggr_dir
-    else
-        echo -e "\n\nTEST.view($1): Unknown option (use 'plot' or 'aggr')"
-        tree_flag
-        exit 1
-    fi
-
-    # view results
-    tree_flag
-    if ls ./$which_dir/*.png; then
-        feh -qrxZ. -B 'black' ./$which_dir &
-    elif ls ./$which_dir/*.pdf; then
-        pdftk ./$which_dir/*.pdf cat output ./$which_dir/__all_plots.pdf
-        evince ./$which_dir/__all_plots.pdf &
-    fi
+    while true; do
+         feh -qrxZ. -B 'black' --on-last-slide hold ./$plot_dir/
+         feh -qrxZ. -B 'black' --on-last-slide hold ./$aggr_dir/
+         sleep 1
+    done
 }
 
 tree_flag(){
@@ -178,11 +132,7 @@ tree_flag(){
 }
 
 clear
-
-#create_maps 3 5000
-#simulate  --metrics CMMA,CUR,CMR --cache cache.conf || exit 1
-plot      --metrics CMMA,CUR,CMR -pw  8 -ph  8 --dpi 400 || exit 1
-aggregate --metrics CMMA,CUR,CMR -pw 8 -ph 8 --dpi 400 || exit 1
-#view plot
-
+#create_maps 3 4000 6000
+mtest sim-plot --metrics MAP,SLD,TLD,CMR,CMMA,CUR
+#mtest aggregate --metrics SLD,TLD,CMR,CMMA,CUR
 echo -e "\n\nTEST: Done"

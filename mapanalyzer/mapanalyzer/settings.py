@@ -417,43 +417,51 @@ class Settings:
                              'which to search for its supported metrics.')
 
                 # add metrics' number, code, and module (instance or class)
-                for sp_met_code,sp_met_str in supp_metrics_dict.items():
+                for sup_met_code,sup_met_str in supp_metrics_dict.items():
                     num_met_mod.append(
-                        (sp_met_str.number, sp_met_code, module)
+                        (sup_met_str.number, sup_met_code, module)
                     )
 
             # sort by metric number and extract key,value for the dictionary
             num_met_mod.sort()
-            _, sp_met_codes, sp_modules = zip(*num_met_mod)
+            _, sup_met_codes, sup_modules = zip(*num_met_mod)
 
             # check that there are no duplicated metric codes
-            if len(sp_met_codes) != len(set(sp_met_codes)):
+            if len(sup_met_codes) != len(set(sup_met_codes)):
                 repeated = ''
                 idx = 0
                 for i,(smc,uniq) in enumerate(
-                        zip_longest(sp_met_codes, set(sp_met_codes))):
+                        zip_longest(sup_met_codes, set(sup_met_codes))):
                     if smc != uniq:
                         repeated = smc
                         idx = i
                         break
-                sp_module = sp_modules[idx]
-                sp_module_other = sp_modules[idx-1]
-                if type(sp_module) == type(type):
-                    sp_module_name = sp_module.__name__
-                    sp_module_name_other = sp_module_other.__name__
+                sup_module = sup_modules[idx]
+                sup_module_other = sup_modules[idx-1]
+                if type(sup_module) == type(type):
+                    sup_module_name = sup_module.__name__
+                    sup_module_name_other = sup_module_other.__name__
                 else:
-                    sp_module_name = sp_module.__class__.__name__
-                    sp_module_name_other = sp_module_other.__class__.__name__
+                    sup_module_name = sup_module.__class__.__name__
+                    sup_module_name_other = sup_module_other.__class__.__name__
                 UI.error(
                     f'The metric code "{repeated}" is not unique across all '
                     'modules.\n'
-                    f'  {sp_module_name}.{supp_metrics_name}[\'{repeated}\']\n'
-                    f'  {sp_module_name_other}.{supp_metrics_name}'
+                    f'  {sup_module_name}.{supp_metrics_name}[\'{repeated}\']\n'
+                    f'  {sup_module_name_other}.{supp_metrics_name}'
                     f'[\'{repeated}\']')
 
             # create the {code -> module} dictionary
             cls.available = {met:mod
-                             for met,mod in zip(sp_met_codes, sp_modules)}
+                             for met,mod in zip(sup_met_codes, sup_modules)}
+
+            # given that we are here already, let's sort cls.enabled too
+            sorted_enabled = []
+            for sup_met in sup_met_codes:
+                if sup_met in cls.enabled:
+                    sorted_enabled.append(sup_met)
+            cls.enabled = sorted_enabled
+
             return
 
         @classmethod
@@ -818,7 +826,7 @@ class Settings:
         img_title_vpad = 6 # padding between the plot and its title
 
         # Ticks (independent_variable, function_variable)
-        ticks_max_count = (30,33) #(11, 11)
+        ticks_max_count = (30,30) #(11, 11)
         max_xtick_count = 11
         max_ytick_count = 11
         max_map_ytick_count = 11
@@ -929,8 +937,14 @@ class Settings:
                 for ran in user_ranges:
                     try:
                         met_code, min_val, max_val = ran.split(':')
-                        min_val = float(min_val)
-                        max_val = float(max_val)
+                        if '.' in min_val:
+                            min_val = float(min_val)
+                        else:
+                            min_val = int(min_val)
+                        if '.' in max_val:
+                            max_val = float(max_val)
+                        else:
+                            max_val = int(max_val)
                     except ValueError:
                         UI.error(f'Plot Range with wrong format "{ran}".')
                     if min_val >= max_val:

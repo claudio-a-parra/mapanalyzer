@@ -21,7 +21,7 @@ def simulate_mode(args):
 
     # Run one simulation/export per map file given
     for map_pth in map_paths:
-        UI.indent_in(f'SIMULATING MEMORY ACCESS PATTERN ({map_pth})')
+        UI.indent_in(f'RE-TRACING MEMORY ACCESS PATTERN ({map_pth})')
 
         # init map settings
         UI.indent_in(title=f'MAP SETTINGS')

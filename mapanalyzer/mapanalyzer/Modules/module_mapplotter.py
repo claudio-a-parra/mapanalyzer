@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-import sys
 from matplotlib.colors import ListedColormap # for axes.imshow() color map
 from itertools import combinations # for resolution finding
 from math import prod # for resolution finding
@@ -126,7 +124,8 @@ class Map(BaseModule):
 
 
         #####################################
-        # CREATE PALETTE BASED ON R/W ACCESS AND THREAD ID
+        ## CREATE COLOR PALETTE
+        # based on read or write access, and the thread id
         #  -X : thread (X-1) read
         #   X : thread (X-1) write
         #   0 : no operation.
@@ -148,6 +147,8 @@ class Map(BaseModule):
         color_map = ListedColormap(color_list)
 
 
+        #####################################
+        ## PLOT METRIC
         # define and pad the extent of the image
         X_pad = 0.5
         Y_pad = 0.5
@@ -156,13 +157,15 @@ class Map(BaseModule):
         # (left, right, bottom, top)
         extent = (xlims[0]-X_pad, xlims[1]+X_pad,
                   ylims[0]-Y_pad, ylims[1]+Y_pad)
-
         # draw the MAP
         mpl_axes.imshow(self.space_time, cmap=color_map, origin='lower',
                         interpolation='none',
                         aspect='auto', zorder=2, extent=extent,
                         vmin=-max(self.threads)-1, vmax=max(self.threads)+1)
 
+
+        ###########################################
+        ## PLOT VISUALS
         # set plot limits
         real_xlim, real_ylim = self.setup_limits(
             mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
@@ -177,18 +180,23 @@ class Map(BaseModule):
         )
 
         # set grid of bytes and blocks (not mpl grids)
-        self.setup_grid(mpl_axes, bg_mode=bg_mode)
+        if (st.Map.num_padded_bytes < st.Plot.grid_max_bytes or
+            st.Map.num_blocks < st.Plot.grid_max_blocks):
+            self.__setup_MAP_grid(mpl_axes, bg_mode=bg_mode)
+        else:
+            self.setup_grid(mpl_axes)
 
         # fade bytes used just for block-padding
         self.__fade_padding_bytes(mpl_axes)
+
         # set labels
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
         # title and bg color
-        self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
+        self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
         return
 
-    def setup_grid(self, mpl_axes, draw_x='auto', draw_y='auto',
+    def __setup_MAP_grid(self, mpl_axes, draw_x='auto', draw_y='auto',
                    byte_sep='auto', bg_mode=False):
         if bg_mode:
             mpl_axes.grid(False)

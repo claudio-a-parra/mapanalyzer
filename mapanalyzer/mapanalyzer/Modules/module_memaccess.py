@@ -7,7 +7,6 @@ from mapanalyzer.ui import UI
 from .base import BaseModule
 
 class MemAccess(BaseModule):
-    # Module info
     name = 'Main Mem. Access'
     about = 'Cumulative distribution of main memory read/write operations'
     hue = 180
@@ -34,6 +33,7 @@ class MemAccess(BaseModule):
             ylab   = 'Cache Blocks Accessed in Main Memory [count]',
         )
     }
+
     def __init__(self, shared_X=None, hue=180):
         # enable metric if user requested it or if used as background
         self.enabled = (any(m in st.Metrics.enabled
@@ -108,7 +108,7 @@ class MemAccess(BaseModule):
 
 
         #####################################
-        ## CREATE COLOR PALETTE FOR READ AND WRITE
+        ## CREATE COLOR PALETTE
         # two colors (for read and write), starting from self.hue
         pal = Palette(hue=2, h_off=self.hue,
                       # (line, _)
@@ -121,7 +121,8 @@ class MemAccess(BaseModule):
 
 
         #####################################
-        ## PLOT READ AND WRITE
+        ## PLOT METRIC
+        # plot read and write
         mpl_axes.plot(X, Y_r, zorder=3, color=read_color,
                       linewidth=line_width, label='Read Access')
         mpl_axes.plot(X, Y_w, zorder=3, color=write_color,
@@ -141,7 +142,7 @@ class MemAccess(BaseModule):
 
 
         ###########################################
-        # PLOT VISUALS
+        ## PLOT VISUALS
         # set plot limits
         X_pad = 0.5
         Y_max = max(max(Y_r), max(Y_w))
@@ -166,7 +167,7 @@ class MemAccess(BaseModule):
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
         # title and bg color
-        self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
+        self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
         return
 
     @classmethod
@@ -275,17 +276,16 @@ class MemAccess(BaseModule):
         #####################################
         # SETUP PLOT VISUALS
         # set plot limits
-        X_pad = 0.5
+        X_pad,Y_pad = 0.5,'auto'
+        xlims = (X_min,X_max)
+        ylims = (0,max(R_max, W_max))
         real_xlim, real_ylim = cls.setup_limits(
-            mpl_axes, metric_code, xlims=(X_min,X_max), x_pad=X_pad,
-            ylims=(0,max(R_max, W_max)), y_pad='auto'
-        )
+            mpl_axes, metric_code, xlims=xlims, x_pad=X_pad, ylims=ylims,
+            y_pad=Y_pad)
 
         # set ticks based on the real limits
-        cls.setup_ticks(
-            mpl_axes, xlims=real_xlim, ylims=real_ylim,
-            bases=(10, 10)
-        )
+        cls.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
+                        bases=(10, 10))
 
         # set grid
         axis = 'y' if st.Plot.aggr_last_x else 'xy'
@@ -304,7 +304,7 @@ class MemAccess(BaseModule):
         cls.setup_labels(mpl_axes, met_str)
 
         # title and bg color
-        cls.setup_general(mpl_axes, cls.palette.bg, met_str)
+        cls.setup_general(mpl_axes, pal.bg, met_str)
 
         PlotFile.save(fig, metric_code, aggr=True)
         return

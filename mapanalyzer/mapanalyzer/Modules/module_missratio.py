@@ -1,6 +1,6 @@
-from collections import deque
 import matplotlib.pyplot as plt
 from itertools import zip_longest
+from collections import deque
 
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import MetricStrings, Palette, PlotFile
@@ -45,7 +45,6 @@ class ThreadMissRatio:
         return ret_str
 
 class MissRatio(BaseModule):
-    # Module info
     name = 'Cache Miss Ratio'
     about = 'Thread-wise Cache Miss Ratio on the last memory accesses.'
     hue = 45
@@ -146,7 +145,8 @@ class MissRatio(BaseModule):
 
 
         #####################################
-        # CREATE PALETTE FOR THREADS {thr -> color}
+        ## CREATE COLOR PALETTE
+        # each thread has its color {thr -> color}
         thread_to_color = {thr:'' for thr in self.thread_miss_ratio.keys()}
         pal = Palette(
             hue = len(thread_to_color), h_off=self.hue,
@@ -159,7 +159,8 @@ class MissRatio(BaseModule):
 
 
         #####################################
-        # PLOT EACH THREAD'S MISS RATIO
+        ## PLOT METRIC
+        # each thread's miss ratio
         for thr,thr_mr in self.thread_miss_ratio.items():
             Y = thr_mr.miss_ratio
             X = range(len(Y))
@@ -169,7 +170,7 @@ class MissRatio(BaseModule):
 
 
         ###########################################
-        # PLOT VISUALS
+        ## PLOT VISUALS
         # set plot limits
         X_pad = 0.5
         X_min = 0
@@ -199,7 +200,8 @@ class MissRatio(BaseModule):
                 for thr,thr_mr_obj in self.thread_miss_ratio.items():
                     thr_mr = thr_mr_obj.miss_ratio
                     avg = sum(thr_mr)/len(thr_mr)
-                    text += f'Avg t{str(thr).ljust(thr_str_len)} CMR: {avg:.2f}%\n'
+                    text += (f'Avg t{str(thr).ljust(thr_str_len)} '
+                             f'{metric_code}: {avg:.2f}%\n')
                 text = text[:-1]
             self.draw_textbox(mpl_axes, text, metric_code)
 
@@ -207,9 +209,8 @@ class MissRatio(BaseModule):
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
         # title and bg color
-        self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
+        self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
         return
-
 
     @classmethod
     def CMR_to_aggregated_plot(cls, pdata_dicts):
@@ -337,7 +338,7 @@ class MissRatio(BaseModule):
         cls.setup_labels(mpl_axes, met_str)
 
         # title and bg color
-        cls.setup_general(mpl_axes, cls.palette.bg, met_str)
+        cls.setup_general(mpl_axes, pal.bg, met_str)
 
         PlotFile.save(fig, metric_code, aggr=True)
         return

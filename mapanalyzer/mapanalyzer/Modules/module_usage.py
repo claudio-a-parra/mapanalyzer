@@ -7,7 +7,6 @@ from mapanalyzer.ui import UI
 from .base import BaseModule
 
 class CacheUsage(BaseModule):
-    # Module info
     name = 'Cache Usage Ratio'
     about = 'Percentage of valid bytes in cache that are used before eviction'
     hue = 120
@@ -45,10 +44,9 @@ class CacheUsage(BaseModule):
             return
 
         # METRIC INTERNAL VARIABLES
-        self.X = [i for i in range(st.Map.time_size)]
         self.accessed_bytes = 0
         self.valid_bytes = 0
-        self.usage_ratio = [-1] * len(self.X)
+        self.usage_ratio = [-1] * st.Map.time_size
         return
 
     def probe(self, delta_access=0, delta_valid=0):
@@ -71,13 +69,11 @@ class CacheUsage(BaseModule):
     def CUR_to_dict(self):
         return {
             'code' : 'CUR',
-            'x' : self.X,
             'usage_ratio' : self.usage_ratio
         }
 
     def dict_to_CUR(self, data):
         try:
-            self.X = data['x']
             self.usage_ratio = data['usage_ratio']
         except:
             class_name = self.__class__.__name__
@@ -94,8 +90,7 @@ class CacheUsage(BaseModule):
 
 
         #####################################
-        ## CREATE COLOR PALETTE FOR READ AND WRITE
-        # two colors (for read and write), starting from self.hue
+        ## CREATE COLOR PALETTE
         pal = Palette(hue=[self.hue],
                       # (line, _)
                       sat=st.Plot.p_sat,
@@ -106,16 +101,16 @@ class CacheUsage(BaseModule):
 
 
         #####################################
-        ## PLOT USAGE RATIO
+        ## PLOT METRIC
         mpl_axes.plot(X, Y, zorder=2, color=line_color, linewidth=line_width)
 
 
         ###########################################
-        # PLOT VISUALS
+        ## PLOT VISUALS
         # set plot limits
         X_pad = 0.5
         real_xlim, real_ylim = self.setup_limits(
-            mpl_axes, metric_code, xlims=(self.X[0],self.X[-1]), x_pad=X_pad,
+            mpl_axes, metric_code, xlims=(X[0],X[-1]), x_pad=X_pad,
             ylims=(0,100), y_pad='auto')
 
         # set ticks based on the real limits
@@ -134,9 +129,8 @@ class CacheUsage(BaseModule):
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
         # title and bg color
-        self.setup_general(mpl_axes, self.palette.bg, met_str, bg_mode=bg_mode)
+        self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
         return
-
 
     @classmethod
     def CUR_to_aggregated_plot(cls, pdata_dicts):
@@ -148,7 +142,6 @@ class CacheUsage(BaseModule):
 
         # extract data from dictionaries and create figure
         total_pdatas = len(pdata_dicts)
-        all_X = [m['fg']['x'] for m in pdata_dicts]
         all_Y = [m['fg']['usage_ratio'] for m in pdata_dicts]
         fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
@@ -169,16 +162,21 @@ class CacheUsage(BaseModule):
 
         #####################################
         # PLOT INDIVIDUAL METRICS
-        for x,y in zip(all_X,all_Y):
-            mpl_axes.plot(x, y, zorder=4, color=ind_color,
+        # also collect the last Xs
+        last_Xs = []
+        for pdata_Y in all_Y:
+            X = range(len(pdata_Y))
+            last_Xs.append(len(pdata_Y)-1)
+            Y = pdata_Y
+            mpl_axes.plot(X, Y, zorder=4, color=ind_color,
                           linewidth=ind_line_width)
 
 
         #####################################
         # PLOT MOVING AVERAGE OF METRICS
         # find range large enough to fit all plots
-        X_min = min(m[0] for m in all_X)
-        X_max = max(m[-1] for m in all_X)
+        X_min = 0
+        X_max = max(last_Xs)
         super_X = list(range(X_min, X_max+1))
 
         all_ith_ys_list = list(zip_longest(*all_Y, fillvalue=None))
@@ -194,7 +192,6 @@ class CacheUsage(BaseModule):
         #####################################
         # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
         if st.Plot.aggr_last_x:
-            last_Xs = [x[-1] for x in all_X]
             last_X_text = cls.draw_last_Xs(mpl_axes, last_Xs, (-20,120))
 
 
@@ -221,14 +218,14 @@ class CacheUsage(BaseModule):
         text = [f'Executions: {total_pdatas}']
         if st.Plot.aggr_last_x:
             text.append(last_X_text)
-        text.append(rf'Avg2 CUR: {sum(Y_avg)/len(Y_avg):.2f}%')
+        text.append(rf'Avg2 {metric_code}: {sum(Y_avg)/len(Y_avg):.2f}%')
         cls.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels
         cls.setup_labels(mpl_axes, met_str)
 
         # title and bg color
-        cls.setup_general(mpl_axes, cls.palette.bg, met_str)
+        cls.setup_general(mpl_axes, pal.bg, met_str)
 
         PlotFile.save(fig, metric_code, aggr=True)
         return

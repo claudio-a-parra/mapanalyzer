@@ -6,7 +6,7 @@ from mapanalyzer.util import MetricStrings, PdataFile, PlotFile
 from mapanalyzer.ui import UI
 
 from .module_mapplotter import Map
-#!from .module_locality import Locality
+from .module_locality import Locality
 from .module_missratio import MissRatio
 from .module_memaccess import MemAccess
 from .module_usage import CacheUsage
@@ -18,7 +18,7 @@ class Manager:
     # list of available classes
     available_module_classes = [
         Map,
-        #!Locality,
+        Locality,
         MissRatio,
         MemAccess,
         CacheUsage,
@@ -29,14 +29,21 @@ class Manager:
     def __init__(self):
         # List of available modules
         self.map = Map()
+        self.locality = Locality()
         self.missratio = MissRatio()
         self.memaccess = MemAccess()
         self.usage = CacheUsage()
+        #!self.aliasing = Aliasing()
+        #!self.evictdur = EvictDuration()
+
         self.available_module_instances = [
             self.map,
+            self.locality,
             self.missratio,
             self.memaccess,
-            self.usage
+            self.usage,
+            #!self.aliasing,
+            #!self.evictdur
         ]
 
         # inform st.Metrics about the available modules

@@ -7,15 +7,11 @@ from mapanalyzer.ui import UI
 from .base import BaseModule
 
 class MemAccess(BaseModule):
-    name = 'Main Mem. Access'
-    about = 'Cumulative distribution of main memory read/write operations'
     hue = 180
-    palette = Palette.default(hue)
-
     supported_metrics = {
         'CMMA' : MetricStrings(
             about  = ('Cumulative distribution of main memory read/write '
-                      'operations'),
+                      'operations.'),
             title  = 'CMMA',
             subtit = 'lower is better',
             number = '03',
@@ -155,7 +151,7 @@ class MemAccess(BaseModule):
                          bases=(10, 10), bg_mode=bg_mode)
 
         # set grid
-        self.setup_grid(mpl_axes, fn_axis='y')
+        self.setup_grid(mpl_axes, fn_axis='y', bg_mode=bg_mode)
 
         # insert text box with total read/write count
         if not bg_mode:

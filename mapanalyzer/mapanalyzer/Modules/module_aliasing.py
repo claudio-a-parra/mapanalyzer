@@ -1,157 +1,391 @@
-import sys
+from collections import deque
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors # to create shades of colors from list
-from collections import deque
 
-from mapanalyzer.util import create_up_to_n_ticks, PlotStrings, save_fig, Palette
 from mapanalyzer.settings import Settings as st
+from mapanalyzer.util import MetricStrings, Palette, PlotFile
+from mapanalyzer.ui import UI
+from .base import BaseModule
 
-class Aliasing:
-    def __init__(self, shared_X=None, hue=220):
-        self.tool_name = 'Cache Aliasing'
-        self.tool_about = ('Proportion in which each set fetches blocks during execution.')
-        self.ps = PlotStrings(
-            title  = 'AD',
-            code   = 'AD',
+class Aliasing(BaseModule):
+    hue = 220
+    supported_metrics = {
+        'AD' : MetricStrings(
+            about  = ('Proportion in which each set fetches blocks during '
+                      'execution.') ,
+            title  = 'Aliasing Density',
+            subtit = 'transparent is better',
+            number = '05',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Sets',
-            suffix = '_plot-06-aliasing',
-            subtit = 'transparent is better'
         )
-        self.enabled = self.ps.code in st.plot.include
+    }
+    supported_aggr_metrics = {
+        'AD' : MetricStrings(
+            about  = ('Average proportion in which each set fetches blocks '
+                      'during execution.') ,
+            title  = 'Aggregated AD',
+            subtit = 'transparent is better',
+            number = '05',
+            xlab   = 'Time [access instr.]',
+            ylab   = 'Cache Sets',
+        )
+    }
+
+    def __init__(self):
+        # enable metric if user requested it or if used as background
+        self.enabled = (any(m in st.Metrics.enabled
+                           for m in self.supported_metrics.keys()) or
+                        st.Metrics.bg in self.supported_metrics)
         if not self.enabled:
             return
-        self.X = shared_X if shared_X is not None else \
-            [i for i in range(st.map.time_size)]
 
-        self.hue = hue
-
+        # METRIC INTERNAL VARIABLES
+        # window of last fetches
         self.time_window = deque()
-        self.time_window_max_size = st.cache.asso * st.cache.num_sets
-        self.set_counters = [0] * st.cache.num_sets
-        self.aliasing = [[0] * len(self.X) for _ in range(st.cache.num_sets)]
-
+        self.time_window_max_size = st.Cache.asso * st.Cache.num_sets
+        self.sets_counters = [0] * st.Cache.num_sets
+        self.sets_aliasing = [[0] * st.Map.time_size
+                             for _ in range(st.Cache.num_sets)]
         return
 
-    def fetch(self, set_index, access_time):
+    def probe(self, set_index, access_time):
+        """Update the Set counters"""
         if not self.enabled:
             return
-        """Update the Set counters"""
+
         # append access to queue
         self.time_window.append((set_index,access_time))
-        self.set_counters[set_index] += 1
+        self.sets_counters[set_index] += 1
 
         # trim queue to fit max_size
         while len(self.time_window) > self.time_window_max_size:
             old_set_idx,_ = self.time_window.popleft()
-            self.set_counters[old_set_idx] -= 1
+            self.sets_counters[old_set_idx] -= 1
         return
 
     def commit(self, time):
         if not self.enabled:
             return
+
+        # if the difference between the "most busy" and the "least busy" set
+        # is just one fetch, this is not proof of imbalance, we may be doing
+        # a perfect round robin. So, only account for aliasing when the
+        # difference is at least 2.
+        if max(self.sets_counters) - min(self.sets_counters) < 2:
+            return
+
         curr_time = self.time_window[-1][1]
-        tot_fetch = sum(self.set_counters)
-        for i in range(st.cache.num_sets):
-            self.aliasing[i][curr_time] = self.set_counters[i] / tot_fetch
+        tot_fetch = sum(self.sets_counters)
+        for s in range(st.Cache.num_sets):
+            self.sets_aliasing[s][curr_time] = self.sets_counters[s] / tot_fetch
         return
 
-    def describe(self, ind=''):
-        if not self.enabled:
-            return
-        print(f'{ind}{self.tool_name:{st.plot.ui_toolname_hpad}}: {self.tool_about}')
+    def finalize(self):
+        # no post-simulation computation to be done
         return
 
-    def plot(self, bottom_tool=None):
-        if not self.enabled:
-            return
+    def AD_to_dict(self):
+        return {
+            'code' : 'AD',
+            'set_aliasing' : self.sets_aliasing
+        }
 
-        # create two set of axes: for the map (bottom) and the tool
-        fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-        bottom_axes.set_xticks([])
-        bottom_axes.set_yticks([])
-        self.axes = fig.add_axes(bottom_axes.get_position())
+    def dict_to_AD(self, data):
+        try:
+            self.sets_aliasing = data['set_aliasing']
+        except:
+            class_name = self.__class__.__name__
+            UI.error(f'{class_name}.dict_to_AD(): Malformed data.')
 
-        self.tool_palette = Palette(hue=self.hue,
-                                    hue_count=st.cache.num_sets,
-                                    lightness=st.plot.pal_lig,
-                                    saturation=st.plot.pal_sat,
-                                    alpha=st.plot.pal_alp)
-
-        padding = 0.5
-        for s in range(st.cache.num_sets):
-            # create color shade from 0 -> transparent to 1 -> solid
-            colors = ['#FFFFFF00', self.tool_palette[s][0]]
-            shade_cmap = mcolors.LinearSegmentedColormap.from_list(
-                'transparency_cmap', colors)
-
-            # set image extent, and draw aliasing for only one set
-            ext = (self.X[0]-padding, self.X[-1]+padding, s-padding, s+padding)
-            this_set_aliasing = [self.aliasing[s]]
-            self.axes.imshow(this_set_aliasing, cmap=shade_cmap, origin='lower',
-                             interpolation='none', aspect='auto', extent=ext,
-                             zorder=1, vmin=0, vmax=1)
-
-        # set plot's limits
-        self.axes.set_xlim(self.X[0]-padding, self.X[-1]+padding)
-        self.axes.set_ylim(0-padding, st.cache.num_sets-padding)
-
-        # finish plot setup
-        self.plot_setup_general()
-        self.plot_setup_X()
-        self.plot_setup_Y()
-
-        # save image
-        save_fig(fig, self.ps.code, self.ps.suffix)
         return
 
-    def plot_setup_Y(self):
-        #self.axes.spines['left'].set_edgecolor(self.tool_palette.fg)
-        self.axes.set_ylabel(self.ps.ylab)
-        self.axes.tick_params(axis='y',
-                              left=True, labelleft=True,
-                              right=False, labelright=False,
-                              width=st.plot.grid_main_width)
-        y_ticks = create_up_to_n_ticks(range(st.cache.num_sets), base=10,
-                                       n=st.plot.max_ytick_count)
-        self.axes.set_yticks(y_ticks)
 
-        # direction
-        self.axes.invert_yaxis()
+    def AD_to_plot(self, mpl_axes, bg_mode=False):
+        metric_code = 'AD'
+        met_str = self.supported_metrics[metric_code]
 
-        # grid
-        self.plot_draw_Y_grid()
+        # create data series
+        X = range(st.Map.time_size)
+        Y = self.sets_aliasing
+
+
+        #####################################
+        ## CREATE COLOR PALETTE
+        pal = Palette(hue=(self.hue,),
+                      sat=st.Plot.p_sat,
+                      lig=st.Plot.p_lig,
+                      alp=(0,100))
+        line_width = st.Plot.p_lw
+        shade_cmap = mcolors.LinearSegmentedColormap.from_list(
+            'transparency_cmap', (pal[0][0][0][0],pal[0][0][0][1]))
+
+
+        #####################################
+        ## PLOT METRIC
+        # for each set, plot a "band" with its colored shades
+        X_pad,Y_pad = 0.5,0.5
+        for s in range(st.Cache.num_sets):
+            # define the extension of this set's band:
+            # - all horizontal (time) span.
+            # - just one unit in the vertical (sets) span.
+            set_ext = (0-X_pad, st.Map.time_size-1+X_pad,
+                       s-Y_pad, s+Y_pad)
+            set_ali = [self.sets_aliasing[s]]
+            mpl_axes.imshow(set_ali, cmap=shade_cmap, origin='lower',
+                            interpolation='none', aspect='auto',
+                            extent=set_ext, zorder=1, vmin=0, vmax=1)
+
+
+        ###########################################
+        ## OBTAIN AVERAGE LOAD IMBALANCE
+        imbal = [0] * st.Map.time_size
+        i = 0
+        for ith_dist in zip(*self.sets_aliasing):
+            if sum(ith_dist) > 0.001: # anything above 0 should do it
+                imbal[i] = max(ith_dist) - min(ith_dist)
+                i += 1
+        imbal = imbal[:i]
+        if i > 0:
+            imbal_avg = 100*sum(imbal)/len(imbal)
+        else:
+            imbal_avg = 0
+        imbal_txt = f'Average load imbalance: {imbal_avg:.2f}%'
+
+
+        ###########################################
+        ## PLOT VISUALS
+        # set plot limits
+        xlims = (0, st.Map.time_size-1)
+        ylims = (0, st.Cache.num_sets-1)
+        real_xlim, real_ylim = self.setup_limits(
+            mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
+            ylims=ylims, y_pad=Y_pad, invert_y=True
+        )
+
+        # set ticks based on the real limits
+        self.setup_ticks(
+            mpl_axes, xlims=real_xlim, ylims=real_ylim,
+            bases=(10, 2), # y-axis powers of two
+            bg_mode=bg_mode
+        )
+
+        # set grid of bytes and blocks (not mpl grids)
+        if st.Cache.num_sets < st.Plot.grid_max_sets and not bg_mode:
+            sets_separators = [s+0.5 for s in range(st.Cache.num_sets-1)]
+            self.setup_manual_grid(mpl_axes, axis='y', fn_axis='y',
+                                   hlines=sets_separators,
+                                   xlims=(xlims[0]-X_pad,xlims[1]+X_pad),
+                                   grid_color='#40BF40CC', zorder=10)
+        else:
+            self.setup_grid(mpl_axes, bg_mode=bg_mode)
+
+        # insert text box with average load imbalance
+        if not bg_mode:
+            self.draw_textbox(mpl_axes, imbal_txt, metric_code)
+
+        # set labels
+        self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
+
+        # title and bg color
+        self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
         return
 
-    def plot_setup_X(self):
-        # X axis label, ticks and grid
-        self.axes.set_xlabel(self.ps.xlab)
-        rot = -90 if st.plot.x_orient == 'v' else 0
-        self.axes.tick_params(axis='x',
-                              bottom=True, labelbottom=True,
-                              top=False, labeltop=False,
-                              rotation=rot, width=st.plot.grid_other_width)
-        x_ticks = create_up_to_n_ticks(self.X, base=10,
-                                       n=st.plot.max_xtick_count)
-        self.axes.set_xticks(x_ticks)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    @classmethod
+    def AD_to_aggregated_plot(cls, pdata_dicts):
+        """Given a list of pdata dictionaries, aggregate their
+        values in a meaningful manner"""
+        # metric info
+        metric_code = pdata_dicts[0]['fg']['code']
+        met_str = cls.supported_aggr_metrics[metric_code]
+
+        # extract data from dictionaries and create figure
+        total_pdatas = len(pdata_dicts)
+        all_pdatas = [pd['fg']['set_aliasing'] for pd in pdata_dicts]
+        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        print(f'all_pdatas:')
+        for pdata in all_pdatas:
+            print(pdata)
+            print()
+
+
+        print()
+        print()
+
+        # make sure all pdatas have the same number of sets:
+        all_num_sets = [0] * total_pdatas
+        for i, s_ali in enumerate(all_pdatas):
+            all_num_sets[i] = len(s_ali)
+        all_num_sets = set(all_num_sets)
+        if len(all_num_sets) > 1:
+            UI.error(f'Aliasing.AD_to_aggregated_plot(): Attempting to '
+                     'aggregate aliasing pdata files with different number '
+                     f'of sets ({str(all_num_sets)} number of sets).')
+        print(f'all_num_sets: {all_num_sets}')
+        num_sets = all_num_sets.pop()
+        print(f'num_sets: {num_sets}')
+
+        #####################################
+        # CREATE COLOR PALETTE
+        pal = Palette(hue=(cls.hue,),
+                      sat = st.Plot.p_sat,
+                      lig = st.Plot.p_lig,
+                      alp = (0, 100))
+        line_width = st.Plot.p_lw
+        shade_cmap = mcolors.LinearSegmentedColormap.from_list(
+            'transparency_cmap', (pal[0][0][0][0],pal[0][0][0][1]))
+
+
+        #####################################
+        # CREATE DATA SERIES
+        # first, find the last Xs across all pdatas
+        last_Xs = [len(pdata_Y[0])-1 for pdata_Y in all_pdatas]
+        print(f'last_Xs: {last_Xs}')
+
+        # create an X big enough to fit all pdatas.
+        X_min = 0
+        X_max = max(last_Xs)
+        super_X = list(range(X_min, X_max+1))
+        print(f'super_X: {super_X}')
+
+        # create a Y big enough to fit all pdatas. This Y has S lists, one for
+        # each set.
+        super_Y = [[0] * len(super_X) for s in range(num_sets)]
+        print(f'super_Y: {super_Y}')
+
+        print(f'len(super_Y[0]): {len(super_Y[0])}')
+
+        """
+        # first you sort across sets, so set 0 is the lightest, and set S-1 the
+        # heaviest.
+        all_pdatas_bottom_heavy = [[] for _ in range(total_pdatas)]
+        for i,pdata in enumerate(all_pdatas):
+             for ith_ali in zip(*pdata):
+                 all_pdatas_bottom_heavy[i].append(sorted(ith_ali))
+
+        # Now, you collect all sets with their own (all sets 0, all sets 1...)
+        all_pdatas_avg = [[] for _ in range(total_pdatas)]
+        for s,sth_sets in enumerate(zip_longest(*all_pdatas_bottom_heavy,
+                                               fillvalue=None)):
+            for i,ith_alises in enumerate(zip(*sth_sets)):
+                for
+        """
         return
 
-    def plot_setup_general(self):
-        # background color
-        self.axes.patch.set_facecolor(self.tool_palette.bg)
-        # setup title
-        title_string = f'{self.ps.title}: {st.plot.prefix}'
-        if self.ps.subtit:
-            title_string += f'. ({self.ps.subtit})'
-        self.axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
-        return
 
-    def plot_draw_Y_grid(self, color='#40BF40CC'):
-        xmin,xmax = 0-0.5,st.map.time_size-0.5
-        max_sets = st.plot.grid_max_blocks
-        block_lw = 0.5 #1.5*(1 - ((st.cache.num_sets-1) / max_sets))
-        block_sep_lines = [i-0.5 for i in range(st.cache.num_sets+1)]
-        self.axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
-                         color=color,
-                         linewidth=block_lw, alpha=1, zorder=2)
+        # If each pdata has S sets, then create a new list with S virtual sets.
+        # Each virtual set will represent from the "busiest" to the "idlest" set
+        # at time t across all pdatas.
+        last_Xs = []
+        for pdata_Y in all_pdatas:
+            X = range(len(pdata_Y))
+            last_Xs.append(len(pdata_Y)-1)
+            Y = pdata_Y
+            mpl_axes.plot(X, Y, zorder=4, color=ind_color,
+                          linewidth=ind_line_width)
+
+
+        #####################################
+        # PLOT MOVING AVERAGE OF METRICS
+        # find range large enough to fit all plots
+        X_min = 0
+        X_max = max(last_Xs)
+        super_X = list(range(X_min, X_max+1))
+
+        all_ith_ys_list = list(zip_longest(*all_pdatas, fillvalue=None))
+        Y_avg = [0] * len(super_X)
+        for x,ith_ys in zip(super_X,all_ith_ys_list):
+            valid_ys = [y for y in ith_ys if y is not None]
+            ys_avg = sum(valid_ys) / len(valid_ys)
+            Y_avg[x] = ys_avg
+        mpl_axes.plot(super_X, Y_avg, zorder=6, color=avg_color,
+                      linewidth=avg_line_width)
+
+
+        #####################################
+        # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
+        if st.Plot.aggr_last_x:
+            last_X_text = cls.draw_last_Xs(mpl_axes, last_Xs, (-20,120))
+
+
+        #####################################
+        # SETUP PLOT VISUALS
+        # set plot limits
+        X_pad = 0.5
+        real_xlim, real_ylim = cls.setup_limits(
+            mpl_axes, metric_code, xlims=(X_min,X_max), x_pad=X_pad,
+            ylims=(0,100), y_pad='auto'
+        )
+
+        # set ticks based on the real limits
+        cls.setup_ticks(
+            mpl_axes, xlims=real_xlim, ylims=real_ylim,
+            bases=(10, 10)
+        )
+
+        # set grid
+        axis = 'y' if st.Plot.aggr_last_x else 'xy'
+        cls.setup_grid(mpl_axes, axis=axis, fn_axis='y')
+
+        # insert text box with average usage
+        text = [f'Executions: {total_pdatas}']
+        if st.Plot.aggr_last_x:
+            text.append(last_X_text)
+        text.append(rf'Avg2 {metric_code}: {sum(Y_avg)/len(Y_avg):.2f}%')
+        cls.draw_textbox(mpl_axes, text, metric_code)
+
+        # set labels
+        cls.setup_labels(mpl_axes, met_str)
+
+        # title and bg color
+        cls.setup_general(mpl_axes, pal.bg, met_str)
+
+        PlotFile.save(fig, metric_code, aggr=True)
         return

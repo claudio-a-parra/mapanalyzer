@@ -45,11 +45,7 @@ class ThreadMissRatio:
         return ret_str
 
 class MissRatio(BaseModule):
-    name = 'Cache Miss Ratio'
-    about = 'Thread-wise Cache Miss Ratio on the last memory accesses.'
     hue = 45
-    palette = Palette.default(hue)
-
     supported_metrics = {
         'CMR' : MetricStrings(
             about  = ('Thread-wise Cache Miss Ratio on the last memory '
@@ -184,7 +180,7 @@ class MissRatio(BaseModule):
                          bases=(10, 10), bg_mode=bg_mode)
 
         # set grid
-        self.setup_grid(mpl_axes, fn_axis='y')
+        self.setup_grid(mpl_axes, fn_axis='y', bg_mode=bg_mode)
 
         # insert text box with average usage
         if not bg_mode:
@@ -233,7 +229,8 @@ class MissRatio(BaseModule):
 
 
         #####################################
-        # CREATE PALETTE FOR THREADS {thr -> (indiv, avg)}
+        ## CREATE COLOR PALETTE
+        # one color per thread {thr -> (indiv, avg)}
         thread_to_color = {thr:('', '') for thr in thread_ids}
         pal = Palette(
             hue = len(thread_to_color), h_off=cls.hue,

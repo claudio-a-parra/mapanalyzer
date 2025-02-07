@@ -10,7 +10,7 @@ from .module_locality import Locality
 from .module_missratio import MissRatio
 from .module_memaccess import MemAccess
 from .module_usage import CacheUsage
-#! from .module_aliasing import Aliasing
+from .module_aliasing import Aliasing
 #! from .module_eviction import EvictionDuration
 
 
@@ -22,7 +22,7 @@ class Manager:
         MissRatio,
         MemAccess,
         CacheUsage,
-        #!Aliasing,
+        Aliasing,
         #!EvictionDuration
     ]
 
@@ -33,7 +33,7 @@ class Manager:
         self.missratio = MissRatio()
         self.memaccess = MemAccess()
         self.usage = CacheUsage()
-        #!self.aliasing = Aliasing()
+        self.aliasing = Aliasing()
         #!self.evictdur = EvictDuration()
 
         self.available_module_instances = [
@@ -42,7 +42,7 @@ class Manager:
             self.missratio,
             self.memaccess,
             self.usage,
-            #!self.aliasing,
+            self.aliasing,
             #!self.evictdur
         ]
 

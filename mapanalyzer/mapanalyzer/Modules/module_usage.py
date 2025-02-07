@@ -7,11 +7,7 @@ from mapanalyzer.ui import UI
 from .base import BaseModule
 
 class CacheUsage(BaseModule):
-    name = 'Cache Usage Ratio'
-    about = 'Percentage of valid bytes in cache that are used before eviction'
     hue = 120
-    palette = Palette.default(hue)
-
     supported_metrics = {
         'CUR' : MetricStrings(
             about  = ('Percentage of valid bytes in the cache that are used '
@@ -84,8 +80,8 @@ class CacheUsage(BaseModule):
         metric_code = 'CUR'
         met_str = self.supported_metrics[metric_code]
 
-        # create data serieas
-        X = range(len(self.usage_ratio))
+        # create data series
+        X = range(st.Map.time_size)
         Y = self.usage_ratio
 
 
@@ -118,11 +114,12 @@ class CacheUsage(BaseModule):
                          bases=(10, 10), bg_mode=bg_mode)
 
         # set grid
-        self.setup_grid(mpl_axes, fn_axis='y')
+        self.setup_grid(mpl_axes, fn_axis='y', bg_mode=bg_mode)
 
         # insert text box with average usage
         if not bg_mode:
-            text = f'Avg Usage: {sum(self.usage_ratio)/len(self.usage_ratio):.2f}%'
+            text = ('Avg Usage: '
+                    f'{sum(self.usage_ratio)/len(self.usage_ratio):.2f}%')
             self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

@@ -123,7 +123,7 @@ class Cache:
                 # fetch block from main memory
                 fetched_block = Block(st.Cache.line_size, tag=p_tag,
                                             dirty=writing)
-                #!self.modules.aliasing.fetch(set_index, access.time)
+                self.modules.aliasing.probe(set_index, access.time)
                 self.modules.memaccess.probe('r') # read
 
                 # add fetched block to the cache

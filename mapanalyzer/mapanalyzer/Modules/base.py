@@ -1,18 +1,13 @@
-#!/usr/bin/env python3
-
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import Palette, MetricStrings, sample_list
 from mapanalyzer.ui import UI
-"""This is the base mapanalyzer module upon which other modules are created.
-This class is intended to be inherited from other mapanalyzer modules."""
-
 
 class BaseModule:
-    enabled = True
-    name = 'Module Name'
-    about = 'Short description of What the module does.'
+    """
+    This is the base mapanalyzer module upon which other modules are created.
+    This class is intended to be inherited from other mapanalyzer modules.
+    """
     hue = 0 # base color of this module
-    palette = Palette.default(hue) # color palette
 
     # Details about all the metrics supported by this module.
     # It could be one, or more.
@@ -79,29 +74,31 @@ class BaseModule:
         if bg_mode:
             mpl_axes.grid(False)
             return
+
         # sanitize axis parameter
         if axis in ('both', 'xy', 'yx'):
-            axis = 'xy'
-        elif axis not in 'xy':
+            user_axes = ('x', 'y')
+        elif axis in ('x', 'y'):
+            user_axes = (axis,)
+        else:
             UI.error(f'Module.setup_grid(): Incorrect axis=\'{axis}\' '
                      'parameter value')
 
-        ax_names = ('x', 'y')
-        # Values associated to either the independent or function axes.
-        # If the function axis is X, then reverse axes meanings.
-        ax_grd_a = st.Plot.grid_alpha
-        ax_grd_s = st.Plot.grid_style
-        ax_grd_w = st.Plot.grid_width
+        # default to x:independent, and y:function
+        axes = ('x', 'y')
+        alpha = st.Plot.grid_alpha
+        style = st.Plot.grid_style
+        width = st.Plot.grid_width
         if fn_axis == 'x':
-            ax_grd_a = ax_grd_a[::-1]
-            ax_grd_s = ax_grd_s[::-1]
-            ax_grd_w = ax_grd_w[::-1]
+            alpha = alpha[::-1]
+            style = style[::-1]
+            width = width[::-1]
 
-        # set grid in x and y
-        for ax,ga,gs,gw in zip(ax_names, ax_grd_a, ax_grd_s, ax_grd_w):
-            if ax in axis:
-                mpl_axes.grid(axis=ax, which='both', zorder=1, alpha=ga,
-                              linestyle=gs, linewidth=gw)
+        # set grid
+        for axi,alp,sty,wid in zip(axes, alpha, style, width):
+            if axi in user_axes:
+                mpl_axes.grid(axis=axi, which='both', zorder=1, alpha=alp,
+                              linestyle=sty, linewidth=wid)
         return
 
     @classmethod
@@ -169,43 +166,41 @@ class BaseModule:
 
     @classmethod
     def setup_manual_grid(cls, mpl_axes, axis='both', hlines=None, xlims=None,
-                            vlines=None, ylims=None, main_axis='y'):
-        if axis == 'both':
-            axis = 'xy'
-        grid_color = '#BFBFBF60' # apparently the default color
+                          vlines=None, ylims=None, fn_axis='y',
+                          grid_color='#BFBFBF60', zorder=1):
+        # sanitize axis parameter
+        if axis in ('both', 'xy', 'yx'):
+            user_axes = ('x', 'y')
+        elif axis in ('x', 'y'):
+            user_axes = (axis,)
+        else:
+            UI.error(f'Module.setup_manual_grid(): Incorrect axis=\'{axis}\' '
+                     'parameter value')
 
-        # If plotting vertical lines (across the X axis)
-        if 'x' in axis:
-            if not vlines or not ylims:
-                UI.error(f'Cannot call __setup_manual_grid() with axis=x, and '
-                         'vlines or ylims None.')
+        # sanitize lines and limits
+        if not (hlines and xlims) and not (vlines and ylims):
+            UI.error(f'Module.setup_manual_grid(): Either set hlines and '
+                     'xlims, or vlines and ylims.')
 
-            # select 'main' or 'other' style
-            if main_axis == 'x':
-                sty,wid = st.Plot.grid_style[0],st.Plot.grid_width[0]
-            else:
-                sty,wid = st.Plot.grid_style[1],st.Plot.grid_width[1]
+        # default to x:independent, and y:function
+        axes = ('x', 'y')
+        style = st.Plot.grid_style
+        width = st.Plot.grid_width
+        if fn_axis == 'x':
+            style = style[::-1]
+            width = width[::-1]
 
-            mpl_axes.vlines(x=vlines, ymin=ylims[0], ymax=ylims[1],
-                            color=grid_color, linestyle=sty, linewidth=wid,
-                            zorder=1)
-
-
-        # If plotting horizontal lines (across the Y axis)
-        if 'y' in axis:
-            if not hlines or not xlims:
-                UI.error(f'Cannot call __setup_manual_grid() with axis=y, and '
-                         'hlines or ylims None.')
-
-            # select 'main' or 'other' style
-            if main_axis == 'y':
-                sty,wid = st.Plot.grid_style[0],st.Plot.grid_width[0]
-            else:
-                sty,wid = st.Plot.grid_style[1],st.Plot.grid_width[1]
-
-            mpl_axes.hlines(y=hlines, xmin=xlims[0], xmax=xlims[1],
-                            color=grid_color, linestyle=sty, linewidth=wid,
-                            zorder=1)
+        # draw either horizontal or vertical lines
+        for axi,sty,wid in zip(axes, style, width):
+            if axi in user_axes:
+                if axi == 'y':
+                    mpl_axes.hlines(y=hlines, xmin=xlims[0], xmax=xlims[1],
+                                    color=grid_color, linestyle=sty,
+                                    linewidth=wid, zorder=zorder)
+                else:
+                    mpl_axes.vlines(x=vlines, ymin=ylims[0], ymax=ylims[1],
+                                    color=grid_color, linestyle=sty,
+                                    linewidth=wid, zorder=zorder)
         return
 
     @classmethod

@@ -303,8 +303,6 @@ class Settings:
     class Metrics:
         ############################################################
         # DERIVED VALUES
-        initialized = False
-
         # Metrics *enabled by the user*. Initialized to set of metric codes.
         enabled = None
 
@@ -316,6 +314,8 @@ class Settings:
         # code of the background metric.
         bg = None
         bg_user_set = None
+
+        initialized = False
 
         @classmethod
         def from_args(cls, args):
@@ -466,7 +466,7 @@ class Settings:
 
         @classmethod
         def describe(cls):
-            attrs = ['enabled', 'available', 'bg', 'initialized']
+            attrs = ['enabled', 'available', 'bg', 'bg_user_set', 'initialized']
             vals = [getattr(cls, at) for at in attrs]
             UI.indent_in(title='METRICS SETTINGS')
             UI.columns((attrs, vals), sep=' : ')
@@ -856,6 +856,7 @@ class Settings:
         # maximum number of bytes or blocks at which to still show the MAP grids
         grid_max_bytes = 128
         grid_max_blocks = 48
+        grid_max_sets = 32
 
         # Text boxes
         tbox_bg = '#FFFFFFCC'

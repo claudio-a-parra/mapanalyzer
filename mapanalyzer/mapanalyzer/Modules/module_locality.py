@@ -8,12 +8,7 @@ from mapanalyzer.ui import UI
 from .base import BaseModule
 
 class Locality(BaseModule):
-    # Module info
-    name = 'Locality'
-    about = 'Spatial and Temporal Locality Degree.'
     hue = 325
-    palette = Palette.default(hue)
-
     supported_metrics = {
         'SLD' : MetricStrings(
             about  = ('Spatial Locality Degree.') ,
@@ -148,6 +143,9 @@ class Locality(BaseModule):
         return
 
     def finalize(self):
+        if not self.enabled:
+            return
+
         self.__all_space_windows_to_lt()
         return
 
@@ -249,7 +247,7 @@ class Locality(BaseModule):
                          bases=(10, 10), bg_mode=bg_mode)
 
         # set grid
-        self.setup_grid(mpl_axes, fn_axis='y')
+        self.setup_grid(mpl_axes, fn_axis='y', bg_mode=bg_mode)
 
         # insert text box with average usage
         if not bg_mode:

@@ -8,14 +8,10 @@ from mapanalyzer.ui import UI
 from .base import BaseModule
 
 class Map(BaseModule):
-    name = 'Mem Acc Pattern'
-    about = 'Visual representation of the Memory Access Pattern.'
     hue = 120
-    palette = Palette.default(hue)
-
     supported_metrics = {
         'MAP' :  MetricStrings(
-            about  = 'Visual representation of Memory Access Pattern',
+            about  = 'Visual representation of Memory Access Pattern.',
             title  = 'MAP',
             subtit = None,
             number = '00',
@@ -25,7 +21,7 @@ class Map(BaseModule):
     }
     supported_aggr_metrics = {}
 
-    def __init__(self, shared_X=None):
+    def __init__(self):
         # enable metric if user requested it or if used as background
         self.enabled = (any(m in st.Metrics.enabled
                            for m in self.supported_metrics.keys()) or
@@ -181,10 +177,10 @@ class Map(BaseModule):
 
         # set grid of bytes and blocks (not mpl grids)
         if (st.Map.num_padded_bytes < st.Plot.grid_max_bytes or
-            st.Map.num_blocks < st.Plot.grid_max_blocks):
+            st.Map.num_blocks < st.Plot.grid_max_blocks) and not bg_mode:
             self.__setup_MAP_grid(mpl_axes, bg_mode=bg_mode)
         else:
-            self.setup_grid(mpl_axes)
+            self.setup_grid(mpl_axes, bg_mode=bg_mode)
 
         # fade bytes used just for block-padding
         self.__fade_padding_bytes(mpl_axes)
@@ -243,11 +239,13 @@ class Map(BaseModule):
                 block_sep = False
 
         xmin,xmax = 0-0.5,st.Map.time_size-0.5
+        line_color = Palette.from_hsla((self.hue, st.Plot.p_sat[0],
+                                        st.Plot.p_lig[0], st.Plot.p_alp[0]))
         if byte_sep:
             byte_lw = 0.5*(1 - ((st.Map.num_padded_bytes-1) / max_bytes))
             byte_sep_lines = [i-0.5 for i in range(1,st.Map.num_padded_bytes)]
             axes.hlines(y=byte_sep_lines, xmin=xmin, xmax=xmax,
-                        color=self.__class__.palette[0][0][0][0],
+                        color=line_color,
                         linewidth=byte_lw, alpha=0.1, zorder=1)
 
         if block_sep:
@@ -258,7 +256,7 @@ class Map(BaseModule):
             # then don't draw anything.
             if block_sep_lines[-1] != st.Cache.line_size-0.5:
                 axes.hlines(y=block_sep_lines, xmin=xmin, xmax=xmax,
-                            color=self.__class__.palette[0][0][0][0],
+                            color=line_color,
                             linewidth=block_lw, alpha=0.4, zorder=1)
         return
 

@@ -1,6 +1,7 @@
 
 # CONVERGENT RANDOM
 # source = conv-rand.c
+# algorithm := conv-rand
 # LIST_LEN = 100
 # SEED = 0
 # cclibs = -lm
@@ -20,7 +21,7 @@ access_pattern = $(algorithm)-$(LIST_LEN)-$(SEED).map
 
 
 define HELP_ABOUT
-	TESTING
+	$(algorithm)
 endef
 export HELP_ABOUT
 define HELP_VARIABLES

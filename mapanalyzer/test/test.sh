@@ -1,12 +1,10 @@
 #!/bin/bash
+set -e
 cr_dir=00-source
 maps_dir=01-maps
 pdata_dir=02-pdata
 plot_dir=03-plots
 aggr_dir=04-aggr
-common_opts=(-pw 8 -ph 8 --dpi 400 --cache cache.conf)
-
-set -e
 
 clean_all(){
     rm -rf ./$maps_dir/*
@@ -15,7 +13,6 @@ clean_all(){
     rm -rf ./$aggr_dir/*
     tree_flag
 }
-
 create_maps(){
     clean_all
     # create map files
@@ -51,7 +48,6 @@ create_maps(){
     fi
     tree_flag
 }
-
 mtest(){
     local mode="$1"
     shift
@@ -62,15 +58,15 @@ mtest(){
 
     # select the input directory based on the mode
     if [[ "$mode" = "simulate" || "$mode" == "sim-plot" ]]; then
-        input_data=$maps_dir/'*.map'
+        local input_data=$maps_dir/'*.map'
     else
-        input_data=$pdata_dir/'*.json'
+        local input_data=$pdata_dir/'*.json'
     fi
 
     # run mapanalyzer
     if ls ./$maps_dir/*.map &>/dev/null; then
         local command=(mapanalyzer --mode $mode $command_options
-                       ${common_opts[@]} -- ./$input_data)
+                       ${common_opts[@]} -- ./"$input_data")
         echo "${command[@]}"
         eval "${command[@]}"
     else
@@ -88,8 +84,8 @@ mtest(){
         if ls ./*.json &>/dev/null; then
             mv ./*.json ./$pdata_dir/
         else
-            echo -e "\n\nTEST.mtest(--mode $mode $command_options): JSON files not " \
-                "created!"
+            echo -e "\n\nTEST.mtest(--mode $mode $command_options): JSON " \
+                "files not created!"
             tree_flag
             exit 1
         fi
@@ -98,9 +94,9 @@ mtest(){
 
     # move plot files to a separated folder
     if [[ "$mode" = "sim-plot" || "$mode" = "plot" || "$mode" = "aggregate" ]]; then
-        fig_dir=$plot_dir
+        local fig_dir=$plot_dir
         if [[ "$mode" = "aggregate" ]]; then
-            fig_dir=$aggr_dir
+            local fig_dir=$aggr_dir
         fi
 
         mkdir -p ./$fig_dir
@@ -110,15 +106,14 @@ mtest(){
         elif ls ./*.pdf &>/dev/null; then
             mv ./*.pdf ./$fig_dir/
         else
-            echo -e "\n\nTEST.mtest(--mode $mode $command_options): PLOT files " \
-                "not created!"
+            echo -e "\n\nTEST.mtest(--mode $mode $command_options): PLOT " \
+                "files not created!"
             tree_flag
             exit 1
         fi
     fi
     tree_flag
 }
-
 view(){
     while true; do
          feh -qrxZ. -B 'black' --on-last-slide hold ./$plot_dir/
@@ -126,13 +121,27 @@ view(){
          sleep 1
     done
 }
-
 tree_flag(){
     touch .flag_tree
 }
+create_cache(){
+    cat <<EOF > cache.conf
+line_size_bytes  : 2
+associativity    : 1
+cache_size_bytes : 4
+arch_size_bits   : 64
+EOF
+    bat cache.conf
+}
+
+common_opts=(-pw 8 -ph 4 --dpi 300 --cache cache.conf)
+METS=MAP,SLD,TLD,CMR,CMMA,CUR,AD
+METS=MAP,AD
 
 clear
-#create_maps 3 4000 6000
-mtest sim-plot --metrics MAP,SLD,TLD,CMR,CMMA,CUR
-#mtest aggregate --metrics SLD,TLD,CMR,CMMA,CUR
-echo -e "\n\nTEST: Done"
+create_cache
+
+#create_maps 3 12
+#mtest sim-plot --metrics MAP,$METS
+mtest aggregate --metrics AD
+#echo -e "\n\nTEST: Done"

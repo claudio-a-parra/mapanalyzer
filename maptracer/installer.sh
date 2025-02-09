@@ -79,6 +79,6 @@ case "$action" in
         ;;
     *)
         echo "Unknown action '$action'."
-        echo "USAGE $(basename $0) install|remove|check"
+        echo "USAGE $(basename $0) install|remove|test"
         exit 1
 esac

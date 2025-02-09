@@ -8,19 +8,12 @@ SHELL := /bin/bash
 .PHONY: help install remove quiet-remove download
 
 help:
-	@echo "DOWNLOAD PIN:"
-	@echo "    Make sure of getting the version that this makefile point to ($(VERSION))."
-	@echo "    You should be able to get it from:"
-	@echo "      $(DL_LINK)"
-	@echo "    Otherwise, you can browse a version in:"
-	@echo "      $(PIN_WEBSITE)"
-	@echo "    Once downloaded, put the tar.gz file in the directory './versions/', then run 'make install'"
-	@echo ""
 	@echo "TARGETS:"
-	@echo "    install : install pin in the system"
-	@echo "    remove  : remove pin from the system"
-	@echo "    help    : print this beautiful message"
-	@eoch "    test    : run 'pin -version'"
+	@echo "    download: download pin-$(VERSION).tar.gz from intel.com."
+	@echo "    install : download and install pin in the system."
+	@echo "    remove  : remove pin from the system."
+	@echo "    help    : print this beautiful message."
+	@echo "    test    : run 'pin -version'."
 	@echo ""
 	@echo "VARIABLES:"
 	@echo "    VERSION : ($(VERSION)) Pin version to install."
@@ -51,7 +44,12 @@ download: ./versions/pin-$(VERSION).tar.gz
 
 ./versions/pin-$(VERSION).tar.gz:
 	@echo "Downloading PIN $(VERSION)"
-	wget -P ./versions $(DL_LINK)
+	@if ! wget -P ./versions $(DL_LINK); then \
+		echo "Error downloading pin from $(DL_LINK)" ;\
+		echo "Download it manually and put it in ./versions/pin-$(VERSION).tar.gz" ;\
+		echo "Then run 'make install'" ;\
+		exit 1 ;\
+	fi
 
 test:
 	pin -version

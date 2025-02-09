@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from mapanalyzer.settings import Settings as st
 from mapanalyzer.util import Palette, MetricStrings, sample_list
 from mapanalyzer.ui import UI
@@ -162,6 +164,11 @@ class BaseModule:
 
             ticks = sample_list(full_list, base=bs, n=mt)
             set_ticks(ticks)
+
+            if ax == 'y':
+                plt.setp(mpl_axes.get_yticklabels(), va='center')
+            elif ax == 'x':
+                plt.setp(mpl_axes.get_xticklabels(), ha='center')
         return
 
     @classmethod
@@ -194,10 +201,12 @@ class BaseModule:
         for axi,sty,wid in zip(axes, style, width):
             if axi in user_axes:
                 if axi == 'y':
+                    mpl_axes.grid(False, axis='y')
                     mpl_axes.hlines(y=hlines, xmin=xlims[0], xmax=xlims[1],
                                     color=grid_color, linestyle=sty,
                                     linewidth=wid, zorder=zorder)
                 else:
+                    mpl_axes.grid(False, axis='x')
                     mpl_axes.vlines(x=vlines, ymin=ylims[0], ymax=ylims[1],
                                     color=grid_color, linestyle=sty,
                                     linewidth=wid, zorder=zorder)
@@ -230,7 +239,7 @@ class BaseModule:
     @classmethod
     def draw_textbox(cls, mpl_axes, text, metric_code):
         # get the offset of the textbox from the user options
-        h_off,v_off=0.98, 0.98
+        h_off,v_off=0.5, 0.98
         if metric_code in st.Plot.textbox_offsets:
             h_off,v_off = st.Plot.textbox_offsets[metric_code]
 
@@ -274,13 +283,14 @@ class BaseModule:
         return
 
     @classmethod
-    def draw_last_Xs(cls, mpl_axes, last_Xs, ylims):
+    def draw_last_Xs(cls, mpl_axes, last_Xs, ylims,
+                     pre_text='Avg Exec Duration'):
         pal = Palette(
             # (individual, avg)
-            hue = (0, 0),
-            sat = (0, 50),
-            lig = (93, 75),
-            alp = (100,100))
+            hue = ( 0,  0),
+            sat = ( 0, 80),
+            lig = (60, 60),
+            alp = (60, 60))
         ind_color = pal[0][0][0][0]
         avg_color = pal[1][1][1][1]
         ind_line_width = st.Plot.p_aggr_ind_vlw
@@ -297,16 +307,16 @@ class BaseModule:
                         colors=avg_color, linestyles='solid',
                         linewidth=avg_line_width, zorder=3)
 
-        return f'Avg Exec Duration: {last_X_avg:.0f}'
+        return f'{pre_text}: {last_X_avg:.0f}'
 
     @classmethod
     def draw_last_Ys(cls, mpl_axes, last_Ys, xlims):
         pal = Palette(
             # (individual, avg)
-            hue = (0, 0),
-            sat = (0, 50),
-            lig = (93, 75),
-            alp = (100,100))
+            hue = ( 0,  0),
+            sat = ( 0, 80),
+            lig = (60, 60),
+            alp = (60, 60))
         ind_color = pal[0][0][0][0]
         avg_color = pal[1][1][1][1]
         ind_line_width = st.Plot.p_aggr_ind_vlw

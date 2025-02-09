@@ -13,27 +13,83 @@ clean_all(){
     rm -rf ./$aggr_dir/*
     tree_flag
 }
+
+create_quicksort(){
+    local map_id=$1
+    local min_len=$2
+    local max_len=$3
+    if [[ "$max_len" == "" ]]; then
+        max_len=$min_len
+    fi
+    local alg=quicksort_pthread
+
+    list_len=$(($min_len + $RANDOM % ($max_len - $min_len + 1)))
+    list_len=$(printf "%0${#max_len}d" $list_len)
+
+    make \
+        source=$alg.c \
+        algorithm=$alg \
+        binary_args="$list_len $map_id" \
+        access_pattern="$alg-$map_id-$list_len.map" \
+        map
+    return
+}
+create_convergent(){
+    local map_id=$1
+    local min_len=$2
+    local max_len=$3
+    if [[ "$max_len" == "" ]]; then
+        max_len=$min_len
+    fi
+    local alg=conv-rand
+
+    list_len=$(($min_len + $RANDOM % ($max_len - $min_len + 1)))
+    list_len=$(printf "%0${#max_len}d" $list_len)
+
+    make \
+        source=$alg.c \
+        algorithm=$alg \
+        binary_args="$list_len $map_id" \
+        access_pattern="$alg-$map_id-$list_len.map" \
+        map
+    return
+}
+create_convolution(){
+    local map_id=$1
+    local ker_size=$2
+    local min_size=$3
+    local max_size=$4
+    if [[ "$max_size" == "" ]]; then
+        max_size=$min_size
+    fi
+    local alg=convolution
+
+    mat_size=$(($min_size + $RANDOM % ($max_size - $min_size + 1)))
+    mat_size=$(printf "%0${#max_size}d" $mat_size)
+
+    make \
+        source=$alg.c \
+        algorithm=$alg \
+        binary_args="$mat_size $ker_size" \
+        access_pattern="$alg-$map_id-$mat_size-$ker_size.map" \
+        map
+    return
+}
+
 create_maps(){
     clean_all
     # create map files
     cd $cr_dir || exit 1
     make clean
-    num_maps=$1
-    min_lsize=$2
-    max_lsize=$3
-    if [[ "$max_lsize" == "" ]]; then
-        max_lsize=$min_lsize
-    fi
-    max_seed=99
+    local kind="$1" && shift
+    local num_maps="$1" && shift
+
     for ((m=1; m<=$num_maps; m++)); do
-        rand_list_size=$(($min_lsize + $RANDOM \
-            % ($max_lsize - $min_lsize + 1)))
-        rand_list_size=$(printf "%0${#max_lsize}d" $rand_list_size)
-        #rand_seed=$(printf "%0${#max_seed}d" $(($RANDOM % ($max_seed + 1))))
-        rand_seed=$(printf "%0${#max_seed}d" $(($m % ($max_seed + 1))))
-        make LIST_LEN=$rand_list_size SEED=$rand_seed map || exit 1
+        map_id=$(printf "%0${#num_maps}d" $m)
+        create_$kind $map_id "$@"
         tree_flag
     done
+
     cd ..
 
     # move maps to separated folder
@@ -42,7 +98,8 @@ create_maps(){
         rm -rf ./$maps_dir/*
         mv $cr_dir/*.map ./$maps_dir/
     else
-        echo -e "\n\nTEST.create_maps($num_maps, $min_lsize, $max_lsize): MAP files not created!"
+        echo -e "\n\nTEST.create_maps($num_maps, $min_lsize, $max_lsize): " \
+            "MAP files not created!"
         tree_flag
         exit 1
     fi
@@ -126,22 +183,26 @@ tree_flag(){
 }
 create_cache(){
     cat <<EOF > cache.conf
-line_size_bytes  : 2
-associativity    : 1
-cache_size_bytes : 4
+line_size_bytes  : 32
+associativity    : 4
+cache_size_bytes : 2048
 arch_size_bits   : 64
 EOF
     bat cache.conf
 }
 
-common_opts=(-pw 8 -ph 4 --dpi 300 --cache cache.conf)
-METS=MAP,SLD,TLD,CMR,CMMA,CUR,AD
-METS=MAP,AD
+
+common_opts=(-pw 10 -ph 6 --dpi 400 --cache cache.conf)
+METS=SLD,TLD,CMR,CMMA,CUR,AD
+
 
 clear
-create_cache
+create_maps quicksort 20 2000
+#create_maps convergent 2 20 3000
+#create_maps convolution 2 3 400 500
 
-#create_maps 3 12
-#mtest sim-plot --metrics MAP,$METS
-mtest aggregate --metrics AD
-#echo -e "\n\nTEST: Done"
+#create_cache
+mtest sim-plot -mc MAP,$METS
+#mtest plot -mc MAP,$METS
+mtest aggregate -mc $METS
+echo -e "\n\nTEST: Done"

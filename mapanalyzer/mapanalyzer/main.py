@@ -65,19 +65,22 @@ def plot_mode(args):
         UI.indent_in(title=f'PLOTTING FROM PDATA ({pd_path})')
         # obtain data from the pdata file
         file_dict = PdataFile.load(pd_path)
+
+        # if user explicitly set the metrics to plot, but this metric is not
+        # included, skip it.
+        metric_code = file_dict['metrics']['fg']['code']
+        if (st.Metrics.enabled_explicit and
+            metric_code not in st.Metrics.enabled_user):
+            UI.info(f'Skipping not requested metric "{metric_code}"', pre='')
+            UI.indent_out()
+            continue
+
+        # obtain the different parts of the pdata
         meta_dict = file_dict['meta']
         cache_dict = file_dict['cache']
         map_dict = file_dict['map']
         pdata_dict = file_dict['metrics']
         st.Metrics.from_dict(pdata_dict)
-
-        # if this metric was not requested by the user, skip it.
-        metric_code = file_dict['metrics']['fg']['code']
-        if metric_code not in st.Metrics.enabled:
-            UI.info(f'Skipping not requested metric "{metric_code}"', pre='')
-            UI.indent_out()
-            continue
-
 
         # init cache settings
         UI.indent_in(title=f'CACHE PARAMETERS')

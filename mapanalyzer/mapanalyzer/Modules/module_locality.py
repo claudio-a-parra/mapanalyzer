@@ -361,7 +361,7 @@ class Locality(BaseModule):
             X = range(len(pdata_Y))
             last_Xs.append(len(pdata_Y)-1)
             Y = pdata_Y
-            mpl_axes.plot(X, Y, zorder=4, color=ind_color,
+            mpl_axes.step(X, Y, where='mid', zorder=4, color=ind_color,
                           linewidth=ind_line_width)
 
 
@@ -378,7 +378,7 @@ class Locality(BaseModule):
             valid_ys = [y for y in ith_ys if y is not None]
             ys_avg = sum(valid_ys) / len(valid_ys)
             Y_avg[x] = ys_avg
-        mpl_axes.plot(super_X, Y_avg, zorder=6, color=avg_color,
+        mpl_axes.step(super_X, Y_avg, where='mid', zorder=6, color=avg_color,
                       linewidth=avg_line_width)
 
 

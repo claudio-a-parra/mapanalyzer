@@ -119,9 +119,9 @@ class MemAccess(BaseModule):
         #####################################
         ## PLOT METRIC
         # plot read and write
-        mpl_axes.plot(X, Y_r, zorder=3, color=read_color,
+        mpl_axes.step(X, Y_r, where='mid', zorder=3, color=read_color,
                       linewidth=line_width, label='Read Access')
-        mpl_axes.plot(X, Y_w, zorder=3, color=write_color,
+        mpl_axes.step(X, Y_w, where='mid', zorder=3, color=write_color,
                       linewidth=line_width, label='Write Access')
 
 
@@ -208,9 +208,9 @@ class MemAccess(BaseModule):
             W = pdata_w
             R = pdata_r
             X = [i for i in range(len(pdata_r))]
-            mpl_axes.plot(X, W, zorder=4, color=write_ind_color,
+            mpl_axes.step(X, W, where='mid', zorder=4, color=write_ind_color,
                           linewidth=ind_line_width)
-            mpl_axes.plot(X, R, zorder=4, color=read_ind_color,
+            mpl_axes.step(X, R, where='mid', zorder=4, color=read_ind_color,
                           linewidth=ind_line_width)
             R_max = max(R[-1], R_max)
             W_max = max(W[-1], W_max)
@@ -239,10 +239,12 @@ class MemAccess(BaseModule):
             W_avg[sx] = w_avg
 
         # plot average read and write
-        mpl_axes.plot(super_X, R_avg, zorder=6, color=read_avg_color,
-                      linewidth=avg_line_width, label='Average Read Access')
-        mpl_axes.plot(super_X, W_avg, zorder=6, color=write_avg_color,
-                      linewidth=avg_line_width, label='Average Write Access')
+        mpl_axes.step(super_X, R_avg, where='mid', zorder=6,
+                      color=read_avg_color, linewidth=avg_line_width,
+                      label='Average Read Access')
+        mpl_axes.step(super_X, W_avg, where='mid', zorder=6,
+                      color=write_avg_color, linewidth=avg_line_width,
+                      label='Average Write Access')
 
 
         #####################################

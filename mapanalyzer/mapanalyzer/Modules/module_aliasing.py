@@ -1,5 +1,6 @@
 from collections import deque
 import matplotlib.pyplot as plt
+from itertools import zip_longest
 import matplotlib.colors as mcolors # to create shades of colors from list
 
 from mapanalyzer.settings import Settings as st
@@ -24,10 +25,10 @@ class Aliasing(BaseModule):
         'AD' : MetricStrings(
             about  = ('Average proportion in which each set fetches blocks '
                       'during execution.') ,
-            title  = 'Aggregated AD',
+            title  = 'Cache Set Load Imbalance',
             subtit = 'transparent is better',
             number = '05',
-            xlab   = 'Time [access instr.]',
+            xlab   = 'Fetch Number',
             ylab   = 'Cache Sets',
         )
     }
@@ -99,7 +100,6 @@ class Aliasing(BaseModule):
             UI.error(f'{class_name}.dict_to_AD(): Malformed data.')
 
         return
-
 
     def AD_to_plot(self, mpl_axes, bg_mode=False):
         metric_code = 'AD'
@@ -191,52 +191,6 @@ class Aliasing(BaseModule):
         self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
         return
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     @classmethod
     def AD_to_aggregated_plot(cls, pdata_dicts):
         """Given a list of pdata dictionaries, aggregate their
@@ -246,21 +200,13 @@ class Aliasing(BaseModule):
         met_str = cls.supported_aggr_metrics[metric_code]
 
         # extract data from dictionaries and create figure
-        total_pdatas = len(pdata_dicts)
+        # three-level list: (pdata, set, time)
         all_pdatas = [pd['fg']['set_aliasing'] for pd in pdata_dicts]
+        num_pdatas = len(all_pdatas)
         fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
-        print(f'all_pdatas:')
-        for pdata in all_pdatas:
-            print(pdata)
-            print()
-
-
-        print()
-        print()
-
-        # make sure all pdatas have the same number of sets:
-        all_num_sets = [0] * total_pdatas
+        # make sure all pdatas have the same number of sets
+        all_num_sets = [0] * num_pdatas
         for i, s_ali in enumerate(all_pdatas):
             all_num_sets[i] = len(s_ali)
         all_num_sets = set(all_num_sets)
@@ -268,9 +214,8 @@ class Aliasing(BaseModule):
             UI.error(f'Aliasing.AD_to_aggregated_plot(): Attempting to '
                      'aggregate aliasing pdata files with different number '
                      f'of sets ({str(all_num_sets)} number of sets).')
-        print(f'all_num_sets: {all_num_sets}')
         num_sets = all_num_sets.pop()
-        print(f'num_sets: {num_sets}')
+
 
         #####################################
         # CREATE COLOR PALETTE
@@ -285,100 +230,125 @@ class Aliasing(BaseModule):
 
         #####################################
         # CREATE DATA SERIES
-        # first, find the last Xs across all pdatas
-        last_Xs = [len(pdata_Y[0])-1 for pdata_Y in all_pdatas]
-        print(f'last_Xs: {last_Xs}')
 
-        # create an X big enough to fit all pdatas.
-        X_min = 0
-        X_max = max(last_Xs)
-        super_X = list(range(X_min, X_max+1))
-        print(f'super_X: {super_X}')
+        # enter each pdata, and sort the aliasings such that at time t,
+        # set_0 becomes the idlest, and set_S-1 the busiest.
+        # save them in a compressed list all_short_pdatas
+        all_compressed_pdatas = [[[] for _ in sets]
+                                 for sets in all_pdatas]
+        tth_alis = [0] * num_sets
+        for p,pdat in enumerate(all_pdatas):
+            for t in range(len(pdat[0])):
+                # collect the t-th alias of each set <s>, ...
+                for s in range(num_sets):
+                    tth_alis[s] = pdat[s][t]
 
-        # create a Y big enough to fit all pdatas. This Y has S lists, one for
-        # each set.
-        super_Y = [[0] * len(super_X) for s in range(num_sets)]
-        print(f'super_Y: {super_Y}')
+                # if there is no fetches at this time, skip it.
+                if sum(tth_alis) < 0.00001: # comparing float to "zero"
+                    continue
 
-        print(f'len(super_Y[0]): {len(super_Y[0])}')
+                # Otherwise, sort alias degrees (idle first, bussy last), and
+                # write their values to the compressed list
+                tth_alis.sort()
+                for s in range(num_sets):
+                    all_compressed_pdatas[p][s].append(tth_alis[s])
 
-        """
-        # first you sort across sets, so set 0 is the lightest, and set S-1 the
-        # heaviest.
-        all_pdatas_bottom_heavy = [[] for _ in range(total_pdatas)]
-        for i,pdata in enumerate(all_pdatas):
-             for ith_ali in zip(*pdata):
-                 all_pdatas_bottom_heavy[i].append(sorted(ith_ali))
-
-        # Now, you collect all sets with their own (all sets 0, all sets 1...)
-        all_pdatas_avg = [[] for _ in range(total_pdatas)]
-        for s,sth_sets in enumerate(zip_longest(*all_pdatas_bottom_heavy,
-                                               fillvalue=None)):
-            for i,ith_alises in enumerate(zip(*sth_sets)):
-                for
-        """
-        return
+        # find the last time across all compressed pdatas
+        last_times = [len(pdat[0])-1 for pdat in all_compressed_pdatas]
+        time_size = max(last_times) + 1
 
 
-        # If each pdata has S sets, then create a new list with S virtual sets.
-        # Each virtual set will represent from the "busiest" to the "idlest" set
-        # at time t across all pdatas.
-        last_Xs = []
-        for pdata_Y in all_pdatas:
-            X = range(len(pdata_Y))
-            last_Xs.append(len(pdata_Y)-1)
-            Y = pdata_Y
-            mpl_axes.plot(X, Y, zorder=4, color=ind_color,
-                          linewidth=ind_line_width)
+        # Create list for averages: <num_sets> tier-sets and <time_size> time
+        # slots.
+        avg_tier_aliasing = [[0] * time_size for _ in range(num_sets)]
+
+        # traverse all_pdatas, taking the s-th set across all pdatas at the
+        # time, remember that sets now represent an idle-to-busy ranking.
+        for s,sth_sets in enumerate(zip(*all_compressed_pdatas)):
+            # In the <s>-tier level of business, get the average for each point
+            # of time <t>
+            for t,tth_alis in enumerate(zip_longest(*sth_sets, fillvalue=None)):
+                valid_tth_alis = [a for a in tth_alis if a is not None]
+                avg = sum(valid_tth_alis)/len(valid_tth_alis)
+                avg_tier_aliasing[s][t] = avg
 
 
         #####################################
-        # PLOT MOVING AVERAGE OF METRICS
-        # find range large enough to fit all plots
-        X_min = 0
-        X_max = max(last_Xs)
-        super_X = list(range(X_min, X_max+1))
+        # PLOT SET-TIERS
+        # for each set-tier, plot a "band" with its colored shades
+        X_pad,Y_pad = 0.5,0.5
+        for s in range(num_sets):
+            # define the extension of this set's band:
+            # - all horizontal (time) span.
+            # - just one unit in the vertical (set-tiers) span.
+            set_tier_ext = (0-X_pad, time_size-1+X_pad,
+                            s-Y_pad, s+Y_pad)
+            set_tier_ali = [avg_tier_aliasing[s]]
+            mpl_axes.imshow(set_tier_ali, cmap=shade_cmap, origin='lower',
+                            interpolation='none', aspect='auto',
+                            extent=set_tier_ext, zorder=1, vmin=0, vmax=1)
 
-        all_ith_ys_list = list(zip_longest(*all_pdatas, fillvalue=None))
-        Y_avg = [0] * len(super_X)
-        for x,ith_ys in zip(super_X,all_ith_ys_list):
-            valid_ys = [y for y in ith_ys if y is not None]
-            ys_avg = sum(valid_ys) / len(valid_ys)
-            Y_avg[x] = ys_avg
-        mpl_axes.plot(super_X, Y_avg, zorder=6, color=avg_color,
-                      linewidth=avg_line_width)
+
+        ###########################################
+        ## OBTAIN AVERAGE LOAD IMBALANCE
+        imbal = [0] * time_size
+        i = 0
+        for ith_alis in zip(*avg_tier_aliasing):
+            if sum(ith_alis) > 0.00000001: # anything above 0 should do it
+                imbal[i] = ith_alis[-1] - ith_alis[0]
+                i += 1
+        imbal = imbal[:i]
+        if i > 0:
+            imbal_avg = 100*sum(imbal)/len(imbal)
+        else:
+            imbal_avg = 0
+        imbal_text = f'Avg load imbalance: {imbal_avg:.2f}%'
 
 
         #####################################
         # PLOT VERT LINE AT LAST X OF EACH METRIC AND AVERAGE
+        xlims = (0,time_size-1)
+        ylims = (0,num_sets-1)
         if st.Plot.aggr_last_x:
-            last_X_text = cls.draw_last_Xs(mpl_axes, last_Xs, (-20,120))
+            last_X_text = cls.draw_last_Xs(
+                mpl_axes, last_times, ylims=(ylims[0]-Y_pad,ylims[1]+Y_pad),
+                pre_text='Avg number of fetches')
 
 
         #####################################
         # SETUP PLOT VISUALS
         # set plot limits
-        X_pad = 0.5
         real_xlim, real_ylim = cls.setup_limits(
-            mpl_axes, metric_code, xlims=(X_min,X_max), x_pad=X_pad,
-            ylims=(0,100), y_pad='auto'
-        )
+            mpl_axes, metric_code, xlims=xlims, x_pad=X_pad, ylims=ylims,
+            y_pad=Y_pad, invert_y=True)
 
         # set ticks based on the real limits
-        cls.setup_ticks(
-            mpl_axes, xlims=real_xlim, ylims=real_ylim,
-            bases=(10, 10)
-        )
+        cls.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
+                        bases=(10, 2))
+
+        # overwrite Y ticks with "idle" and "busy"
+        text_ticks = ['' for _ in range(num_sets)]
+        text_ticks[0] = 'idlest'
+        text_ticks[-1] = 'busiest'
+        mpl_axes.set_yticklabels(text_ticks)
+        mpl_axes.tick_params(axis='y', rotation=90)
 
         # set grid
-        axis = 'y' if st.Plot.aggr_last_x else 'xy'
-        cls.setup_grid(mpl_axes, axis=axis, fn_axis='y')
+        if num_sets < st.Plot.grid_max_sets:
+            sets_separators = [s+0.5 for s in range(num_sets-1)]
+            cls.setup_manual_grid(mpl_axes, axis='y', fn_axis='y',
+                                  hlines=sets_separators,
+                                  xlims=(xlims[0]-X_pad,xlims[1]+X_pad),
+                                  grid_color='#40BF40CC', zorder=2)
+        else:
+            axis = 'y' if st.Plot.aggr_last_x else 'xy'
+            cls.setup_grid(mpl_axes, axis=axis, fn_axis='y')
 
-        # insert text box with average usage
-        text = [f'Executions: {total_pdatas}']
+        # insert text box with average imbalance
+        text = [f'Executions: {num_pdatas}']
         if st.Plot.aggr_last_x:
             text.append(last_X_text)
-        text.append(rf'Avg2 {metric_code}: {sum(Y_avg)/len(Y_avg):.2f}%')
+        text.append(imbal_text)
         cls.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

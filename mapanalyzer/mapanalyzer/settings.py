@@ -305,6 +305,8 @@ class Settings:
         # DERIVED VALUES
         # Metrics *enabled by the user*. Initialized to set of metric codes.
         enabled = None
+        enabled_user = None
+        enabled_explicit = False
 
         # Metrics *available in the tool*. All the metrics with some module
         # supporting them. Check comments on Settings.Metrics.set_available()
@@ -320,8 +322,8 @@ class Settings:
         @classmethod
         def from_args(cls, args):
             # initialize each argument
-            # assg_val(cls.enabled, args.met_codes)
-            cls.enabled = cls.__init_enabled(args.met_codes)
+            cls.__init_enabled(args.met_codes)
+
             cls.bg = cls.__init_bg(args.bg_metric,
                                    list(Settings.ALL_METRIC_CODES.keys()),
                                    'MAP')
@@ -332,7 +334,7 @@ class Settings:
         @classmethod
         def from_dict(cls, pdata_dict):
             # set values from the dictionary
-            cls.enabled = cls.__init_enabled(pdata_dict['fg']['code'])
+            cls.enabled = {pdata_dict['fg']['code']}
 
             # get pdata bg metric (if any)
             pdata_bg = None
@@ -350,12 +352,26 @@ class Settings:
 
         @classmethod
         def __init_enabled(cls, fg_codes):
-            # if nothing or 'all' specified, enable them all
-            if fg_codes is None or fg_codes.upper() == 'ALL':
-                return [m.upper() for m in Settings.ALL_METRIC_CODES.keys()]
+            all_codes = {m.upper() for m in Settings.ALL_METRIC_CODES.keys()}
+            # if user said nothing
+            if fg_codes is None:
+                cls.enabled_user = all_codes
+                cls.enabled = all_codes
+                cls.enabled_explicit = False
 
-            # otherwise parse whatever was given
-            return {m.strip().upper() for m in fg_codes.split(',')}
+            # if user said 'all'
+            elif fg_codes.upper() == 'ALL':
+                cls.enabled_user = all_codes
+                cls.enabled = all_codes
+                cls.enabled_explicit = True
+
+            # if user gave an explicit list:
+            else:
+                user_codes = {m.strip().upper() for m in fg_codes.split(',')}
+                cls.enabled_user = user_codes
+                cls.enabled = user_codes
+                cls.enabled_explicit = True
+            return
 
         @classmethod
         def __init_bg(cls, bg_code, bg_options, fallback_code):

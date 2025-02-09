@@ -161,7 +161,7 @@ class MissRatio(BaseModule):
             Y = thr_mr.miss_ratio
             X = range(len(Y))
             line_color = thread_to_color[thr]
-            mpl_axes.plot(X, Y, zorder=2, color=line_color,
+            mpl_axes.step(X, Y, where='mid', zorder=2, color=line_color,
                           linewidth=line_width)
 
 
@@ -258,12 +258,13 @@ class MissRatio(BaseModule):
                 Y = thr_cmr
                 thr = int(thr)
                 thr_color = thread_to_color[thr][0]
-                mpl_axes.plot(X, Y, zorder=4, color=thr_color,
+                mpl_axes.step(X, Y, where='mid', zorder=4, color=thr_color,
                               linewidth=ind_line_width)
 
 
         #####################################
-        # PLOT MOVING AVERAGE OF METRICS (FOR EACH THREAD)
+        # PLOT MOVING AVERAGE OF METRICS
+        # one average for each thread.
         # find range large enough to fit all plots
         X_min,X_max = 0,max(last_Xs)
         super_X = list(range(X_min, X_max+1))
@@ -292,7 +293,7 @@ class MissRatio(BaseModule):
         # plot average of each thread
         for thr,thr_cmr_avg in all_threads_cmr_avg.items():
             thr_color = thread_to_color[thr][1]
-            mpl_axes.plot(super_X, thr_cmr_avg, zorder=4,
+            mpl_axes.step(super_X, thr_cmr_avg, where='mid', zorder=4,
                           color=thr_color, linewidth=avg_line_width)
 
 

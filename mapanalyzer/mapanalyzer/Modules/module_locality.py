@@ -11,7 +11,7 @@ class Locality(BaseModule):
     hue = 325
     supported_metrics = {
         'SLD' : MetricStrings(
-            about  = ('Spatial Locality Degree.') ,
+            about  = ('Spatial Locality Degree.'),
             title  = 'SLD',
             subtit = 'higher is better',
             number = '01',
@@ -19,7 +19,7 @@ class Locality(BaseModule):
             ylab   = 'Spatial Locality Degree',
         ),
         'TLD' : MetricStrings(
-            about  = ('Temporal Locality Degree.') ,
+            about  = ('Temporal Locality Degree.'),
             title  = 'TLD',
             subtit = 'higher is better',
             number = '01',
@@ -29,7 +29,7 @@ class Locality(BaseModule):
     }
     supported_aggr_metrics = {
         'SLD' : MetricStrings(
-            about  = ('Average Spatial Locality Degree.') ,
+            about  = ('Average Spatial Locality Degree.'),
             title  = 'Aggregated SLD',
             subtit = 'higher is better',
             number = '01',
@@ -37,7 +37,7 @@ class Locality(BaseModule):
             ylab   = 'Spatial Locality Degree',
         ),
         'TLD' : MetricStrings(
-            about  = ('Average Temporal Locality Degree.') ,
+            about  = ('Average Temporal Locality Degree.'),
             title  = 'Aggregated TLD',
             subtit = 'higher is better',
             number = '01',

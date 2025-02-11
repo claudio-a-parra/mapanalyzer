@@ -11,7 +11,7 @@ clean_all(){
     rm -rf ./$pdata_dir/*
     rm -rf ./$plot_dir/*
     rm -rf ./$aggr_dir/*
-    tree_flag
+    flag_tree
 }
 
 create_quicksort(){
@@ -87,7 +87,7 @@ create_maps(){
     for ((m=1; m<=$num_maps; m++)); do
         map_id=$(printf "%0${#num_maps}d" $m)
         create_$kind $map_id "$@"
-        tree_flag
+        flag_tree
     done
 
     cd ..
@@ -100,10 +100,10 @@ create_maps(){
     else
         echo -e "\n\nTEST.create_maps($num_maps, $min_lsize, $max_lsize): " \
             "MAP files not created!"
-        tree_flag
+        flag_tree
         exit 1
     fi
-    tree_flag
+    flag_tree
 }
 mtest(){
     local mode="$1"
@@ -129,10 +129,10 @@ mtest(){
     else
         echo -e "\n\nTEST.mtest(--mode $mode $command_options): MAP files " \
             "not found in ./$maps_dir/"
-        tree_flag
+        flag_tree
         exit 1
     fi
-    tree_flag
+    flag_tree
 
     # move json files to a separated folder
     if [[ "$mode" = "simulate" || "$mode" = "sim-plot" ]]; then
@@ -143,11 +143,11 @@ mtest(){
         else
             echo -e "\n\nTEST.mtest(--mode $mode $command_options): JSON " \
                 "files not created!"
-            tree_flag
+            flag_tree
             exit 1
         fi
     fi
-    tree_flag
+    flag_tree
 
     # move plot files to a separated folder
     if [[ "$mode" = "sim-plot" || "$mode" = "plot" || "$mode" = "aggregate" ]]; then
@@ -165,11 +165,11 @@ mtest(){
         else
             echo -e "\n\nTEST.mtest(--mode $mode $command_options): PLOT " \
                 "files not created!"
-            tree_flag
+            flag_tree
             exit 1
         fi
     fi
-    tree_flag
+    flag_tree
 }
 view(){
     while true; do
@@ -178,31 +178,31 @@ view(){
          sleep 1
     done
 }
-tree_flag(){
+flag_tree(){
     touch .flag_tree
 }
 create_cache(){
     cat <<EOF > cache.conf
-line_size_bytes  : 32
-associativity    : 4
-cache_size_bytes : 2048
+line_size_bytes  : 4
+associativity    : 2
+cache_size_bytes : 32
 arch_size_bits   : 64
 EOF
     bat cache.conf
 }
 
 
-common_opts=(-pw 10 -ph 6 --dpi 400 --cache cache.conf)
+common_opts=(-pw 10 -ph 8 --dpi 400 --cache cache.conf)
 METS=SLD,TLD,CMR,CMMA,CUR,AD
-
+METS=BPA
 
 clear
-create_maps quicksort 20 2000
-#create_maps convergent 2 20 3000
+#create_maps quicksort 1 40
+create_maps convergent 1 400
 #create_maps convolution 2 3 400 500
 
 #create_cache
-mtest sim-plot -mc MAP,$METS
-#mtest plot -mc MAP,$METS
-mtest aggregate -mc $METS
+mtest simulate -mc MAP,$METS
+mtest plot -mc MAP,$METS
+#mtest aggregate -mc $METS
 echo -e "\n\nTEST: Done"

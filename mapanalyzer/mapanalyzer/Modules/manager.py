@@ -11,7 +11,7 @@ from .module_missratio import MissRatio
 from .module_memaccess import MemAccess
 from .module_usage import CacheUsage
 from .module_aliasing import Aliasing
-#! from .module_eviction import EvictionDuration
+from .module_roundtrip import EvictionRoundtrip
 
 
 class Manager:
@@ -23,7 +23,7 @@ class Manager:
         MemAccess,
         CacheUsage,
         Aliasing,
-        #!EvictionDuration
+        EvictionRoundtrip
     ]
 
     def __init__(self):
@@ -34,7 +34,7 @@ class Manager:
         self.memaccess = MemAccess()
         self.usage = CacheUsage()
         self.aliasing = Aliasing()
-        #!self.evictdur = EvictDuration()
+        self.roundtrip = EvictionRoundtrip()
 
         self.available_module_instances = [
             self.map,
@@ -43,7 +43,7 @@ class Manager:
             self.memaccess,
             self.usage,
             self.aliasing,
-            #!self.evictdur
+            self.roundtrip
         ]
 
         # inform st.Metrics about the available modules

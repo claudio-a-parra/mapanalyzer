@@ -50,6 +50,17 @@ class BaseModule:
         return str(code).upper() in cls.metrics
 
     @classmethod
+    def get_plot_xy_size(cls, mpl_axes):
+        """Get the dimensions of the plotting area"""
+        pos = mpl_axes.get_position()
+        # Get the figure size in inches
+        fig_width, fig_height = mpl_axes.figure.get_size_inches()
+        # Convert to plotting area size in inches
+        plot_width_pts = pos.width * fig_width * 72
+        plot_height_pts = pos.height * fig_height * 72
+        return (plot_width_pts, plot_height_pts)
+
+    @classmethod
     def setup_labels(cls, mpl_axes, met_str, bg_mode=False):
         """setup axes labels"""
         ax_names = ('x', 'y')
@@ -379,3 +390,4 @@ class BaseModule:
             UI.error(f'Trying to aggregate "{metric_code}" data. '
                      f'{class_name}.{fn_name}() is not defined.')
         MET_to_aggregated_plot(pdata_dicts)
+        return

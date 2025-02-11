@@ -68,7 +68,6 @@ class Cache:
         self.modules = modules
         self.blocks_in_cache = {}
         self.sets = [Set(st.Cache.asso) for _ in range(st.Cache.num_sets)]
-        UI.warning('Commenting some modules. Marked with "#!".', pre='TODO')
         return
 
     def __accesses(self, concurrent_access):
@@ -133,7 +132,8 @@ class Cache:
                 # handle potentially evicted block
                 evicted_block = self.sets[set_index].push_block(fetched_block)
                 tag_out = None if evicted_block is None else evicted_block.tag
-                #!self.modules.evicd.update(access.time, set_index, p_tag, tag_out)
+                self.modules.roundtrip.probe(access.time, set_index, p_tag,
+                                             tag_out)
                 if evicted_block is not None:
                     # EVICTION
                     del self.blocks_in_cache[(evicted_block.tag,set_index)]
@@ -172,8 +172,8 @@ class Cache:
             tag_out = None if evicted_block is None else evicted_block.tag
             while evicted_block is not None:
                 tag_out = evicted_block.tag
-                #!self.modules.evicd.update(st.Map.time_size, set_idx, None,
-                #!                          tag_out)
+                self.modules.roundtrip.probe(st.Map.time_size, set_idx, None,
+                                         tag_out)
 
                 # It doesn't make much sense to register usage on flush
                 # self.modules.usage.probe(

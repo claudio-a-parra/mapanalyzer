@@ -13,7 +13,7 @@ class Aliasing(BaseModule):
     supported_metrics = {
         'AD' : MetricStrings(
             about  = ('Proportion in which each set fetches blocks during '
-                      'execution.') ,
+                      'execution.'),
             title  = 'Aliasing Density',
             subtit = 'transparent is better',
             number = '05',
@@ -24,7 +24,7 @@ class Aliasing(BaseModule):
     supported_aggr_metrics = {
         'AD' : MetricStrings(
             about  = ('Average proportion in which each set fetches blocks '
-                      'during execution.') ,
+                      'during execution.'),
             title  = 'Cache Set Load Imbalance',
             subtit = 'transparent is better',
             number = '05',

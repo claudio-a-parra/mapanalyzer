@@ -16,9 +16,9 @@ class Settings:
         'CMMA' : 'Cumulative Main Memory Access',
         'CUR'  : 'Cache Usage Ratio',
         'AD'   : 'Aliasing Density',
-        'ED'   : 'Eviction Duration',
         'BPA'  : 'Block Personality Adoption',
-        'EDH'  : 'Eviction Duration Histogram'
+        'SRI'  : 'Short Roundtrip Interval',
+        'RID'  : 'Roundtrip Interval Distribution'
     }
 
     @classmethod
@@ -942,8 +942,6 @@ class Settings:
             cls.textbox_offsets = cls.__init_textbox_offsets()
             cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
                 cls.width, cls.height, cls.dpi, cls.max_map_res)
-            UI.warning('Hardcoded jump_line_width.', pre='TODO')
-            cls.jump_line_width = 1 #max(0.2,min(3,12*(width/data_X_size)))
             return
 
         @classmethod

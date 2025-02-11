@@ -11,7 +11,7 @@ class Map(BaseModule):
     hue = 120
     supported_metrics = {
         'MAP' :  MetricStrings(
-            about  = 'Visual representation of Memory Access Pattern.',
+            about  = ('Visual representation of Memory Access Pattern.'),
             title  = 'MAP',
             subtit = None,
             number = '00',

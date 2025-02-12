@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from itertools import zip_longest
 
 from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import MetricStrings, Palette, PlotFile
+from mapanalyzer.util import MetricStrings, Palette, PlotFile, sample_list
 from mapanalyzer.ui import UI
 from .base import BaseModule
 
@@ -17,20 +17,19 @@ class EvictionRoundtrip(BaseModule):
             xlab   = 'Time [access instr.]',
             ylab   = 'Space [blocks]',
         ),
-        'SRI' : MetricStrings(
-            about  = ('Short Roundtrip Intervals: The time it takes for a '
-                      'block to be evicted to main memory and brought back to '
-                      'the cache.'),
-            title  = 'Short Roundtrip Interval',
+        'SMRI' : MetricStrings(
+            about  = ('The time a block spends in main memory until it is '
+                      'fetched back to cache.'),
+            title  = 'Short Memory Roundtrip Interval',
             subtit = 'fewer is better',
             number = '07',
             xlab   = 'Time [access instr.]',
             ylab   = 'Space [blocks]',
         ),
-        'RID' : MetricStrings(
-            about  = ('Roundtrip Interval Distribution: Histogram of roundtrip '
-                      'intervals.'),
-            title  = 'Roundtrip Interval Distribution',
+        'MRID' : MetricStrings(
+            about  = ('Histogram showing the memory roundtrip intervals '
+                      'duration distribution.'),
+            title  = 'Memory Roundtrip Interval Distribution',
             subtit = 'right-skewed is better',
             number = '08',
             xlab   = 'Rountrip duration [access instr.]',
@@ -38,9 +37,9 @@ class EvictionRoundtrip(BaseModule):
         )
     }
     supported_aggr_metrics = {
-        'RID' : MetricStrings(
-            about  = ('Average RID.'),
-            title  = 'Average RI Distribution',
+        'MRID' : MetricStrings(
+            about  = ('Average MRID.'),
+            title  = 'Average MRI Distribution',
             subtit = 'right-skewed is better',
             number = '08',
             xlab   = 'Rountrip duration [access instr.]',
@@ -49,49 +48,7 @@ class EvictionRoundtrip(BaseModule):
     }
 
 
-    def __init__(self, shared_X=None, hue=220):
-        # self.tool_name = 'Eviction Duration'
-        # self.tool_about = ('Detects blocks that are evicted and fetched back '
-        #                    'in a short time.')
-        # self.ps_e = PlotStrings(
-        #     title  = 'ED',
-        #     code = 'ED',
-        #     xlab   = 'Time [access instr.]',
-        #     ylab   = 'Memory Blocks',
-        #     suffix = '_plot-07-eviction-duration',
-        #     subtit = 'longer is better'
-        # )
-        # self.ps_p = PlotStrings(
-        #     title  = 'BPA',
-        #     code   = 'BPA',
-        #     xlab   = 'Time [access instr.]',
-        #     ylab   = 'Memory Blocks',
-        #     suffix = '_plot-08-personality',
-        #     subtit = ''
-        # )
-        # self.ps_h = PlotStrings(
-        #     title  = 'EDH',
-        #     code = 'EDH',
-        #     xlab   = 'Time to Re-Fetch [access instr.]',
-        #     ylab   = 'Frequency',
-        #     suffix = '_plot-09-eviction-duration-hist',
-        #     subtit = 'right-skewed is better'
-        # )
-        # self.enabled = self.ps_e.code in st.plot.include or \
-        #     self.ps_h.code in st.plot.include or \
-        #     self.ps_p.code in st.plot.include
-        # if not self.enabled:
-        #     return
-        # self.X = shared_X if shared_X is not None else \
-        #     [i for i in range(st.map.time_size)]
-        # self.hue = hue
-        # self.tool_palette = Palette(hue=hue,
-        #                             hue_count=st.cache.num_sets,
-        #                             # [main bars, alive blocks, average time-to-refetch]
-        #                             lightness= [60, 75, 50],
-        #                             saturation=[50, 75, 90],
-        #                             alpha=     [90, 30, 100])
-
+    def __init__(self):
         self.enabled = (any(m in st.Metrics.enabled
                            for m in self.supported_metrics.keys()) or
                         st.Metrics.bg in self.supported_metrics)
@@ -289,6 +246,7 @@ class EvictionRoundtrip(BaseModule):
         self.personalities = sets_personalities
         return
 
+
     def BPA_to_dict(self):
         return {
             'code' : 'BPA',
@@ -303,7 +261,7 @@ class EvictionRoundtrip(BaseModule):
                                     for s,dt in data['alive_intervals'].items()}
             self.personalities = {int(s): dt
                                   for s,dt in data['personalities'].items()}
-            self.num_sets = data['num_sets']
+            self.num_sets = int(data['num_sets'])
         except:
             class_name = self.__class__.__name__
             UI.error(f'{class_name}.dict_to_BPA(): Malformed data.')
@@ -321,7 +279,7 @@ class EvictionRoundtrip(BaseModule):
         pal = Palette(
             hue = len(set_to_color), h_off=self.hue,
             sat = st.Plot.p_sat,
-            lig = st.Plot.p_lig,
+            lig = (50, 0),
             alp = st.Plot.p_alp)
         for i,set_idx in enumerate(set_to_color):
             set_to_color[set_idx] = pal[i][0][0][0]
@@ -346,568 +304,456 @@ class EvictionRoundtrip(BaseModule):
 
         #####################################
         ## PLOT METRIC
-        for set_idx in sorted(self.alive_intervals.keys()):
-            set_interv = self.alive_intervals[set_idx]
-            set_person = self.personalities[set_idx]
-            set_color = set_to_color[set_idx]
+        mpl_fig = mpl_axes.figure
+        plot_types = ('single', 'all')
+        # save plots for each independent set, and one for all together
+        for plot_type in plot_types:
+            all_sets = sorted(self.alive_intervals.keys())
+            for set_idx in all_sets:
+                set_interv = self.alive_intervals[set_idx]
+                set_person = self.personalities[set_idx]
+                set_color = set_to_color[set_idx]
 
-            mpl_axes.hlines(y=set_interv['bl'], xmin=set_interv['t0'],
-                            xmax=set_interv['t1'],
-                            color=set_color, linewidth=block_line_width,
-                            alpha=block_line_alpha, zorder=2,
-                            linestyle=block_line_style)
+                mpl_axes.hlines(y=set_interv['bl'], xmin=set_interv['t0'],
+                                xmax=set_interv['t1'],
+                                color=set_color, linewidth=block_line_width,
+                                alpha=block_line_alpha, zorder=2,
+                                linestyle=block_line_style)
 
-            mpl_axes.plot(set_person['t'], set_person['b'],
-                          color=set_color, linewidth=jump_line_width,
-                          alpha=jump_line_alpha, zorder=3,
-                          linestyle=jump_line_style, solid_capstyle='round')
+                mpl_axes.plot(set_person['t'], set_person['b'],
+                              color=set_color, linewidth=jump_line_width,
+                              alpha=jump_line_alpha, zorder=3,
+                              linestyle=jump_line_style, solid_capstyle='round')
+
+                # visuals for each "single" plot, or after the last of "all"
+                if plot_type == 'single' or set_idx == all_sets[-1]:
+                    ###########################################
+                    ## PLOT VISUALS
+                    # set plot limits
+                    X_pad,Y_pad = 0.5,0.5
+                    X_min,X_max = 0,st.Map.time_size-1
+                    Y_min,Y_max = 0,st.Map.num_blocks-1
+                    xlims = (X_min, X_max)
+                    ylims = (Y_min, Y_max)
+                    real_xlim, real_ylim = self.setup_limits(
+                        mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
+                        ylims=ylims, y_pad=Y_pad, invert_y=True)
+
+                    # set ticks based on the real limits
+                    self.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
+                                     bases=(10, 10), bg_mode=bg_mode)
+
+                    # set grid
+                    self.setup_grid(mpl_axes, fn_axis='y', bg_mode=bg_mode)
+
+                    # set labels
+                    self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
+
+                    # title and bg color
+                    variant = ''
+                    if plot_type == 'single':
+                        variant = f's{set_idx:02d}'
+                    self.setup_general(mpl_axes, pal.bg, met_str,
+                                       variant=variant,
+                                       bg_mode=bg_mode)
+
+                    # save if single mode
+                    if plot_type == 'single':
+                        PlotFile.save(mpl_fig, metric_code,
+                                      variant=f'_s{set_idx:02d}')
+                        # reset axes
+                        mpl_axes.clear()
+                        mpl_fig.canvas.draw()
+        return
 
 
-        ###########################################
-        ## PLOT VISUALS
-        # set plot limits
-        X_pad,Y_pad = 0.5,0.5
-        X_min,X_max = 0,st.Map.time_size-1
-        Y_min,Y_max = 0,st.Map.num_blocks-1
-        xlims = (X_min, X_max)
-        ylims = (Y_min, Y_max)
-        real_xlim, real_ylim = self.setup_limits(
-            mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
-            ylims=ylims, y_pad=Y_pad, invert_y=True)
+    def SMRI_to_dict(self):
+        return {
+            'code' : 'SMRI',
+            'dead_intervals' : self.dead_intervals,
+            'num_sets' : self.num_sets
+        }
 
-        # set ticks based on the real limits
-        self.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
-                         bases=(10, 10), bg_mode=bg_mode)
+    def dict_to_SMRI(self, data):
+        try:
+            self.dead_intervals = {int(s): dt
+                                   for s,dt in data['dead_intervals'].items()}
+            self.num_sets = int(data['num_sets'])
+        except:
+            class_name = self.__class__.__name__
+            UI.error(f'{class_name}.dict_to_SMRI(): Malformed data.')
+        return
 
-        # set grid
-        self.setup_grid(mpl_axes, fn_axis='y', bg_mode=bg_mode)
+    def SMRI_to_plot(self, mpl_axes, bg_mode=False):
+        metric_code = 'SMRI'
+        met_str = self.supported_metrics[metric_code]
+
+
+        #####################################
+        ## CREATE COLOR PALETTE
+        # each set has its color {set -> color}
+        set_to_color = {s:'' for s in range(self.num_sets)}
+        pal = Palette(
+            hue = len(set_to_color), h_off=self.hue,
+            sat = (50, 0),
+            lig = (50, 0),
+            alp = (100, 0))
+        for i,set_idx in enumerate(set_to_color):
+            set_to_color[set_idx] = pal[i][0][0][0]
+
+        # compute the width of block lines
+        plt_w,plt_h = self.get_plot_xy_size(mpl_axes)
+        height_range = st.Map.num_blocks
+        if metric_code in st.Plot.y_ranges:
+            ymin,ymax = st.Plot.y_ranges[metric_code]
+            height_range = ymax - ymin
+        block_line_width = plt_h / height_range
+        block_line_alpha = 0.5
+        block_line_style = '-'
+
+
+        #####################################
+        ## PLOT METRIC
+        mpl_fig = mpl_axes.figure
+        plot_types = ('single', 'all')
+        # save plots for each independent set, and one for all together
+        for plot_type in plot_types:
+            all_sets = sorted(self.dead_intervals.keys())
+            all_roundtrips_count = 0 # count of dead segments <= threshold.
+            for set_idx in all_sets:
+                set_intervs = self.dead_intervals[set_idx]
+                blocks = set_intervs['bl']
+                t_start = set_intervs['t0']
+                t_end = set_intervs['t1']
+                set_color = set_to_color[set_idx]
+                roundtrips_count = len(blocks)
+
+                # If a maximum threshold was given by the user, then filter
+                # the intervals to only plot shorter ones.
+                thrshld = st.Plot.roundtrip_threshold
+                thrshld_text = '(all)'
+                if thrshld is not None:
+                    blocks,t_start,t_end = [],[],[]
+                    for bl,t0,t1 in zip(set_intervs['bl'], set_intervs['t0'],
+                                        set_intervs['t1']):
+                        if t1-t0 <= thrshld:
+                            blocks.append(bl)
+                            t_start.append(t0)
+                            t_end.append(t1)
+                    roundtrips_count = len(blocks)
+                    thrshld_text = rf' ($\leq${thrshld})'
+                all_roundtrips_count += roundtrips_count
+
+                # draw the horizontal lines
+                mpl_axes.hlines(y=blocks, xmin=t_start, xmax=t_end,
+                                color=set_color, linewidth=block_line_width,
+                                alpha=block_line_alpha, zorder=2,
+                                linestyle=block_line_style)
+
+
+                ###########################################
+                ## PLOT VISUALS
+                # visuals for each "single" plot, or after the last of "all"
+                if plot_type == 'single' or set_idx == all_sets[-1]:
+                    # set plot limits
+                    X_pad,Y_pad = 0.5,0.5
+                    X_min,X_max = 0,st.Map.time_size-1
+                    Y_min,Y_max = 0,st.Map.num_blocks-1
+                    xlims = (X_min, X_max)
+                    ylims = (Y_min, Y_max)
+                    real_xlim, real_ylim = self.setup_limits(
+                        mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
+                        ylims=ylims, y_pad=Y_pad, invert_y=True)
+
+                    # set ticks based on the real limits
+                    self.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
+                                     bases=(10, 10), bg_mode=bg_mode)
+
+                    # set grid
+                    self.setup_grid(mpl_axes, fn_axis='y', bg_mode=bg_mode)
+
+                    # insert text box with total read/write count
+                    if not bg_mode:
+                        count = all_roundtrips_count
+                        if plot_type == 'single':
+                            count = roundtrips_count
+                        text = (rf'SMRI count{thrshld_text} : {count}')
+                        self.draw_textbox(mpl_axes, text, metric_code)
+
+                    # set labels
+                    self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
+
+                    # title and bg color
+                    variant = ''
+                    if plot_type == 'single':
+                        variant = f's{set_idx:02d}'
+                    self.setup_general(mpl_axes, pal.bg, met_str,
+                                       variant=variant,
+                                       bg_mode=bg_mode)
+
+                    # save if single mode
+                    if plot_type == 'single':
+                        PlotFile.save(mpl_fig, metric_code,
+                                      variant=f'_s{set_idx:02d}')
+                        # reset axes
+                        mpl_axes.clear()
+                        mpl_fig.canvas.draw()
+        return
+
+
+    def MRID_to_dict(self):
+        return {
+            'code' : 'MRID',
+            'dead_intervals' : self.dead_intervals,
+            'num_sets' : self.num_sets
+        }
+
+    def dict_to_MRID(self, data):
+        try:
+            self.dead_intervals = {int(s): dt
+                                   for s,dt in data['dead_intervals'].items()}
+            self.num_sets = int(data['num_sets'])
+        except:
+            class_name = self.__class__.__name__
+            UI.error(f'{class_name}.dict_to_MRID(): Malformed data.')
+        return
+
+    def MRID_to_plot(self, mpl_axes, bg_mode=False):
+        metric_code = 'MRID'
+        met_str = self.supported_metrics[metric_code]
+
+
+        #####################################
+        ## CREATE COLOR PALETTE
+        # each set has its color set_to_color[set] -> color:str
+        # for histogram and medians
+        hset_to_color = ['' for _ in range(self.num_sets)]
+        mset_to_color = ['' for _ in range(self.num_sets)]
+        pal = Palette(
+            hue = self.num_sets, h_off=self.hue,
+            sat = (50,  90),
+            lig = (75,  30),
+            alp = (100, 90))
+        for s in range(self.num_sets):
+            hset_to_color[s] = pal[s][0][0][0]
+            mset_to_color[s] = pal[s][1][1][1]
+
+        #####################################
+        ## CREATE DATA SERIES
+        # obtain dead intervals and medians (per set) and max dead interval
+        # (across all sets)
+        all_dintervals, med_dintervals, max_dinterval = \
+            self.__obtain_intervals(dead_intervals=self.dead_intervals,
+                                    num_sets=self.num_sets)
+
+        # define bin edges
+        bin_edges = self.__create_bins(max_dinterval, exp=20)
+
+        # map dead intervals and bin edges to a linear scale so the histogram
+        # has even columns width
+        lin_dintervals, lin_medians, lin_bin_edges, lin_max_bin_idx = \
+            self.__linearize_data(all_dintervals, med_dintervals, bin_edges)
+
+
+        #####################################
+        ## PLOT HISTOGRAM AND MEDIANS
+        hist_labels = [str(s) for s in range(self.num_sets)]
+        counts,_,_ = mpl_axes.hist(
+            lin_dintervals, stacked=True, zorder=3, width=0.95,
+            bins=lin_bin_edges, label=hist_labels, color=hset_to_color)
+
+        Y_max = max(max(i) if len(i) else 0 for i in counts)
+        ylims = (0,Y_max)
+
+        #####################################
+        ## PLOT HISTOGRAM AND MEDIANS
+        for med_x, med_col in zip(lin_medians, mset_to_color):
+            mpl_axes.axvline(x=med_x, color=med_col, linestyle='-',
+                             linewidth=3, zorder=4)
+
+
+        #####################################
+        # PLOT VISUALS
+        # setup limits and tick-labels
+        xlims = (1,max_dinterval)
+        self.__setup_hist_limits_and_ticks(
+            mpl_axes, metric_code=metric_code, xlims=xlims, ylims=ylims,
+            xticks=lin_bin_edges, xticks_labels=bin_edges)
+
+        # insert text box with medians
+        text = []
+        for s,s_med in enumerate(med_dintervals):
+            text.append(f's{s} median {metric_code}: {s_med}')
+        '\n'.join(text)
+        # set default textbox to upper-right corner
+        if metric_code not in st.Plot.textbox_offsets:
+            st.Plot.textbox_offsets[metric_code] = (0.98, 0.98)
+        self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels
-        self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
+        self.setup_labels(mpl_axes, met_str)
 
         # title and bg color
-        self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
-        return
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def DEPRECATED_plot_setup_X(self, ps):
-        # Data range based on data
-        X_padding = 0.5
-        # add tails at start/end of X for cosmetic purposes
-        self.axes.set_xlim(self.X[0]-X_padding, self.X[-1]+X_padding)
-
-        # Axis details: label, ticks and grid
-        self.axes.set_xlabel(ps.xlab)
-        rot = -90 if st.plot.x_orient == 'v' else 0
-        self.axes.tick_params(axis='x',
-                              top=False, bottom=True,
-                              labeltop=False, labelbottom=True,
-                              rotation=rot, width=st.plot.grid_other_width)
-        x_ticks = create_up_to_n_ticks(self.X, base=10,
-                                       n=st.plot.max_xtick_count)
-        self.axes.set_xticks(x_ticks)
-        # self.axes.grid(axis='x', which='both',
-        #           zorder=1,
-        #           alpha=st.plot.grid_main_alpha,
-        #           linestyle=st.plot.grid_other_style,
-        #           linewidth=st.plot.grid_other_width)
-        return
-
-    def DEPRECATED_plot_setup_Y(self, ps):
-        # define Y-axis data based on data and user input
-        Y_min = 0
-        Y_max = st.map.num_blocks-1
-        if ps.code in st.plot.y_ranges:
-            Y_min = int(st.plot.y_ranges[ps.code][0])
-            Y_max = int(st.plot.y_ranges[ps.code][1])
-        Y_padding = 0.5
-        self.axes.set_ylim(Y_min-Y_padding, Y_max+Y_padding)
-
-        # Axis details: label, ticks, and grid
-        self.axes.set_ylabel(ps.ylab)
-        self.axes.tick_params(axis='y',
-                              left=True, right=False,
-                              labelleft=True, labelright=False,
-                              width=st.plot.grid_main_width)
-        y_ticks = create_up_to_n_ticks(range(Y_min,Y_max+1), base=10,
-                                       n=st.plot.max_ytick_count)
-        self.axes.set_yticks(y_ticks)
-        # self.axes.grid(axis='y', which='both',
-        #                zorder=1,
-        #                alpha=st.plot.grid_main_alpha,
-        #                linewidth=st.plot.grid_main_width,
-        #                linestyle=st.plot.grid_main_style)
-        # invert Y axis direction
-        self.axes.invert_yaxis()
-        return
-
-    def DEPRECATED_plot_setup_general(self, title=None, variant=None, subtit=None):
-        # background color
-        self.axes.patch.set_facecolor(Palette(hue=self.hue).bg)
-
-        # setup title bits
-        title_string = st.plot.prefix
-        if title:
-            title_string = f'{title}: {title_string}'
-        if variant:
-            title_string = f'{title_string}. {variant}'
-        if subtit:
-            title_string = f'{title_string}. ({subtit})'
-
-        self.axes.set_title(title_string, fontsize=10, pad=st.plot.img_title_vpad)
-        return
-
-    def DEPRECATED_plot(self, bottom_tool=None):
-        if not self.enabled:
-            return
-
-        # collect the parameters to plot the dead_intervals of each block.
-        dead_intervals_per_set = {}
-        dead_palette = Palette(hue=self.hue, hue_count=st.cache.num_sets,
-                               lightness=[60], saturation=[50], alpha=[90])
-        for s in range(st.cache.num_sets):
-            if s in self.dead_intervals:
-                #s_color = dead_palette[s][0]
-                s_dead_intervals = self.dead_intervals[s]
-                s_all_block_ids,s_all_evictions,s_all_fetches = [],[],[]
-
-                # iterate over all the (tag,t_ram_in_out) pairs under this set.
-                for s_tag, s_tag_evictfetch_list in sorted(s_dead_intervals.items()):
-                    # iterate over every (out,in) pair in the history of a single tag
-                    for (s_t_evict_time,s_t_fetch_time) in s_tag_evictfetch_list:
-                        if s_t_fetch_time == None:
-                            continue
-                        s_all_block_ids.append((s_tag << st.cache.bits_set) | s)
-                        s_all_evictions.append(s_t_evict_time+0.5)
-                        s_all_fetches.append(s_t_fetch_time+0.5)
-
-                dead_intervals_per_set[s] = {
-                    'y': s_all_block_ids,
-                    'x0': s_all_evictions,
-                    'x1': s_all_fetches,
-                    #'col': s_color
-                }
-
-        # collect the parameters to plot the alive_intervals of each block.
-        alive_intervals_per_set = {}
-        alive_palette = Palette(hue=self.hue, hue_count=st.cache.num_sets,
-                                lightness=[75], saturation=[75], alpha=[30])
-        for s in range(st.cache.num_sets):
-            if s in self.alive_intervals:
-                s_color = alive_palette[s][0]
-                s_alive_intervals = self.alive_intervals[s]
-                s_all_block_ids,s_all_fetches,s_all_evictions = [],[],[]
-
-                # iterate over all the (tag,t_cache_in_out) pairs under this set.
-                for s_tag, s_tag_fetchevict_list in sorted(s_alive_intervals.items()):
-                    # iterate over every (in,out) pair in the history of a single tag
-                    for (s_t_fetch_time,s_t_evict_time) in s_tag_fetchevict_list:
-                        if s_t_evict_time == None:
-                            continue
-                        s_all_block_ids.append((s_tag << st.cache.bits_set) | s)
-                        s_all_fetches.append(s_t_fetch_time+0.5)
-                        s_all_evictions.append(s_t_evict_time+0.5)
-
-                alive_intervals_per_set[s] = {
-                    'y': s_all_block_ids,
-                    'x0': s_all_fetches,
-                    'x1': s_all_evictions,
-                    'col': s_color
-                }
-
-        # collect the parameters to plot the jumps of each set.
-        # set_idx -> plot parameters for all the jumps made by that set on its blocks
-        personalities_per_set = {}
-        perso_palette = Palette(hue=self.hue, hue_count=st.cache.num_sets,
-                                #lightness=[80], saturation=[75], alpha=[30])
-                                lightness=[60], saturation=[50], alpha=[90])
-        for s in range(st.cache.num_sets):
-            set_color = perso_palette[s][0]
-            set_personalities = self.personalities[s]
-            set_times = [0 for _ in range(len(set_personalities)*3)] # start, end, None
-            set_blocks = [0 for _ in range(len(set_personalities)*3)]
-            for i,p in enumerate(set_personalities):
-                ii = 3*i
-                if p[1] < p[2]:
-                    top = p[2]# - 0.5
-                    bottom = p[1]#  + 0.5
-                    t0 = p[0]
-                    t1 = p[0] + 1
-                else:
-                    top = p[1]# - 0.5
-                    bottom = p[2]# + 0.5
-                    t0 = p[0] + 1
-                    t1 = p[0]
-                set_times[ii], set_times[ii+1], set_times[ii+2] = t0, t1, None
-                set_blocks[ii], set_blocks[ii+1], set_blocks[ii+2] = bottom, top, None
-            personalities_per_set[s] = {
-                't': set_times,
-                'b': set_blocks,
-                'col': set_color
-            }
-
-        all_dead_intervals = None # to be filled late by the plots
-
-        if self.ps_e.code in st.plot.include:
-            ##############################################################
-            # PLOT THE EVICTION DURATION OF ALL SETS IN ONE IMAGE
-            # create two set of axes: for the map (bottom) and the tool
-            fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-            self.axes = fig.add_axes(bottom_axes.get_position())
-
-            # plot map
-            if bottom_tool is not None:
-                bottom_tool.plot(axes=bottom_axes)
-
-            # setup axes
-            self.plot_setup_X(self.ps_e)
-            self.plot_setup_Y(self.ps_e)
-            self.plot_setup_general(title=self.ps_e.title,
-                                    variant=f'All Sets',
-                                    subtit=self.ps_e.subtit)
-
-            # draw all alive_intervals
-            plt_w,plt_h = self.get_plot_xy_size(fig)
-            alive_linewidth = round(plt_h / st.map.num_blocks, 4)
-            for s,ai in sorted(alive_intervals_per_set.items()):
-                self.axes.hlines(y=ai['y'], color=ai['col'],
-                                 xmin=ai['x0'], xmax=ai['x1'],
-                                 linewidth=alive_linewidth,
-                                 alpha=0.5, zorder=2, linestyle='-')
-
-            # draw all dead_intervals
-            dead_linewidth = round(max(0.5, alive_linewidth / 5), 4)
-            for s,di in sorted(dead_intervals_per_set.items()):
-                self.axes.hlines(y=di['y'], color=di['col'],
-                                 xmin=di['x0'], xmax=di['x1'],
-                                 linewidth=dead_linewidth,
-                                 alpha=1, zorder=2, linestyle='-')
-
-            # save image
-            save_fig(fig, f'{self.ps_e.title} all', f'{self.ps_e.suffix}-all')
-
-
-            ##############################################################
-            # PLOT THE EVICTION DURATION OF EACH SET IN A DIFFERENT IMAGE
-            all_dead_intervals = [[] for _ in range(st.cache.num_sets)]
-            for s in range(st.cache.num_sets):
-                # create two set of axes: for the map (bottom) and the tool
-                fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-                self.axes = fig.add_axes(bottom_axes.get_position())
-
-                # plot map
-                if bottom_tool is not None:
-                    bottom_tool.plot(axes=bottom_axes)
-
-                # setup axes
-                self.plot_setup_X(self.ps_e)
-                self.plot_setup_Y(self.ps_e)
-                self.plot_setup_general(title=self.ps_e.title,
-                                        variant=f'S{s}',
-                                        subtit=self.ps_e.subtit)
-
-                # draw dead intervals
-                if s in dead_intervals_per_set:
-                    di = dead_intervals_per_set[s]
-                    self.axes.hlines(y=di['y'], color=di['col'],
-                                     xmin=di['x0'], xmax=di['x1'],
-                                     linewidth=dead_linewidth,
-                                     alpha=1, zorder=2, linestyle='-')
-                    # compute intervals for histogram
-                    all_dead_intervals[s].extend([f-e for e,f in zip(di['x0'], di['x1'])])
-
-                # draw alive intervals
-                if s in alive_intervals_per_set:
-                    ai = alive_intervals_per_set[s]
-                    self.axes.hlines(y=ai['y'], color=ai['col'],
-                                 xmin=ai['x0'], xmax=ai['x1'],
-                                 linewidth=alive_linewidth,
-                                 alpha=0.5, zorder=2, linestyle='-')
-
-                # save image
-                save_fig(fig, f'{self.ps_e.title} s{s:02}', f'{self.ps_e.suffix}-s{s:02}')
-
-
-
-        if self.ps_p.code in st.plot.include:
-            ##############################################################
-            # PLOT PERSONALITY CHANGES OF ALL SETS IN ONE IMAGE
-            # create two set of axes: for the map (bottom) and the tool
-            fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-            self.axes = fig.add_axes(bottom_axes.get_position())
-
-            # plot map
-            if bottom_tool is not None:
-                bottom_tool.plot(axes=bottom_axes)
-
-            # setup axes
-            self.plot_setup_X(self.ps_p)
-            self.plot_setup_Y(self.ps_p)
-            self.plot_setup_general(title=self.ps_p.title,
-                                    variant=f'All Sets {st.cache.asso}-way',
-                                    subtit=self.ps_p.subtit)
-
-            # set lines width based on plot height
-            plt_w,plt_h = self.get_plot_xy_size(fig)
-            alive_linewidth = round(plt_h / st.map.num_blocks, 4)
-            # 0.5 <= jump_linewidth <= alive_lw/6
-            jump_linewidth = round(max(0.5, plt_w / (st.map.time_size)),4)
-            jump_linewidth = min(alive_linewidth/6, jump_linewidth)
-
-            # draw all alive_intervals
-            for s,ai in sorted(alive_intervals_per_set.items()):
-                self.axes.hlines(y=ai['y'], color=ai['col'],
-                                 xmin=ai['x0'], xmax=ai['x1'],
-                                 linewidth=alive_linewidth,
-                                 alpha=0.5, zorder=2, linestyle='-')
-
-            # draw jumps
-            for s,ps in sorted(personalities_per_set.items()):
-                self.axes.plot(ps['t'], ps['b'],
-                               color=ps['col'],
-                               linewidth=jump_linewidth,
-                               alpha=1, zorder=2, linestyle='-',
-                               solid_capstyle='round')
-
-            # save image
-            save_fig(fig, f'{self.ps_p.title} all', f'{self.ps_p.suffix}-all')
-
-
-
-            ##############################################################
-            # PLOT PERSONALITY CHANGES OF EACH SET IN A DIFFERENT IMAGE
-            for s in range(st.cache.num_sets):
-                # create two set of axes: for the map (bottom) and the tool
-                fig,bottom_axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-                self.axes = fig.add_axes(bottom_axes.get_position())
-
-                # plot map
-                if bottom_tool is not None:
-                    bottom_tool.plot(axes=bottom_axes)
-
-                # setup axes
-                self.plot_setup_X(self.ps_p)
-                self.plot_setup_Y(self.ps_p)
-                self.plot_setup_general(title=self.ps_p.title,
-                                        variant=f'S{s} {st.cache.asso}-way',
-                                        subtit=self.ps_p.subtit)
-
-                # draw alive intervals
-                if s in alive_intervals_per_set:
-                    ai = alive_intervals_per_set[s]
-                    self.axes.hlines(y=ai['y'], color=ai['col'],
-                                 xmin=ai['x0'], xmax=ai['x1'],
-                                 linewidth=alive_linewidth,
-                                 alpha=0.5, zorder=2, linestyle='-')
-
-                # draw jumps
-                if s in personalities_per_set:
-                    ps = personalities_per_set[s]
-                    self.axes.plot(ps['t'], ps['b'],
-                                   color=ps['col'],
-                                   linewidth=jump_linewidth,
-                                   alpha=1, zorder=2, linestyle='-',
-                                   solid_capstyle='round')
-
-                # save image
-                save_fig(fig, f'{self.ps_p.title} s{s:02}', f'{self.ps_p.suffix}-s{s:02}')
-
-
-
-        if self.ps_h.code in st.plot.include:
-            ##############################################################
-            # PLOT HISTOGRAM OF ALL EVICTION DURATION OF ALL SETS IN ONE IMAGE
-            # create a set of axes for the histogram
-            fig,self.axes = plt.subplots(figsize=(st.plot.width, st.plot.height))
-
-            # define the labels and colors for each set in the histogram
-            hist_labels = [str(s) for s in range(st.cache.num_sets)]
-            hist_palette = Palette(self.hue, hue_count=st.cache.num_sets,
-                                   lightness=[60], saturation=[50], alpha=[90])
-            hist_colors = [s_col[0] for s_col in hist_palette]
-            # hist_colors = [hist_palette[i][0] for i in range(st.cache.num_sets)]
-
-            # Prepare data for histogram plotting:
-            if all_dead_intervals is None:
-                # compute intervals for histogram
-                all_dead_intervals = [[] for _ in range(st.cache.num_sets)]
-                for s in range(st.cache.num_sets):
-                    if s in dead_intervals_per_set:
-                        di = dead_intervals_per_set[s]
-                        all_dead_intervals[s].extend([f-e for e,f in zip(di['x0'], di['x1'])])
-            # this value +1 is the right edge of the rightmost bin.
-            max_dead_interval = 0
-            # array with the avg dead_interval per Set.
-            avg_dead_intervals = [0 for _ in range(st.cache.num_sets)]
-            for i,set_d_intr in enumerate(all_dead_intervals):
-                if len(set_d_intr) > 0:
-                    avg_dead_intervals[i] = sum(set_d_intr)/len(set_d_intr)
-                    max_dead_this_set = max(set_d_intr)
-                    if max_dead_interval < max_dead_this_set:
-                        max_dead_interval = max_dead_this_set
-
-            # Create bins for histogram plotting (bin_edges)
-            #   Create bins up to 2^b in "half" exponential fashion:
-            #   0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64....
-            b = 20
-            bin_right_edges = [1] * (2*b+1)
-            for i in range(1,b+1):
-                bin_right_edges[2*i-1] = 2**i
-                bin_right_edges[2*i] = 2**i + 2**(i-1)
-            #   If the max_dead_interval is greater than 2^14+2^13, then create a last
-            #   bin at the end so that all the info is contained in some bin.
-            if bin_right_edges[-1] < max_dead_interval:
-                bin_right_edges += [max_dead_interval+1]
-            bin_edges = [0] + bin_right_edges
-
-
-            # [!] Bins are of different width. So columns would be narrow on the left, and wide
-            # on the right. Normalize the histogram by creating a new dataset with a linear
-            # distribution.
-            # Map real dead_time values (from bins of different sizes) to linear values (to bins
-            # of same width)
-            for s in all_dead_intervals:
-                s.sort()
-            lin_all_dead_intervals = [[0] * len(sdi) for sdi in all_dead_intervals]
-            max_bin_idx_used = 0
-            for s,sdi in enumerate(all_dead_intervals):
-                bin_idx = 0
-                for sdi_idx,d in enumerate(sdi):
-                    while d >= bin_edges[bin_idx]:
-                        bin_idx += 1
-                    lin_all_dead_intervals[s][sdi_idx] = bin_idx-1
-                # determine the last used bin to trim the right side of the histogram
-                if bin_idx > max_bin_idx_used:
-                    max_bin_idx_used = bin_idx
-
-            # Define the linear edges used by the histogram
-            lin_bin_edges = [i for i in range(len(bin_edges))]
-
-            # Plot histogram
-            counts, _, _ = self.axes.hist(lin_all_dead_intervals, stacked=True, zorder=3,
-                                          width=0.975, # leave gap between bars
-                                          bins=lin_bin_edges,
-                                          label=hist_labels,
-                                          color=hist_colors)
-
-            # map averages to linear values within each bin.
-            lin_avg_dead_intervals = [0 for _ in avg_dead_intervals]
-            for s,s_avg_di in enumerate(avg_dead_intervals):
-                be_idx = 0
-                while bin_edges[be_idx] < s_avg_di:
-                    be_idx += 1
-                s_lin_avg_int = be_idx - 1
-                s_lin_ang_frac = (s_avg_di - bin_edges[be_idx-1])/(bin_edges[be_idx] - bin_edges[be_idx-1])
-                lin_avg_dead_intervals[s] = s_lin_avg_int + s_lin_ang_frac
-
-            # Plot averages
-            avg_hist_palette = Palette(self.hue, hue_count=st.cache.num_sets,
-                                   lightness=[50], saturation=[90], alpha=[100])
-            avg_hist_colors = [s_col[0] for s_col in avg_hist_palette]
-            avg_linewidth = max(1.5,self.get_plot_xy_size(fig)[0]/(20*(max_bin_idx_used+1)))
-            for l_s_avg,s_avg_col in zip(lin_avg_dead_intervals, avg_hist_colors):
-                self.axes.axvline(x=l_s_avg, color='#000000CC', linestyle='solid',
-                                  linewidth=avg_linewidth+0.5, zorder=3)
-                self.axes.axvline(x=l_s_avg, color=s_avg_col, linestyle='solid',
-                                  linewidth=avg_linewidth, zorder=3)
-
-            # configure axes
-            self.plot_setup_axes_for_hist(
-                y_auto_max=max(max(i) if len(i) else 0 for i in counts),
-                x_max_bin_edge=max_bin_idx_used,
-                x_ticks=lin_bin_edges,
-                x_ticks_labels=bin_edges
-
-            )
-            self.plot_setup_general(title=self.ps_h.title,
-                                    subtit=self.ps_h.subtit)
-
-            # save image
-            save_fig(fig, self.ps_h.title, self.ps_h.suffix)
+        self.setup_general(mpl_axes, pal.bg, met_str)
 
         return
 
-    def DEPRECATED_plot_setup_axes_for_hist(self, y_auto_max, x_max_bin_edge, x_ticks, x_ticks_labels):
-        # bring spines to top:
-        for spine in self.axes.spines.values():
-            spine.set_zorder(4)
+    def __obtain_intervals(self, dead_intervals, num_sets):
+        """
+        Obtains list of intervals (per set), median (per set), and maximum
+        (across all sets)
+        """
+        # all_dintervals[set] -> [di0:int, di1, di2, ...]
+        all_dintervals = [None for _ in range(num_sets)]
+        # med_dintervals[set] -> median:int
+        med_dintervals = [None for _ in range(num_sets)]
+        # longest dead interval across all sets
+        max_dinterval = 0
+        for set_idx,set_intrvs in sorted(dead_intervals.items()):
+            # get plain intervals length for this set
+            set_intervs = sorted(
+                [t1-t0 for t0,t1 in zip(set_intrvs['t0'],set_intrvs['t1'])])
+            all_dintervals[set_idx] = set_intervs
 
-        # X-AXIS
-        X_min = 1
-        X_max = x_ticks[x_max_bin_edge] #round(x_ticks[-1])
-        if self.ps_h.code in st.plot.x_ranges:
-            # pick the index corresponding to the greatest
-            # minX that is <= given_min
-            given_min = int(st.plot.x_ranges[self.ps_h.code][0])
-            for minX_idx,minX in zip(x_ticks,x_ticks_labels):
-                if minX <= given_min:
-                    X_min = minX_idx
-                else:
-                    break
-            # pick the index corresponding to the smallest
-            # maxX that is >= given_max
-            given_max = int(st.plot.x_ranges[self.ps_h.code][1])
-            for maxX_idx,maxX in reversed(list(zip(x_ticks,x_ticks_labels))):
-                if maxX >= given_max:
-                    X_max = maxX_idx
-                else:
-                    break
+            # get median of this set
+            med_idx = len(set_intervs) // 2
+            if len(set_intervs) % 2 == 0:
+                med = (set_intervs[med_idx] +
+                       set_intervs[med_idx+1]) / 2
+            else:
+                med = set_intervs[med_idx]
+            med_dintervals[set_idx] = med
 
-        # X_min must be >= 1
-        if X_min < 1:
-            X_min = 1
-        # make sure there is at least a dummy range
-        if X_min == X_max:
-            X_max = X_min + 1
-        X_padding = (X_max-X_min)/200
-        self.axes.set_xlim(X_min-X_padding, X_max+X_padding)
+            # update maximum dead interval across all sets
+            max_dinterval = max(max_dinterval, set_intervs[-1])
 
-        # Axis details: label, ticks, and grid
-        self.axes.set_xticks(x_ticks[X_min:X_max+1])
-        self.axes.set_xticklabels(x_ticks_labels[X_min:X_max+1])
-        self.axes.set_xlabel(self.ps_h.xlab)
-        rot = -90 if st.plot.x_orient == 'v' else 0
-        self.axes.tick_params(axis='x',
-                              bottom=True, top=False,
-                              labelbottom=True, labeltop=False,
-                              rotation=rot, width=st.plot.grid_main_width)
+        return all_dintervals, med_dintervals, max_dinterval
 
-        # Y-AXIS
-        Y_min = 0
-        Y_max = round(y_auto_max)
-        if self.ps_h.code in st.plot.y_ranges:
-            Y_min = int(st.plot.y_ranges[self.ps_h.code][0])
-            Y_max = int(st.plot.y_ranges[self.ps_h.code][1])
+    def __create_bins(self, max_value, exp=20):
+        """
+        Create bins up to 2^exp in "half" exponential fashion:
+        0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64....
+        """
+        bin_right_edges = [1] * (2 * exp + 1)
+        for i in range(1, exp+1):
+            bin_right_edges[2*i-1] = 2**i
+            bin_right_edges[2*i] = 2**i + 2**(i-1)
 
-        if Y_min == Y_max:
-            Y_max = Y_min + 1
-        Y_padding = (Y_max-Y_min)/200
-        self.axes.set_ylim(Y_min-Y_padding, Y_max+5*Y_padding) # extra room on top
+        # if the rightmost edge is still too small, then create an extra bin to
+        # fit the largest interval
+        if bin_right_edges[-1] < max_value:
+            bin_right_edges += [max_value+1]
 
-        # Axis details: label, ticks, and grid
-        self.axes.set_ylabel(self.ps_h.ylab)
-        self.axes.tick_params(axis='y',
-                              left=True, right=False,
-                              labelleft=True, labelright=False,
-                              width=st.plot.grid_main_width)
-        y_ticks = create_up_to_n_ticks(range(Y_min,round(Y_max+5*Y_padding)+1), base=10,
-                                       n=st.plot.max_ytick_count)
-        self.axes.set_yticks(y_ticks)
-        self.axes.grid(axis='y', which='both',
-                       zorder=1,
-                       alpha=st.plot.grid_main_alpha,
-                       linewidth=st.plot.grid_main_width,
-                       linestyle=st.plot.grid_main_style)
+        # add the left edge of the first bin.
+        return [0] + bin_right_edges
+
+    def __linearize_data(self, all_dintervals, med_dintervals, bin_edges):
+        """
+        Bins are of different width. So columns would be narrow on the left,
+        and wide on the right. Normalize the histogram by creating a new
+        dataset with a linear distribution.
+        Map real dead-interval values (from bins of different sizes) to linear
+        values (to bins of same width).
+        """
+
+        # linear counterpart of the original dataset.
+        # linear_all_di[set] -> [ldi0:int, ldi1, ldi2, ...]
+        linear_all_dintervals = [[0]*len(set_di) for set_di in all_dintervals]
+        # max bin index actually used
+        max_bin_idx_used = 0
+
+        for s,set_dinterv in enumerate(all_dintervals):
+            # current bin being used
+            curr_bin_idx = 0
+            # map all original data to the linear dataset
+            for i,dint in enumerate(set_dinterv):
+                # find the correct bin for this dead interval (dint)
+                # (yes, this assumes set_dinterv is sorted, and it is.)
+                while dint >= bin_edges[curr_bin_idx]:
+                    curr_bin_idx += 1
+                # add data-point to linear dataset.
+                linear_all_dintervals[s][i] = curr_bin_idx-1
+
+            # update the last actually used bin
+            max_bin_idx_used = max(max_bin_idx_used, curr_bin_idx)
+
+        # linear counterpart of original bin_edges
+        linear_bin_edges = [i for i in range(len(bin_edges))]
+
+
+        # map medians to values in the linear scale
+        linear_medians = [0 for _ in med_dintervals]
+        for s,s_med_di in enumerate(med_dintervals):
+            curr_bin_idx = 0
+                # find the correct bin for this dead interval (dint)
+            while bin_edges[curr_bin_idx] < s_med_di:
+                curr_bin_idx += 1
+            # integer and fractional parts
+            lmed_int = curr_bin_idx - 1
+            lmed_frac = (s_med_di - bin_edges[curr_bin_idx-1]) / \
+                (bin_edges[curr_bin_idx] - bin_edges[curr_bin_idx-1])
+            linear_medians[s] = lmed_int + lmed_frac
+
+        return linear_all_dintervals, linear_medians, linear_bin_edges, \
+            max_bin_idx_used
+
+    def __setup_hist_limits_and_ticks(self, mpl_axes, metric_code, xlims, ylims,
+                                      xticks, xticks_labels):
+        #####################################
+        ## SET X-AXIS LIMITS AND TICK LABELS
+        # find the tick index (what matplotlib sees) based on what the user
+        # gave (relative to xtick_lables)
+        xmin = xlims[0]
+        xmax = xlims[1]
+        if metric_code in st.Plot.x_ranges:
+            xmin,xmax = st.Plot.x_ranges[metric_code]
+            xmin = max(1,xmin)
+            xmax = max(xmin,xmax)
+
+        # find the first tick (bin_edge) that is just at the left of
+        # the given xmin
+        curr_label_idx = 0
+        while xticks_labels[curr_label_idx] <= xmin:
+            curr_label_idx += 1
+        xmin_idx = curr_label_idx - 1
+
+        # find the first tick (bin_edge) that is just at the right of
+        # the given xmax
+        curr_label_idx = 0
+        while xticks_labels[curr_label_idx] <= xmax:
+            curr_label_idx += 1
+        xmax_idx = curr_label_idx
+
+        # Set axis parameters: ticks, tick-labels, and limits
+        mpl_axes.set_xticks(xticks[xmin_idx:xmax_idx+1])
+        mpl_axes.set_xticklabels(xticks_labels[xmin_idx:xmax_idx+1])
+        mpl_axes.tick_params(axis='x', rotation=-90)
+        xpad = (xmax_idx - xmin_idx) / 100
+        mpl_axes.set_xlim(xmin_idx-xpad, xmax_idx+xpad)
+
+
+        #####################################
+        ## SET Y-AXIS LIMITS AND TICK LABELS
+        ymin = ylims[0]
+        ymax = ylims[1]
+        if metric_code in st.Plot.y_ranges:
+            ymin,ymax = st.Plot.y_ranges[metric_code]
+            ymin = max(0,ymin)
+            ymax = max(ymin,ymax)
+            top_ypad = (ymax-ymin) / 100
+            bot_ypad = top_ypad
+        else:
+            top_ypad = (ymax-ymin) / 10
+            bot_ypad = 0
+
+        # create list of ticks
+        y_tick_count = st.Plot.ticks_max_count[1]
+        y_tick_list = list(range(ymin,int(ymax+1+top_ypad)))
+        y_tick_labels = sample_list(y_tick_list, n=y_tick_count, base=10)
+
+        # Set axis parameters: ticks and limits
+        mpl_axes.set_yticks(y_tick_labels)
+        mpl_axes.set_ylim(ymin-bot_ypad, ymax+top_ypad)
+
         return
+

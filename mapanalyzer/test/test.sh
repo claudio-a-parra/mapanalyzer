@@ -192,17 +192,16 @@ EOF
 }
 
 
-common_opts=(-pw 10 -ph 8 --dpi 400 --cache cache.conf)
-METS=SLD,TLD,CMR,CMMA,CUR,AD
-METS=BPA
+common_opts=(-pw 12 -ph 10 --dpi 400 --cache cache.conf)
+METS=MAP,SLD,TLD,CMR,CMMA,CUR,AD,BPA,SMRI,MRID
 
 clear
 #create_maps quicksort 1 40
-create_maps convergent 1 400
+create_maps convergent 1 1000
 #create_maps convolution 2 3 400 500
 
 #create_cache
-mtest simulate -mc MAP,$METS
-mtest plot -mc MAP,$METS
+mtest sim-plot -mc $METS
+#mtest plot -mc $METS -st 7
 #mtest aggregate -mc $METS
 echo -e "\n\nTEST: Done"

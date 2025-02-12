@@ -224,12 +224,15 @@ class BaseModule:
         return
 
     @classmethod
-    def setup_general(cls, mpl_axes, bg_color, met_str, bg_mode=False):
+    def setup_general(cls, mpl_axes, bg_color, met_str, variant='',
+                      bg_mode=False):
         """ setup title and axes background color"""
         # set title only if in foreground mode
         title_string = ''
         if not bg_mode:
             title_string = met_str.title
+            if variant != '':
+                title_string += f' {variant}'
             if st.Map.ID is not None:
                 title_string += f': {st.Map.ID}'
             if met_str.subtit:

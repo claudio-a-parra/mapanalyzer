@@ -272,7 +272,7 @@ class MemAccess(BaseModule):
 
 
         #####################################
-        # SETUP PLOT VISUALS
+        # PLOT VISUALS
         # set plot limits
         X_pad,Y_pad = 0.5,'auto'
         xlims = (X_min,X_max)

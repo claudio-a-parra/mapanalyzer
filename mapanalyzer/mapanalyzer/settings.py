@@ -17,8 +17,8 @@ class Settings:
         'CUR'  : 'Cache Usage Ratio',
         'AD'   : 'Aliasing Density',
         'BPA'  : 'Block Personality Adoption',
-        'SRI'  : 'Short Roundtrip Interval',
-        'RID'  : 'Roundtrip Interval Distribution'
+        'SMRI' : 'Short Memory Roundtrip Interval',
+        'MRID' : 'Memory Roundtrip Interval Distribution'
     }
 
     @classmethod
@@ -906,9 +906,10 @@ class Settings:
         # This is a derived value because sensible values is derived from the
         # width, height, and dpi given.
         min_map_res,max_map_res = 1, 'auto'
-        #
-        # Specific of Personality
-        jump_line_width = 1
+
+        # Specific to SMRI.
+        # draw segments of up to this length. If None, draw them all.
+        roundtrip_threshold = None
 
 
         @classmethod
@@ -930,6 +931,8 @@ class Settings:
             cls.textbox_offsets = assg_val(cls.textbox_offsets,
                                            args.textbox_offsets)
             cls.aggr_last_x = assg_val(cls.aggr_last_x, args.aggr_last_x)
+            cls.roundtrip_threshold = assg_val(cls.roundtrip_threshold,
+                                               args.rt_threshld)
 
             cls.__init_derived_values()
             cls.initialized = True
@@ -1023,7 +1026,7 @@ class Settings:
                 'grid_max_bytes', 'grid_max_blocks', 'tbox_bg', 'tbox_border',
                 'tbox_font', 'tbox_font_size', 'fade_bytes_alpha',
                 'x_ranges', 'y_ranges', 'min_map_res', 'max_map_res',
-                'jump_line_width', 'initialized'
+                'initialized'
             ]
             vals = [getattr(cls, at) for at in attrs]
             UI.indent_in(title='PLOTS SETTINGS')

@@ -370,7 +370,7 @@ class PlotFile:
     fmt_aggr = 'aggr'
 
     @classmethod
-    def save(cls, mpl_fig, metric_code, aggr=False):
+    def save(cls, mpl_fig, metric_code, aggr=False, variant=''):
         # set different components based on normal vs aggregation mode
         if aggr:
             fmt_name = cls.fmt_aggr
@@ -391,7 +391,7 @@ class PlotFile:
         ext = st.Plot.format
 
         # assembly the final file name
-        filename = f'{prefix}{fmt_name}_{number}_{metric_code}.{ext}'
+        filename = f'{prefix}{fmt_name}_{number}_{metric_code}{variant}.{ext}'
 
         # print UI message and actually save figure
         UI.text(f'{metric_code.ljust(UI.metric_code_hpad)}: ', end='')
@@ -591,6 +591,14 @@ def command_line_args_parser():
         choices=['h', 'v'], default=None,
         help=('Orientation of the X-axis tick labels.\n'
               'Format: h | v')
+    )
+
+    parser.add_argument(
+        '-st', '--short-roundtrip-threshold', metavar='SRT', dest='rt_threshld',
+        type=int, default=None,
+        help=('Draw short memory roundtrip intervals (SMRI) of up to this '
+              'length.\n'
+              'Format: none | <integer>')
     )
 
     parser.add_argument(

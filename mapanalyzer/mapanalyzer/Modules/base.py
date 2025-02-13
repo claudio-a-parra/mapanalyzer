@@ -251,11 +251,17 @@ class BaseModule:
         return
 
     @classmethod
-    def draw_textbox(cls, mpl_axes, text, metric_code):
-        # get the offset of the textbox from the user options
-        h_off,v_off=0.5, 0.98
+    def draw_textbox(cls, mpl_axes, text, metric_code, off=(None,None)):
+        # Get textbox offsets. Start with defaults
+        h_off, v_off = 0.98, 0.98
+        # if given by the user, use that
         if metric_code in st.Plot.textbox_offsets:
-            h_off,v_off = st.Plot.textbox_offsets[metric_code]
+            h_off, v_off = st.Plot.textbox_offsets[metric_code]
+        # but if given to the function, override
+        if off[0] is not None:
+            h_off = off[0]
+        if off[1] is not None:
+            v_off = off[1]
 
         # pick the anchor point of the textbox based on the horizontal
         # and vertical offsets

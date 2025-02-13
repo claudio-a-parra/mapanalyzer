@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+
 cr_dir=00-source
 maps_dir=01-maps
 pdata_dir=02-pdata
@@ -190,18 +190,20 @@ arch_size_bits   : 64
 EOF
     bat cache.conf
 }
-
-
-common_opts=(-pw 12 -ph 10 --dpi 400 --cache cache.conf)
+size=(-pw 8 -ph 6.5)
+size=(-pw 11 -ph 20)
+common_opts=(${size[@]} --dpi 400 --cache cache.conf)
 METS=MAP,SLD,TLD,CMR,CMMA,CUR,AD,BPA,SMRI,MRID
+METS=MRID
+MODE=plot
+
 
 clear
-#create_maps quicksort 1 40
-create_maps convergent 1 1000
+#create_maps quicksort 2 40
+#create_maps convergent 2 2000000
 #create_maps convolution 2 3 400 500
 
 #create_cache
-mtest sim-plot -mc $METS
-#mtest plot -mc $METS -st 7
+mtest $MODE -mc $METS
 #mtest aggregate -mc $METS
 echo -e "\n\nTEST: Done"

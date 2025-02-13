@@ -56,24 +56,24 @@ class EvictionRoundtrip(BaseModule):
             return
 
         # METRIC INTERNAL VARIABLES
-        # This map-of-maps stores the in-cache time duration of each block.
-        # Take this map of maps as a compressed table where the block_id is the
-        # concatenation of the block-tag and the set-id:
-        # so:            ,------ set id
-        #                |   ,-- block tag
-        #                |   |
-        # alive_intervals[3][47] -> [(time_in,t_out), (t_in,t_out), ...]
-        #
-        # In the example, block_id = '47 concat 3'
-        self.alive_intervals = {}
-        self.dead_intervals = {}
+        # number of sets in the cache.
+        self.num_sets = st.Cache.num_sets
+
+        # This table-of-dicts stores the in-cache time duration of each block.
+        # The block_id is the concatenation of the block-tag and the set-id.
+        # So, assuming 3bits set size:
+        # block_id 35 = b1000011 =  b1000 concat b011 = tag:9, set:3
+        #                 +------ set id
+        #                 |  +-- block tag
+        #                 |  |
+        # alive_intervals[3][9] -> [(time_in,t_out), (t_in,t_out), ...]
+        self.alive_intervals = [{} for _ in range(self.num_sets)]
+        self.dead_intervals = [{} for _ in range(self.num_sets)]
 
         # S lists with the personality switch history of each set. Each
         # change is a tuple set_idx -> [(time, old_block, new_block), ...]
-        self.personalities = [[] for _ in range(st.Cache.num_sets)]
+        self.personalities = [[] for _ in range(self.num_sets)]
 
-        # number of sets in the cache.
-        self.num_sets = st.Cache.num_sets
         return
 
     def probe(self, time, set_idx, tag_in, tag_out):
@@ -83,8 +83,6 @@ class EvictionRoundtrip(BaseModule):
         # if a block is being fetched...
         if tag_in is not None:
             # Begin registration of in-Cache interval
-            if set_idx not in self.alive_intervals:
-                self.alive_intervals[set_idx] = {}
             if tag_in not in self.alive_intervals[set_idx]:
                 self.alive_intervals[set_idx][tag_in] = []
             self.alive_intervals[set_idx][tag_in].append((time, None))
@@ -92,12 +90,11 @@ class EvictionRoundtrip(BaseModule):
         # if a block is being evicted...
         if tag_out is not None:
             # Finish registration of in-Cache interval
-            if set_idx in self.alive_intervals:
-                if tag_out in self.alive_intervals[set_idx]:
-                    fetch_time = self.alive_intervals[set_idx][tag_out][-1][0]
-                    evict_time = time
-                    self.alive_intervals[set_idx][tag_out][-1] = \
-                        (fetch_time,evict_time)
+            if tag_out in self.alive_intervals[set_idx]:
+                fetch_time = self.alive_intervals[set_idx][tag_out][-1][0]
+                evict_time = time
+                self.alive_intervals[set_idx][tag_out][-1] = \
+                    (fetch_time,evict_time)
 
 
         # if one block is evicted and the other fetched...
@@ -130,17 +127,14 @@ class EvictionRoundtrip(BaseModule):
         # dead_intervals is the time in between alive_intervals.
         # Also, while we traverse alive intervals, let's fix the end-time of
         # alive intervals (None -> st.Map.time_size-1)
-        for set_idx in self.alive_intervals.keys():
-            for tag in self.alive_intervals[set_idx].keys():
-                blk_intervals = self.alive_intervals[set_idx][tag]
+        for set_idx,set_intervals in enumerate(self.alive_intervals):
+            for tag,blk_intervals in set_intervals.items():
                 # if the block was alive only once, then there is no dead
                 # interval.
                 if len(blk_intervals) < 2:
                     continue
 
                 # there is activity to register. Allocate memory
-                if set_idx not in self.dead_intervals:
-                    self.dead_intervals[set_idx] = {}
                 if tag not in self.dead_intervals[set_idx]:
                     self.dead_intervals[set_idx][tag] = []
 
@@ -177,9 +171,9 @@ class EvictionRoundtrip(BaseModule):
         # This format is suitable for matplotlib to efficiently plot the
         # horizontal lines. The just created dead_intervals is also transformed
         # to this format.
-        plot_alive_intervals = {}
+        plot_alive_intervals = [{} for _ in range(self.num_sets)]
         # for each set that registers activity...
-        for set_idx,blocks_intervals in sorted(self.alive_intervals.items()):
+        for set_idx,blocks_intervals in enumerate(self.alive_intervals):
             # create equal-length lists
             blk_ids,fetch_times,evict_times = [], [], []
             # for each tag that registers activity...
@@ -195,9 +189,9 @@ class EvictionRoundtrip(BaseModule):
             }
         self.alive_intervals = plot_alive_intervals
 
-        plot_dead_intervals = {}
+        plot_dead_intervals = [{} for _ in range(self.num_sets)]
         # for each set that registers activity...
-        for set_idx,blocks_intervals in sorted(self.dead_intervals.items()):
+        for set_idx,blocks_intervals in enumerate(self.dead_intervals):
             # create equal-length lists
             blk_ids,evict_times,fetch_times = [], [], []
             # for each tag that registers activity...
@@ -229,21 +223,21 @@ class EvictionRoundtrip(BaseModule):
         #     't' : [t0, t1, None, t0, t1, None, ..., ..., None, ...],
         #     'b' : [b0, b1, None, b0, b1, None, ..., ..., None, ...]
         # }
-        sets_personalities = {}
-        for set_idx,set_pers in enumerate(self.personalities):
+        plot_personalities = [{} for _ in range(self.num_sets)]
+        for set_idx,perso in enumerate(self.personalities):
             # three times long because of the 'start, end, None' triplets
-            times = [0 for _ in range(len(set_pers)*3)]
-            blocks = [0 for _ in range(len(set_pers)*3)]
-            for i,(t,blk_old,blk_new) in enumerate(set_pers):
+            times = [0 for _ in range(len(perso)*3)]
+            blocks = [0 for _ in range(len(perso)*3)]
+            for i,(t,blk_old,blk_new) in enumerate(perso):
                 ii = 3*i
                 times[ii],times[ii+1],times[ii+2] = t-1, t, None
                 blocks[ii],blocks[ii+1],blocks[ii+2] = blk_old, blk_new, None
 
-            sets_personalities[set_idx] = {
+            plot_personalities[set_idx] = {
                 't' : times,
                 'b' : blocks
             }
-        self.personalities = sets_personalities
+        self.personalities = plot_personalities
         return
 
 
@@ -257,10 +251,8 @@ class EvictionRoundtrip(BaseModule):
 
     def dict_to_BPA(self, data):
         try:
-            self.alive_intervals = {int(s): dt
-                                    for s,dt in data['alive_intervals'].items()}
-            self.personalities = {int(s): dt
-                                  for s,dt in data['personalities'].items()}
+            self.alive_intervals = data['alive_intervals']
+            self.personalities = data['personalities']
             self.num_sets = int(data['num_sets'])
         except:
             class_name = self.__class__.__name__
@@ -275,14 +267,15 @@ class EvictionRoundtrip(BaseModule):
         #####################################
         ## CREATE COLOR PALETTE
         # each set has its color {set -> color}
-        set_to_color = {s:'' for s in range(self.num_sets)}
+        set_to_color = [''] * self.num_sets
         pal = Palette(
             hue = len(set_to_color), h_off=self.hue,
+            # blocks, _
             sat = st.Plot.p_sat,
-            lig = (50, 0),
-            alp = st.Plot.p_alp)
-        for i,set_idx in enumerate(set_to_color):
-            set_to_color[set_idx] = pal[i][0][0][0]
+            lig = ( 50, 0),
+            alp = (100, 0))
+        for s in range(self.num_sets):
+            set_to_color[s] = pal[s][0][0][0]
 
         plt_w,plt_h = self.get_plot_xy_size(mpl_axes)
         height_range = st.Map.num_blocks
@@ -297,7 +290,7 @@ class EvictionRoundtrip(BaseModule):
         if metric_code in st.Plot.x_ranges:
             xmin,xmax = st.Plot.x_ranges[metric_code]
             width_range = xmax - xmin
-        jump_line_width = max(0.1, plt_w / (4*width_range))
+        jump_line_width = max(0.1, plt_w / (3*width_range))
         jump_line_alpha = 1
         jump_line_style = '-'
 
@@ -308,12 +301,8 @@ class EvictionRoundtrip(BaseModule):
         plot_types = ('single', 'all')
         # save plots for each independent set, and one for all together
         for plot_type in plot_types:
-            all_sets = sorted(self.alive_intervals.keys())
-            for set_idx in all_sets:
-                set_interv = self.alive_intervals[set_idx]
-                set_person = self.personalities[set_idx]
-                set_color = set_to_color[set_idx]
-
+            for set_idx,(set_interv,set_person,set_color) in enumerate(zip(
+                    self.alive_intervals, self.personalities, set_to_color)):
                 mpl_axes.hlines(y=set_interv['bl'], xmin=set_interv['t0'],
                                 xmax=set_interv['t1'],
                                 color=set_color, linewidth=block_line_width,
@@ -326,7 +315,7 @@ class EvictionRoundtrip(BaseModule):
                               linestyle=jump_line_style, solid_capstyle='round')
 
                 # visuals for each "single" plot, or after the last of "all"
-                if plot_type == 'single' or set_idx == all_sets[-1]:
+                if plot_type == 'single' or set_idx == self.num_sets-1:
                     ###########################################
                     ## PLOT VISUALS
                     # set plot limits
@@ -376,8 +365,7 @@ class EvictionRoundtrip(BaseModule):
 
     def dict_to_SMRI(self, data):
         try:
-            self.dead_intervals = {int(s): dt
-                                   for s,dt in data['dead_intervals'].items()}
+            self.dead_intervals = data['dead_intervals']
             self.num_sets = int(data['num_sets'])
         except:
             class_name = self.__class__.__name__
@@ -392,14 +380,14 @@ class EvictionRoundtrip(BaseModule):
         #####################################
         ## CREATE COLOR PALETTE
         # each set has its color {set -> color}
-        set_to_color = {s:'' for s in range(self.num_sets)}
+        set_to_color = [''] * self.num_sets
         pal = Palette(
             hue = len(set_to_color), h_off=self.hue,
             sat = (50, 0),
             lig = (50, 0),
             alp = (100, 0))
-        for i,set_idx in enumerate(set_to_color):
-            set_to_color[set_idx] = pal[i][0][0][0]
+        for s in range(self.num_sets):
+            set_to_color[s] = pal[s][0][0][0]
 
         # compute the width of block lines
         plt_w,plt_h = self.get_plot_xy_size(mpl_axes)
@@ -407,7 +395,7 @@ class EvictionRoundtrip(BaseModule):
         if metric_code in st.Plot.y_ranges:
             ymin,ymax = st.Plot.y_ranges[metric_code]
             height_range = ymax - ymin
-        block_line_width = plt_h / height_range
+        block_line_width = max(0.3, plt_h / height_range)
         block_line_alpha = 0.5
         block_line_style = '-'
 
@@ -415,17 +403,23 @@ class EvictionRoundtrip(BaseModule):
         #####################################
         ## PLOT METRIC
         mpl_fig = mpl_axes.figure
+        X_pad,Y_pad = 0.5,0.5
+        X_min,X_max = 0,st.Map.time_size-1
+        Y_min,Y_max = 0,st.Map.num_blocks-1
+        xlims = (X_min, X_max)
+        ylims = (Y_min, Y_max)
         plot_types = ('single', 'all')
+        no_data_in_all_sets = sum(
+            len(siv['bl']) for siv in self.dead_intervals) == 0
         # save plots for each independent set, and one for all together
         for plot_type in plot_types:
-            all_sets = sorted(self.dead_intervals.keys())
             all_roundtrips_count = 0 # count of dead segments <= threshold.
-            for set_idx in all_sets:
-                set_intervs = self.dead_intervals[set_idx]
+            for set_idx,(set_intervs,set_color) in enumerate(zip(
+                    self.dead_intervals, set_to_color)):
                 blocks = set_intervs['bl']
+                no_data_in_this_set = len(blocks) == 0
                 t_start = set_intervs['t0']
                 t_end = set_intervs['t1']
-                set_color = set_to_color[set_idx]
                 roundtrips_count = len(blocks)
 
                 # If a maximum threshold was given by the user, then filter
@@ -444,7 +438,6 @@ class EvictionRoundtrip(BaseModule):
                     thrshld_text = rf' ($\leq${thrshld})'
                 all_roundtrips_count += roundtrips_count
 
-                # draw the horizontal lines
                 mpl_axes.hlines(y=blocks, xmin=t_start, xmax=t_end,
                                 color=set_color, linewidth=block_line_width,
                                 alpha=block_line_alpha, zorder=2,
@@ -454,13 +447,8 @@ class EvictionRoundtrip(BaseModule):
                 ###########################################
                 ## PLOT VISUALS
                 # visuals for each "single" plot, or after the last of "all"
-                if plot_type == 'single' or set_idx == all_sets[-1]:
+                if plot_type == 'single' or set_idx == self.num_sets-1:
                     # set plot limits
-                    X_pad,Y_pad = 0.5,0.5
-                    X_min,X_max = 0,st.Map.time_size-1
-                    Y_min,Y_max = 0,st.Map.num_blocks-1
-                    xlims = (X_min, X_max)
-                    ylims = (Y_min, Y_max)
                     real_xlim, real_ylim = self.setup_limits(
                         mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
                         ylims=ylims, y_pad=Y_pad, invert_y=True)
@@ -477,8 +465,15 @@ class EvictionRoundtrip(BaseModule):
                         count = all_roundtrips_count
                         if plot_type == 'single':
                             count = roundtrips_count
-                        text = (rf'SMRI count{thrshld_text} : {count}')
-                        self.draw_textbox(mpl_axes, text, metric_code)
+                        text = (rf'{metric_code} count{thrshld_text} : {count}')
+
+                        # If there is no data to plot, show a "NO DATA" message
+                        off = (None, None)
+                        if (plot_type == 'single' and no_data_in_this_set) or \
+                           (plot_type == 'all' and no_data_in_all_sets):
+                            text = f'{metric_code}: NO DATA'
+                            off = (0.5,0.5)
+                        self.draw_textbox(mpl_axes, text, metric_code, off=off)
 
                     # set labels
                     self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
@@ -510,8 +505,7 @@ class EvictionRoundtrip(BaseModule):
 
     def dict_to_MRID(self, data):
         try:
-            self.dead_intervals = {int(s): dt
-                                   for s,dt in data['dead_intervals'].items()}
+            self.dead_intervals = data['dead_intervals']
             self.num_sets = int(data['num_sets'])
         except:
             class_name = self.__class__.__name__
@@ -543,8 +537,7 @@ class EvictionRoundtrip(BaseModule):
         # obtain dead intervals and medians (per set) and max dead interval
         # (across all sets)
         all_dintervals, med_dintervals, max_dinterval = \
-            self.__obtain_intervals(dead_intervals=self.dead_intervals,
-                                    num_sets=self.num_sets)
+            self.__obtain_intervals(dead_intervals=self.dead_intervals)
 
         # define bin edges
         bin_edges = self.__create_bins(max_dinterval, exp=20)
@@ -556,18 +549,18 @@ class EvictionRoundtrip(BaseModule):
 
 
         #####################################
-        ## PLOT HISTOGRAM AND MEDIANS
+        ## PLOT HISTOGRAM
         hist_labels = [str(s) for s in range(self.num_sets)]
         counts,_,_ = mpl_axes.hist(
             lin_dintervals, stacked=True, zorder=3, width=0.95,
             bins=lin_bin_edges, label=hist_labels, color=hset_to_color)
 
-        Y_max = max(max(i) if len(i) else 0 for i in counts)
-        ylims = (0,Y_max)
 
         #####################################
-        ## PLOT HISTOGRAM AND MEDIANS
+        ## PLOT MEDIANS
         for med_x, med_col in zip(lin_medians, mset_to_color):
+            if med_x is None:
+                continue
             mpl_axes.axvline(x=med_x, color=med_col, linestyle='-',
                              linewidth=3, zorder=4)
 
@@ -575,20 +568,26 @@ class EvictionRoundtrip(BaseModule):
         #####################################
         # PLOT VISUALS
         # setup limits and tick-labels
-        xlims = (1,max_dinterval)
+        Y_max = int(max(max(i) if len(i) else 0 for i in counts))
+        ylims = (0,max(Y_max,1))
+        xlims = (1,max(1,max_dinterval))
         self.__setup_hist_limits_and_ticks(
             mpl_axes, metric_code=metric_code, xlims=xlims, ylims=ylims,
             xticks=lin_bin_edges, xticks_labels=bin_edges)
 
         # insert text box with medians
-        text = []
-        for s,s_med in enumerate(med_dintervals):
-            text.append(f's{s} median {metric_code}: {s_med}')
-        '\n'.join(text)
-        # set default textbox to upper-right corner
-        if metric_code not in st.Plot.textbox_offsets:
-            st.Plot.textbox_offsets[metric_code] = (0.98, 0.98)
-        self.draw_textbox(mpl_axes, text, metric_code)
+        if all(di is None for di in med_dintervals):
+            self.draw_textbox(mpl_axes, f'{metric_code}: NO DATA', metric_code,
+                              off=(0.5,0.5))
+        else:
+            text = []
+            for s,s_med in enumerate(med_dintervals):
+                text.append(f's{s} median {metric_code}: {s_med}')
+            '\n'.join(text)
+            # set default textbox to upper-right corner
+            if metric_code not in st.Plot.textbox_offsets:
+                st.Plot.textbox_offsets[metric_code] = (0.98, 0.98)
+            self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels
         self.setup_labels(mpl_axes, met_str)
@@ -598,28 +597,30 @@ class EvictionRoundtrip(BaseModule):
 
         return
 
-    def __obtain_intervals(self, dead_intervals, num_sets):
+    def __obtain_intervals(self, dead_intervals:list):
         """
         Obtains list of intervals (per set), median (per set), and maximum
-        (across all sets)
+        (across all sets).
         """
+        num_sets = len(dead_intervals)
         # all_dintervals[set] -> [di0:int, di1, di2, ...]
         all_dintervals = [None for _ in range(num_sets)]
         # med_dintervals[set] -> median:int
         med_dintervals = [None for _ in range(num_sets)]
         # longest dead interval across all sets
         max_dinterval = 0
-        for set_idx,set_intrvs in sorted(dead_intervals.items()):
+        for set_idx,set_intrvs in enumerate(dead_intervals):
             # get plain intervals length for this set
             set_intervs = sorted(
                 [t1-t0 for t0,t1 in zip(set_intrvs['t0'],set_intrvs['t1'])])
             all_dintervals[set_idx] = set_intervs
 
-            # get median of this set
+            # get median dead interval (if there are any items)
+            if len(set_intervs) == 0:
+                continue
             med_idx = len(set_intervs) // 2
             if len(set_intervs) % 2 == 0:
-                med = (set_intervs[med_idx] +
-                       set_intervs[med_idx+1]) / 2
+                med = (set_intervs[med_idx-1] + set_intervs[med_idx]) / 2
             else:
                 med = set_intervs[med_idx]
             med_dintervals[set_idx] = med
@@ -631,13 +632,12 @@ class EvictionRoundtrip(BaseModule):
 
     def __create_bins(self, max_value, exp=20):
         """
-        Create bins up to 2^exp in "half" exponential fashion:
-        0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64....
+        Create bins up to 2^exp in "half" exponential fashion
         """
         bin_right_edges = [1] * (2 * exp + 1)
         for i in range(1, exp+1):
             bin_right_edges[2*i-1] = 2**i
-            bin_right_edges[2*i] = 2**i + 2**(i-1)
+            bin_right_edges[2*i] = int(2**(i+0.5))
 
         # if the rightmost edge is still too small, then create an extra bin to
         # fit the largest interval
@@ -658,11 +658,15 @@ class EvictionRoundtrip(BaseModule):
 
         # linear counterpart of the original dataset.
         # linear_all_di[set] -> [ldi0:int, ldi1, ldi2, ...]
-        linear_all_dintervals = [[0]*len(set_di) for set_di in all_dintervals]
+        linear_all_dintervals = [[0]*len(set_di)
+                                 if set_di is not None else []
+                                 for set_di in all_dintervals]
         # max bin index actually used
         max_bin_idx_used = 0
 
         for s,set_dinterv in enumerate(all_dintervals):
+            if set_dinterv is None:
+                continue
             # current bin being used
             curr_bin_idx = 0
             # map all original data to the linear dataset
@@ -682,8 +686,10 @@ class EvictionRoundtrip(BaseModule):
 
 
         # map medians to values in the linear scale
-        linear_medians = [0 for _ in med_dintervals]
+        linear_medians = [None for _ in med_dintervals]
         for s,s_med_di in enumerate(med_dintervals):
+            if s_med_di is None:
+                continue
             curr_bin_idx = 0
                 # find the correct bin for this dead interval (dint)
             while bin_edges[curr_bin_idx] < s_med_di:
@@ -699,6 +705,11 @@ class EvictionRoundtrip(BaseModule):
 
     def __setup_hist_limits_and_ticks(self, mpl_axes, metric_code, xlims, ylims,
                                       xticks, xticks_labels):
+        """
+        Setup X and Y axes limits, ticks and labels. The X axis is a bit
+        tricky because it has linear (0, 1, 2...) ticks, but it shows the
+        exponential scale (the tick "labels")
+        """
         #####################################
         ## SET X-AXIS LIMITS AND TICK LABELS
         # find the tick index (what matplotlib sees) based on what the user
@@ -757,3 +768,35 @@ class EvictionRoundtrip(BaseModule):
 
         return
 
+    @classmethod
+    def MRID_to_aggregated_plot(cls, pdata_dicts):
+        """
+        Aggregate the multiple dictionaries.
+        Basically create a huge pool of interval lengths, separate them in bins,
+        and pick the median of each bin and use that to create the histogram.
+        Also, each bin will show a vertical I-shaped bar showing the full range
+        of that bin across all instances.
+        """
+        # metric info
+        metric_code = pdata_dicts[0]['fg']['code']
+        met_str = cls.supported_aggr_metrics[metric_code]
+
+        # extract data from dictionaries
+        all_pdatas = [pd['fg']['dead_intervals'] for pd in pdata_dicts]
+        num_pdatas = len(all_pdatas)
+        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # flatten all dead intervals across all pdatas
+        all_dintervals = {'t0':[], 't1':[]}
+        for pd_idx,pdata in enumerate(all_pdatas):
+            all_dintervals['t0'].extend(pdata['t0'])
+            all_dintervals['t1'].extend(pdata['t1'])
+
+        # split in bins
+
+        # get means and per-bin data ranges
+
+        # plot histogram
+
+        # plot per-bin data ranges
+        return

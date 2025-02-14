@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 from itertools import zip_longest
+import math
 
 from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import MetricStrings, Palette, PlotFile, sample_list
+from mapanalyzer.util import MetricStrings, Palette, PlotFile, sample_list, \
+    median
 from mapanalyzer.ui import UI
 from .base import BaseModule
 
@@ -38,8 +40,8 @@ class EvictionRoundtrip(BaseModule):
     }
     supported_aggr_metrics = {
         'MRID' : MetricStrings(
-            about  = ('Average MRID.'),
-            title  = 'Average MRI Distribution',
+            about  = ('Median MRID.'),
+            title  = 'Median MRI Distribution',
             subtit = 'right-skewed is better',
             number = '08',
             xlab   = 'Rountrip duration [access instr.]',
@@ -205,6 +207,7 @@ class EvictionRoundtrip(BaseModule):
                 't0' : evict_times,
                 't1' : fetch_times
             }
+        # self.dead_intervals[<set>] -> {'bl':[], 't0': [], 't1': []}
         self.dead_intervals = plot_dead_intervals
 
 
@@ -271,8 +274,8 @@ class EvictionRoundtrip(BaseModule):
         pal = Palette(
             hue = len(set_to_color), h_off=self.hue,
             # blocks, _
-            sat = st.Plot.p_sat,
-            lig = ( 50, 0),
+            sat = ( 50, 0),
+            lig = ( 75, 0),
             alp = (100, 0))
         for s in range(self.num_sets):
             set_to_color[s] = pal[s][0][0][0]
@@ -290,7 +293,7 @@ class EvictionRoundtrip(BaseModule):
         if metric_code in st.Plot.x_ranges:
             xmin,xmax = st.Plot.x_ranges[metric_code]
             width_range = xmax - xmin
-        jump_line_width = max(0.1, plt_w / (3*width_range))
+        jump_line_width = min(max(0.1, plt_w / (3*width_range)),5)
         jump_line_alpha = 1
         jump_line_style = '-'
 
@@ -298,7 +301,10 @@ class EvictionRoundtrip(BaseModule):
         #####################################
         ## PLOT METRIC
         mpl_fig = mpl_axes.figure
-        plot_types = ('single', 'all')
+        if st.Plot.plot_indiv_sets:
+            plot_types = ('single', 'all')
+        else:
+            plot_types = ('all')
         # save plots for each independent set, and one for all together
         for plot_type in plot_types:
             for set_idx,(set_interv,set_person,set_color) in enumerate(zip(
@@ -383,8 +389,8 @@ class EvictionRoundtrip(BaseModule):
         set_to_color = [''] * self.num_sets
         pal = Palette(
             hue = len(set_to_color), h_off=self.hue,
-            sat = (50, 0),
-            lig = (50, 0),
+            sat = ( 25, 0),
+            lig = ( 50, 0),
             alp = (100, 0))
         for s in range(self.num_sets):
             set_to_color[s] = pal[s][0][0][0]
@@ -408,7 +414,10 @@ class EvictionRoundtrip(BaseModule):
         Y_min,Y_max = 0,st.Map.num_blocks-1
         xlims = (X_min, X_max)
         ylims = (Y_min, Y_max)
-        plot_types = ('single', 'all')
+        if st.Plot.plot_indiv_sets:
+            plot_types = ('single', 'all')
+        else:
+            plot_types = ('all')
         no_data_in_all_sets = sum(
             len(siv['bl']) for siv in self.dead_intervals) == 0
         # save plots for each independent set, and one for all together
@@ -422,6 +431,7 @@ class EvictionRoundtrip(BaseModule):
                 t_end = set_intervs['t1']
                 roundtrips_count = len(blocks)
 
+
                 # If a maximum threshold was given by the user, then filter
                 # the intervals to only plot shorter ones.
                 thrshld = st.Plot.roundtrip_threshold
@@ -430,7 +440,7 @@ class EvictionRoundtrip(BaseModule):
                     blocks,t_start,t_end = [],[],[]
                     for bl,t0,t1 in zip(set_intervs['bl'], set_intervs['t0'],
                                         set_intervs['t1']):
-                        if t1-t0 <= thrshld:
+                        if int(t1-t0) <= thrshld:
                             blocks.append(bl)
                             t_start.append(t0)
                             t_end.append(t1)
@@ -525,8 +535,9 @@ class EvictionRoundtrip(BaseModule):
         mset_to_color = ['' for _ in range(self.num_sets)]
         pal = Palette(
             hue = self.num_sets, h_off=self.hue,
+            # bars, medians (vertical lines)
             sat = (50,  90),
-            lig = (75,  30),
+            lig = (75,  35),
             alp = (100, 90))
         for s in range(self.num_sets):
             hset_to_color[s] = pal[s][0][0][0]
@@ -536,24 +547,31 @@ class EvictionRoundtrip(BaseModule):
         ## CREATE DATA SERIES
         # obtain dead intervals and medians (per set) and max dead interval
         # (across all sets)
-        all_dintervals, med_dintervals, max_dinterval = \
-            self.__obtain_intervals(dead_intervals=self.dead_intervals)
+        intervs, medians, range_intervs = \
+            self.__obtain_intervals(interv_marks=self.dead_intervals)
+
+        if all(m is None for m in medians):
+            self.draw_textbox(mpl_axes, f'{metric_code}: NO DATA', metric_code,
+                              off=(0.5,0.5))
+            return
 
         # define bin edges
-        bin_edges = self.__create_bins(max_dinterval, exp=20)
+        global_max_interv = max(ri[1] for ri in range_intervs if ri is not None)
+        bin_edges = self.__create_bins(max_value=global_max_interv)
+        lin_bin_edges = [i for i in range(len(bin_edges))]
 
         # map dead intervals and bin edges to a linear scale so the histogram
         # has even columns width
-        lin_dintervals, lin_medians, lin_bin_edges, lin_max_bin_idx = \
-            self.__linearize_data(all_dintervals, med_dintervals, bin_edges)
+        lin_intervs, lin_medians = self.__linearize_data(intervs, medians,
+                                                         bin_edges)
 
 
         #####################################
         ## PLOT HISTOGRAM
-        hist_labels = [str(s) for s in range(self.num_sets)]
-        counts,_,_ = mpl_axes.hist(
-            lin_dintervals, stacked=True, zorder=3, width=0.95,
-            bins=lin_bin_edges, label=hist_labels, color=hset_to_color)
+        hist_labels = [f's{s}' for s in range(self.num_sets)]
+        counts,_,_ = mpl_axes.hist(lin_intervs, bins=lin_bin_edges,
+                                   label=hist_labels, color=hset_to_color,
+                                   stacked=True, zorder=3, width=0.95)
 
 
         #####################################
@@ -570,19 +588,23 @@ class EvictionRoundtrip(BaseModule):
         # setup limits and tick-labels
         Y_max = int(max(max(i) if len(i) else 0 for i in counts))
         ylims = (0,max(Y_max,1))
-        xlims = (1,max(1,max_dinterval))
+        xlims = (1,max(1,global_max_interv))
         self.__setup_hist_limits_and_ticks(
             mpl_axes, metric_code=metric_code, xlims=xlims, ylims=ylims,
             xticks=lin_bin_edges, xticks_labels=bin_edges)
 
         # insert text box with medians
-        if all(di is None for di in med_dintervals):
+        if all(di is None for di in medians):
             self.draw_textbox(mpl_axes, f'{metric_code}: NO DATA', metric_code,
                               off=(0.5,0.5))
         else:
             text = []
-            for s,s_med in enumerate(med_dintervals):
-                text.append(f's{s} median {metric_code}: {s_med}')
+            for s,s_med in enumerate(medians):
+                if s_med is not None:
+                    s_med_txt = f'{s_med:.1f}'
+                else:
+                    s_med_txt = 'None'
+                text.append(f's{s} median MRI: {s_med_txt}')
             '\n'.join(text)
             # set default textbox to upper-right corner
             if metric_code not in st.Plot.textbox_offsets:
@@ -593,61 +615,67 @@ class EvictionRoundtrip(BaseModule):
         self.setup_labels(mpl_axes, met_str)
 
         # title and bg color
-        self.setup_general(mpl_axes, pal.bg, met_str)
+        # 'white' because there is no possible bg plot for this boy
+        self.setup_general(mpl_axes, 'white', met_str)
 
         return
 
-    def __obtain_intervals(self, dead_intervals:list):
+    @classmethod
+    def __obtain_intervals(cls, interv_marks:list):
         """
         Obtains list of intervals (per set), median (per set), and maximum
         (across all sets).
         """
-        num_sets = len(dead_intervals)
-        # all_dintervals[set] -> [di0:int, di1, di2, ...]
-        all_dintervals = [None for _ in range(num_sets)]
-        # med_dintervals[set] -> median:int
-        med_dintervals = [None for _ in range(num_sets)]
-        # longest dead interval across all sets
-        max_dinterval = 0
-        for set_idx,set_intrvs in enumerate(dead_intervals):
-            # get plain intervals length for this set
+        num_sets = len(interv_marks)
+        # all_intervals[set] -> [di0:int, di1, di2, ...]
+        all_intervals = [None for _ in range(num_sets)]
+        # med_intervals[set] -> median:int
+        med_intervals = [None for _ in range(num_sets)]
+        # range_intervals[set] -> (min:int, max:int)
+        range_intervals = [None for _ in range(num_sets)]
+        for set_idx,marks in enumerate(interv_marks):
+            # transform marks to a plain list of lengths for this set
             set_intervs = sorted(
-                [t1-t0 for t0,t1 in zip(set_intrvs['t0'],set_intrvs['t1'])])
-            all_dintervals[set_idx] = set_intervs
+                [int(t1-t0) for t0,t1 in zip(marks['t0'],marks['t1'])])
+
+            all_intervals[set_idx] = set_intervs
 
             # get median dead interval (if there are any items)
             if len(set_intervs) == 0:
                 continue
-            med_idx = len(set_intervs) // 2
-            if len(set_intervs) % 2 == 0:
-                med = (set_intervs[med_idx-1] + set_intervs[med_idx]) / 2
-            else:
-                med = set_intervs[med_idx]
-            med_dintervals[set_idx] = med
+            med_intervals[set_idx] = median(set_intervs)
 
-            # update maximum dead interval across all sets
-            max_dinterval = max(max_dinterval, set_intervs[-1])
+            # get the range
+            range_intervals[set_idx] = (set_intervs[0], set_intervs[-1])
 
-        return all_dintervals, med_dintervals, max_dinterval
+        return all_intervals, med_intervals, range_intervals
 
-    def __create_bins(self, max_value, exp=20):
+    @classmethod
+    def __create_bins(cls, exp=30, max_value=None):
         """
         Create bins up to 2^exp in "half" exponential fashion
         """
         bin_right_edges = [1] * (2 * exp + 1)
-        for i in range(1, exp+1):
-            bin_right_edges[2*i-1] = 2**i
-            bin_right_edges[2*i] = int(2**(i+0.5))
+        for i,e in enumerate([i/2 for i in range(1, 2*exp+2)]):
+            bin_right_edges[i] = round(2**e)
 
-        # if the rightmost edge is still too small, then create an extra bin to
-        # fit the largest interval
-        if bin_right_edges[-1] < max_value:
-            bin_right_edges += [max_value+1]
+        # if the created rightmost edge is still too small to fit the max value,
+        # then create an extra bin to fit the largest interval
+        if max_value is not None and bin_right_edges[-1] < max_value:
+            bin_right_edges += [int(max_value+1)]
+        # else:
+        #     curr_idx = 0
+        #     for right_edge in bin_right_edges:
+        #         curr_idx += 1
+        #         if max_value < right_edge:
+        #             break
+        #     bin_right_edges = bin_right_edges[:curr_idx]
 
         # add the left edge of the first bin.
         return [0] + bin_right_edges
 
-    def __linearize_data(self, all_dintervals, med_dintervals, bin_edges):
+    @classmethod
+    def __linearize_data(cls, intervs, medians, bin_edges):
         """
         Bins are of different width. So columns would be narrow on the left,
         and wide on the right. Normalize the histogram by creating a new
@@ -657,14 +685,12 @@ class EvictionRoundtrip(BaseModule):
         """
 
         # linear counterpart of the original dataset.
-        # linear_all_di[set] -> [ldi0:int, ldi1, ldi2, ...]
-        linear_all_dintervals = [[0]*len(set_di)
+        # linear_intervs[set] -> [li0:int, li1, li2, ...]
+        linear_intervs = [[0]*len(set_di)
                                  if set_di is not None else []
-                                 for set_di in all_dintervals]
-        # max bin index actually used
-        max_bin_idx_used = 0
+                                 for set_di in intervs]
 
-        for s,set_dinterv in enumerate(all_dintervals):
+        for s,set_dinterv in enumerate(intervs):
             if set_dinterv is None:
                 continue
             # current bin being used
@@ -676,34 +702,18 @@ class EvictionRoundtrip(BaseModule):
                 while dint >= bin_edges[curr_bin_idx]:
                     curr_bin_idx += 1
                 # add data-point to linear dataset.
-                linear_all_dintervals[s][i] = curr_bin_idx-1
+                linear_intervs[s][i] = curr_bin_idx-1
 
-            # update the last actually used bin
-            max_bin_idx_used = max(max_bin_idx_used, curr_bin_idx)
-
-        # linear counterpart of original bin_edges
-        linear_bin_edges = [i for i in range(len(bin_edges))]
-
-
-        # map medians to values in the linear scale
-        linear_medians = [None for _ in med_dintervals]
-        for s,s_med_di in enumerate(med_dintervals):
-            if s_med_di is None:
+        linear_medians = [None for _ in medians]
+        for set_idx,set_median in enumerate(medians):
+            if set_median is None:
                 continue
-            curr_bin_idx = 0
-                # find the correct bin for this dead interval (dint)
-            while bin_edges[curr_bin_idx] < s_med_di:
-                curr_bin_idx += 1
-            # integer and fractional parts
-            lmed_int = curr_bin_idx - 1
-            lmed_frac = (s_med_di - bin_edges[curr_bin_idx-1]) / \
-                (bin_edges[curr_bin_idx] - bin_edges[curr_bin_idx-1])
-            linear_medians[s] = lmed_int + lmed_frac
+            linear_medians[set_idx] = 2*math.log2(set_median)
 
-        return linear_all_dintervals, linear_medians, linear_bin_edges, \
-            max_bin_idx_used
+        return linear_intervs, linear_medians
 
-    def __setup_hist_limits_and_ticks(self, mpl_axes, metric_code, xlims, ylims,
+    @classmethod
+    def __setup_hist_limits_and_ticks(cls, mpl_axes, metric_code, xlims, ylims,
                                       xticks, xticks_labels):
         """
         Setup X and Y axes limits, ticks and labels. The X axis is a bit
@@ -765,11 +775,15 @@ class EvictionRoundtrip(BaseModule):
         # Set axis parameters: ticks and limits
         mpl_axes.set_yticks(y_tick_labels)
         mpl_axes.set_ylim(ymin-bot_ypad, ymax+top_ypad)
-
+        alp = st.Plot.grid_alpha[1]
+        sty = st.Plot.grid_style[1]
+        wid = st.Plot.grid_width[1]
+        mpl_axes.grid(axis='y', which='both', zorder=10, alpha=alp,
+                              linestyle=sty, linewidth=wid)
         return
 
     @classmethod
-    def MRID_to_aggregated_plot(cls, pdata_dicts):
+    def MRID_to_aggregated_plot(cls, all_pdata_dicts):
         """
         Aggregate the multiple dictionaries.
         Basically create a huge pool of interval lengths, separate them in bins,
@@ -778,25 +792,128 @@ class EvictionRoundtrip(BaseModule):
         of that bin across all instances.
         """
         # metric info
-        metric_code = pdata_dicts[0]['fg']['code']
+        metric_code = all_pdata_dicts[0]['fg']['code']
         met_str = cls.supported_aggr_metrics[metric_code]
 
         # extract data from dictionaries
-        all_pdatas = [pd['fg']['dead_intervals'] for pd in pdata_dicts]
-        num_pdatas = len(all_pdatas)
+        all_interv_marks = [pd['fg']['dead_intervals']
+                            for pd in all_pdata_dicts]
+        num_pdatas = len(all_interv_marks)
         fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
 
-        # flatten all dead intervals across all pdatas
-        all_dintervals = {'t0':[], 't1':[]}
-        for pd_idx,pdata in enumerate(all_pdatas):
-            all_dintervals['t0'].extend(pdata['t0'])
-            all_dintervals['t1'].extend(pdata['t1'])
+        # obtain intervals and stats for each pdata_mark
+        pdatas_intervs = []
+        pdatas_medians = []
+        pdatas_ranges = []
+        global_max_interv = 0
+        for pdata_marks in all_interv_marks:
+            # flatten marks so that there is only one "dummy" set that merges
+            # all the actual sets in this pdata_marks
+            merged_t0 = []
+            merged_t1 = []
+            for set_marks in pdata_marks:
+                merged_t0.extend(set_marks['t0'])
+                merged_t1.extend(set_marks['t1'])
 
-        # split in bins
+            merged_marks = [{'bl':None, 't0':merged_t0, 't1':merged_t1}]
+            intervs, medians, ranges = cls.__obtain_intervals(merged_marks)
+            pdatas_intervs.append(intervs)
+            pdatas_medians.append(medians)
+            pdatas_ranges.append(ranges)
+            if ranges[0] is not None:
+                global_max_interv = max(global_max_interv,ranges[0][1])
 
-        # get means and per-bin data ranges
+        # define bin edges
+        bin_edges = cls.__create_bins(max_value=global_max_interv)
+        lin_bin_edges = [i for i in range(len(bin_edges))]
 
-        # plot histogram
+        # obtain the linear index that corresponds to the global_max_interv
+        global_max_lin_idx = 0
+        for i,right_edge in enumerate(bin_edges):
+            if global_max_interv < right_edge:
+                global_max_lin_idx = i
+                break
 
-        # plot per-bin data ranges
+        # map intervals to linear scale
+        pdatas_lin_intervs = []
+        pdatas_lin_medians = []
+        for intvs,med,ran in zip(pdatas_intervs,pdatas_medians,pdatas_ranges):
+            lin_intvs,lin_med = cls.__linearize_data(intvs, med,
+                                                            bin_edges)
+            pdatas_lin_intervs.append(lin_intvs)
+            pdatas_lin_medians.append(lin_med)
+
+        # bin count distribution. to get intra-bin stats. One sub-list per bin
+        # b_c_d = [[b0cnt:int, b1cnt, b2cnt...], [b0cnt, b1cnt...], ...]
+        bin_count_distr = [[0]*(len(bin_edges)-1) for _ in pdatas_intervs]
+        for i,(intv,med) in enumerate(zip(pdatas_lin_intervs,
+                                          pdatas_lin_medians)):
+            for l_idx in intv[0]:
+                bin_count_distr[i][l_idx] += 1
+
+        # Find the median of each bin
+        bin_medians = [0] * (len(bin_edges)-1)
+        bin_ranges = [None for _ in range(len(bin_edges)-1)]
+        for n,nth_bin_counters in enumerate(zip(*bin_count_distr)):
+            bin_medians[n] = median(nth_bin_counters)
+            bin_ranges[n] = (min(nth_bin_counters), max(nth_bin_counters))
+
+
+        #####################################
+        ## PLOT HISTOGRAM
+        # Plot the damn histogram (a bar plot actually, coz medians can be
+        # decimals)
+        X = [x-0.5 for x in lin_bin_edges[2:global_max_lin_idx+1]]
+        X_labels = bin_edges[2:global_max_lin_idx+1]
+        Y = bin_medians[1:global_max_lin_idx]
+
+        bar_color = Palette.from_hsla((cls.hue+60,50,75,100))
+        mpl_axes.bar(x=X, height=Y, width=0.95, zorder=3, color=bar_color)
+
+
+
+        #####################################
+        ## PLOT RANGES
+        # make a 'I-shaped' range line in each histogram bin to show the range
+        # of the instances that lead to this median-bin.
+        Xran = [x-0.5 for x in lin_bin_edges[2:global_max_lin_idx+1]]
+        Ymin = [y[0] for y in bin_ranges[1:global_max_lin_idx]]
+        Ymax = [y[1] for y in bin_ranges[1:global_max_lin_idx]]
+        range_color = '#888888'
+        mpl_axes.vlines(x=Xran, ymin=Ymin, ymax=Ymax,
+                        color=range_color, linewidth=1,
+                        zorder=4,linestyle='solid')
+        mpl_axes.scatter(x=Xran, y=Ymin, zorder=4, s=25, marker='_',
+                         color=range_color)
+        mpl_axes.scatter(x=Xran, y=Ymax, zorder=4, s=25, marker='_',
+                         color=range_color)
+
+
+        #####################################
+        # SETUP PLOT VISUALS
+        # set plot limits
+        xlims = (1, max(1,global_max_interv))
+        if len(Ymax) == 0:
+            ymax = 1
+        else:
+            ymax = max(Ymax)
+        ylims = (0, ymax)
+        pads = ('auto', 'auto')
+        cls.__setup_hist_limits_and_ticks(
+            mpl_axes, metric_code=metric_code, xlims=xlims, ylims=ylims,
+            xticks=lin_bin_edges, xticks_labels=bin_edges)
+
+        # insert text box with average imbalance
+        text = [f'Executions: {num_pdatas}']
+        cls.draw_textbox(mpl_axes, text, metric_code)
+
+        # set labels
+        cls.setup_labels(mpl_axes, met_str)
+
+        # title and bg color
+        # 'white' because there is no possible bg plot for this boy
+        cls.setup_general(mpl_axes, 'white', met_str)
+
+        PlotFile.save(fig, metric_code, aggr=True)
+
         return

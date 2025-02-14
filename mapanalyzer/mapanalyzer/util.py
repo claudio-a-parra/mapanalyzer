@@ -594,6 +594,12 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
+        '-Pi', '--no-plot-individual-sets', dest='plot_indiv_sets',
+        action='store_false',
+        help=('If set, do not plot individual sets in BPA and SMRI.')
+    )
+
+    parser.add_argument(
         '-st', '--short-roundtrip-threshold', metavar='SRT', dest='rt_threshld',
         type=int, default=None,
         help=('Draw short memory roundtrip intervals (SMRI) of up to this '
@@ -622,3 +628,10 @@ def command_line_args_parser():
     args = parser.parse_args()
     return args
 
+def median(full_list:list):
+    med_idx = len(full_list) // 2
+    if len(full_list) % 2 == 0:
+        med = (full_list[med_idx-1] + full_list[med_idx]) / 2
+    else:
+        med = full_list[med_idx]
+    return med

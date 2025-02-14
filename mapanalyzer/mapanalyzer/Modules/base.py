@@ -110,7 +110,7 @@ class BaseModule:
         # set grid
         for axi,alp,sty,wid in zip(axes, alpha, style, width):
             if axi in user_axes:
-                mpl_axes.grid(axis=axi, which='both', zorder=1, alpha=alp,
+                mpl_axes.grid(axis=axi, which='both', zorder=10, alpha=alp,
                               linestyle=sty, linewidth=wid)
         return
 
@@ -185,7 +185,7 @@ class BaseModule:
     @classmethod
     def setup_manual_grid(cls, mpl_axes, axis='both', hlines=None, xlims=None,
                           vlines=None, ylims=None, fn_axis='y',
-                          grid_color='#BFBFBF60', zorder=1):
+                          grid_color='#BFBFBF60', zorder=10):
         # sanitize axis parameter
         if axis in ('both', 'xy', 'yx'):
             user_axes = ('x', 'y')

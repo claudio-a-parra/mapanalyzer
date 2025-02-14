@@ -6,3 +6,6 @@
 .flag_installed
 .flag_ready
 cache.conf
+*.map
+*.json
+*.png

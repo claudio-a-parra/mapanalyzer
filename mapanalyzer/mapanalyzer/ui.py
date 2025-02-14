@@ -22,6 +22,7 @@ class UI:
               |    +---------------------------------- pre-message
               +--------------------------------------- symbol
         """
+        msg = str(msg)
         # determine indentation string.
         if indent and len(msg) > 0:
             # if a manual indentation string has been given

@@ -842,7 +842,7 @@ class Settings:
         img_title_vpad = 6 # padding between the plot and its title
 
         # Ticks (independent_variable, function_variable)
-        ticks_max_count = (30,30) #(11, 11)
+        ticks_max_count = (11, 11)
         max_xtick_count = 11
         max_ytick_count = 11
         max_map_ytick_count = 11
@@ -885,6 +885,9 @@ class Settings:
 
         # draw vertical lines denoting the executions ends in aggregation mode
         aggr_last_x = True
+
+        # draw individual plots for sets in BPA and SMRI?
+        plot_indiv_sets = True
 
         ############################################################
         # DERIVED VALUES
@@ -931,6 +934,8 @@ class Settings:
             cls.textbox_offsets = assg_val(cls.textbox_offsets,
                                            args.textbox_offsets)
             cls.aggr_last_x = assg_val(cls.aggr_last_x, args.aggr_last_x)
+            cls.plot_indiv_sets = assg_val(cls.plot_indiv_sets,
+                                           args.plot_indiv_sets)
             cls.roundtrip_threshold = assg_val(cls.roundtrip_threshold,
                                                args.rt_threshld)
 

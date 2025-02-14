@@ -72,6 +72,23 @@ class Cache:
 
     def __accesses(self, concurrent_access):
         common_time = concurrent_access[0].time
+
+        # sort concurrent accesses so requests to blocks in cache
+        # have priority (to avoid potential evict&fetch the same block
+        # during the same time
+        if len(concurrent_access) > 1:
+            priority = []
+            rest = []
+            for a in concurrent_access:
+                addr = a.addr - st.Map.aligned_start_addr
+                tag, idx, _ = st.AddrFmt.split(addr)
+                if (tag,idx) in self.blocks_in_cache:
+                    priority.append(a)
+                else:
+                    rest.append(a)
+            concurrent_access = priority+rest
+
+        # effect all concurrent accesses
         for a in concurrent_access:
             self.__single_access(a)
         self.modules.commit(common_time)

@@ -457,17 +457,16 @@ def command_line_args_parser():
                   f'{st.Cache.arch}\n')
 
     examples = ('examples:\n'
-                '  Run cache simulation with a given configuration and produce '
-                'metric and plot results:\n'
+                '  Run cache simulation with a given configuration and \n'
+                '  produce metric and plot results:\n'
                 '      mapanalyzer --cache mycache.conf -- myexperiment.map\n'
                 '\n'
                 '  Plot the results of a previously simulated cache:\n'
-                '      mapanalyzer --mode plot -- myexperiment.metric.json\n'
+                '      mapanalyzer --mode plot -- myexperiment.json\n'
                 '\n'
-                '  Aggregate three different runs of the same experiment into '
-                'a single plot:\n'
-                '      mapanalyzer --mode aggregate -- run1.metric.json '
-                'run2.metric.json run3.metric.json\n')
+                '  Aggregate three different runs of the same experiment into\n'
+                '  a single plot:\n'
+                '      mapanalyzer --mode aggregate -- A.json B.json C.json\n')
 
     signature = ('By Claudio A. Parra. 2025.\n'
                  'parraca@uci.edu')
@@ -481,8 +480,8 @@ def command_line_args_parser():
     parser.add_argument(
         metavar='INPUT-FILE', dest='input_files', nargs='+',
         type=str, default=None,
-        help=('List of input files. Depending on the analysis '
-              '"mode", they are either MAP or PDATA type.')
+        help=('List of input files. Depending on the analysis "mode", they\n'
+              'are either MAP or PDATA type.')
     )
 
     parser.add_argument(
@@ -561,15 +560,15 @@ def command_line_args_parser():
     parser.add_argument(
         '-Lx', '--no-last-x', dest='aggr_last_x',
         action='store_false',
-        help=('If set, do not include vertical lines (and an extra average '
-              'line) to denote the end of each execution contained in each '
+        help=('If set, do not include vertical lines (and an extra average\n'
+              'line) to denote the end of each execution contained in each\n'
               'PDATA file during aggregation mode.\n')
     )
 
     parser.add_argument(
         '-xr', '--x-ranges', metavar='XRANGES', dest='x_ranges',
         type=str, default=None,
-        help=('Set a manual range for the X-axis. Useful to compare several '
+        help=('Set a manual range for the X-axis. Useful to compare several\n'
               'individually produced plots.\n'
               'Format : full | <CODE>:<MIN>:<MAX>{,<CODE>:<MIN>:<MAX>}\n'
               '         Were <MIN> and <MAX> are numbers.\n'
@@ -579,7 +578,7 @@ def command_line_args_parser():
     parser.add_argument(
         '-yr', '--y-ranges', metavar='YRANGES', dest='y_ranges',
         type=str, default=None,
-        help=('Set a manual range for the Y-axis. Useful to compare several '
+        help=('Set a manual range for the Y-axis. Useful to compare several\n'
               'individually produced plots.\n'
               'Format : full | <CODE>:<MIN>:<MAX>{,<CODE>:<MIN>:<MAX>}\n'
               '         Were <MIN> and <MAX> are numbers.\n'
@@ -610,8 +609,8 @@ def command_line_args_parser():
     parser.add_argument(
         '-to', '--textbox-offsets', metavar='OFFSETS', dest='textbox_offsets',
         type=str, default=None,
-        help=('Set the horizontal and vertical offset for text boxes in the '
-              'plots. The range goes from 0 to 1 (left to right and bottom to '
+        help=('Set the horizontal and vertical offset for text boxes in the\n'
+              'plots. The range goes from 0 to 1 (left to right and bottom to\n'
               'top).\n'
               'Format : <CODE>:<HORIZ>:<VERT>{,<CODE>:<HORIZ>:<VERT>}\n'
               '         Were 0 < HORIZ,VERT < 1.\n'

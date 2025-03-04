@@ -3,11 +3,11 @@ SHELL := /bin/bash
 .PHONY: help install remove check
 
 help:
-	echo "TARGETS: "
-	echo "    install : install pin, maptracer, and mapanalyzer"
-	echo "    remove  : remove pin, maptracer, and mapanalyzer"
-	echo "    help    : print this message"
-	echo "    test    : test the installation of the components"
+	@echo "TARGETS: "
+	@echo "    install : install pin, maptracer, and mapanalyzer"
+	@echo "    remove  : remove pin, maptracer, and mapanalyzer"
+	@echo "    help    : print this message"
+	@echo "    test    : test the installation of the components"
 
 install:
 	@echo -e "==================================="

@@ -468,7 +468,8 @@ def command_line_args_parser():
                 '  a single plot:\n'
                 '      mapanalyzer --mode aggregate -- A.json B.json C.json\n')
 
-    signature = ('By Claudio A. Parra. 2025.\n'
+    signature = ('By Claudio A. Parra.\n'
+                 '2025.\n'
                  'parraca@uci.edu')
 
     parser = argparse.ArgumentParser(
@@ -490,16 +491,19 @@ def command_line_args_parser():
         type=str, default=None,
         help=(
             'Defines the operation mode of the tool:\n'
-            'simulate  : Only run the cache simulation. You must provide a\n'
-            '            list of MAP files. Generates PDATA files.\n'
-            'plot      : Plot already obtained metric data. One plot per\n'
-            '            input file. You must provide a list of PDATA files.\n'
-            '            Generates PLOT files.\n'
-            'sim-plot  : (default) Simulate cache and plot results. Generates\n'
-            '            PDATA and PLOT files.\n'
+            'simulate  : Only run the cache simulation.\n'
+            '              Input : list of MAP files.\n'
+            '              Output: PDATA files.\n'
+            'plot      : Only plot already obtained metric data (PDATA).\n'
+            '              Input : list of PDATA files.\n'
+            '              Output: PLOT files. One plot per input PDATA file.\n'
+            'sim-plot  : (default) Simulate cache and plot results.\n'
+            '              Input : list of MAP files.\n'
+            '              Output: PDATA and PLOT files.\n'
             'aggregate : Plot the aggregation of multiple metric data files,\n'
-            '            aggregating the ones of the same kind. You must\n'
-            '            provide a list of PDATA files.\n')
+            '            aggregating the ones of the same kind.\n'
+            '              Input : list of PDATA files.\n'
+            '              Output: Aggregated PLOT files.')
     )
 
     parser.add_argument(
@@ -558,7 +562,7 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
-        '-Lx', '--no-last-x', dest='aggr_last_x',
+        '-Lx', '--no-plot-last-x', dest='aggr_last_x',
         action='store_false',
         help=('If set, do not include vertical lines (and an extra average\n'
               'line) to denote the end of each execution contained in each\n'
@@ -600,10 +604,10 @@ def command_line_args_parser():
 
     parser.add_argument(
         '-st', '--short-roundtrip-threshold', metavar='SRT', dest='rt_threshld',
-        type=int, default=None,
+        type=str, default=None,
         help=('Draw short memory roundtrip intervals (SMRI) of up to this '
               'length.\n'
-              'Format: none | <integer>')
+              'Format: all | <integer>')
     )
 
     parser.add_argument(
@@ -612,7 +616,7 @@ def command_line_args_parser():
         help=('Set the horizontal and vertical offset for text boxes in the\n'
               'plots. The range goes from 0 to 1 (left to right and bottom to\n'
               'top).\n'
-              'Format : <CODE>:<HORIZ>:<VERT>{,<CODE>:<HORIZ>:<VERT>}\n'
+              'Format : default | <CODE>:<HORIZ>:<VERT>{,<CODE>:<HORIZ>:<VERT>}\n'
               '         Were 0 < HORIZ,VERT < 1.\n'
               'Example: CUR:0.02:0.98,CMMA:0.9:0.9')
     )

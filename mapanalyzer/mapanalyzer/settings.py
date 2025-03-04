@@ -898,7 +898,7 @@ class Settings:
         y_ranges = 'full'
 
         # textbox horizontal and vertical offsets, {CODE -> (horiz,vert)}
-        textbox_offsets = None
+        textbox_offsets = 'default'
 
         # Specific to MAP plot.
         # min_map_res is only used if the native resolution is too large (above
@@ -911,8 +911,8 @@ class Settings:
         min_map_res,max_map_res = 1, 'auto'
 
         # Specific to SMRI.
-        # draw segments of up to this length. If None, draw them all.
-        roundtrip_threshold = None
+        # draw segments of up to this length. If 'all', draw them all.
+        roundtrip_threshold = 'all'
 
 
         @classmethod
@@ -950,6 +950,12 @@ class Settings:
             cls.textbox_offsets = cls.__init_textbox_offsets()
             cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
                 cls.width, cls.height, cls.dpi, cls.max_map_res)
+            if cls.roundtrip_threshold != 'all':
+                try:
+                    cls.roundtrip_threshold = int(cls.roundtrip_threshold)
+                except:
+                    UI.error(f'Argument "-st/--short-roundtrip-threshold" '
+                             'expects an integer or "all".')
             return
 
         @classmethod
@@ -981,7 +987,7 @@ class Settings:
         @classmethod
         def __init_textbox_offsets(cls):
             user_tboff = cls.textbox_offsets
-            if user_tboff is None:
+            if user_tboff is None or user_tboff == 'default':
                 return {}
             user_tb_off = str(user_tboff)
             user_offsets = [o.strip() for o in user_tboff.split(',')]

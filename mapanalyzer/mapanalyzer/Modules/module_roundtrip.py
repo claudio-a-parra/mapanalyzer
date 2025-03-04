@@ -436,7 +436,7 @@ class EvictionRoundtrip(BaseModule):
                 # the intervals to only plot shorter ones.
                 thrshld = st.Plot.roundtrip_threshold
                 thrshld_text = '(all)'
-                if thrshld is not None:
+                if thrshld != 'all':
                     blocks,t_start,t_end = [],[],[]
                     for bl,t0,t1 in zip(set_intervs['bl'], set_intervs['t0'],
                                         set_intervs['t1']):

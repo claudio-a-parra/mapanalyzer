@@ -160,6 +160,7 @@ def mode_dispatcher():
 
 def main():
     try:
+        UI.text('', end='') # reset terminal color
         mode_dispatcher()
     except KeyboardInterrupt:
         UI.indent_set(ind=0)

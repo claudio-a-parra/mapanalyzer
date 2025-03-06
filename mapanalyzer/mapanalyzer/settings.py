@@ -725,6 +725,9 @@ class Settings:
             while almost_id != almost_id_new:
                 almost_id = almost_id_new
                 almost_id_new = almost_id.strip(unwanted)
+            # avoid hidden files
+            while almost_id[0] == '.':
+                almost_id = almost_id[1:]
             cls.ID = almost_id
             return
 

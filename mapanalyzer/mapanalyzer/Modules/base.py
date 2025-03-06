@@ -135,6 +135,10 @@ class BaseModule:
             set_lim = getattr(mpl_axes, f'set_{ax}lim')
             if pad == 'auto':
                 pad = (lmax-lmin) / 200
+
+            # add dummy range if limits are the same:
+            if lmin-pad == lmax+pad:
+                lmax += 1
             set_lim(lmin-pad, lmax+pad)
 
             # decide whether to invert the axis

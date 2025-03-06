@@ -597,7 +597,7 @@ def command_line_args_parser():
     )
 
     parser.add_argument(
-        '-Pi', '--no-plot-individual-sets', dest='plot_indiv_sets',
+        '-Is', '--no-plot-individual-sets', dest='plot_indiv_sets',
         action='store_false',
         help=('If set, do not plot individual sets in BPA and SMRI.')
     )

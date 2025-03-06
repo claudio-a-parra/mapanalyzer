@@ -279,10 +279,13 @@ class Aliasing(BaseModule):
         X_pad,Y_pad = 0.5,0.5
         for s in range(num_sets):
             # define the extension of this set's band:
-            # - all horizontal (time) span.
+            # - all horizontal (time) span. If no time, add a dummy unit.
             # - just one unit in the vertical (set-tiers) span.
-            set_tier_ext = (0-X_pad, time_size-1+X_pad,
-                            s-Y_pad, s+Y_pad)
+            set_tier_ext = [0-X_pad, time_size-1+X_pad,
+                            s-Y_pad, s+Y_pad]
+            if set_tier_ext[0] == set_tier_ext[1]:
+                set_tier_ext[1] += 1
+
             set_tier_ali = [avg_tier_aliasing[s]]
             mpl_axes.imshow(set_tier_ali, cmap=shade_cmap, origin='lower',
                             interpolation='none', aspect='auto',

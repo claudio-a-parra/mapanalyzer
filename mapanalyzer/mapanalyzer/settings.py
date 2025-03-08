@@ -728,6 +728,9 @@ class Settings:
             # avoid hidden files
             while almost_id[0] == '.':
                 almost_id = almost_id[1:]
+            # avoid ending with dash
+            while almost_id[-1] == '-':
+                almost_id = almost_id[:-1]
             cls.ID = almost_id
             return
 

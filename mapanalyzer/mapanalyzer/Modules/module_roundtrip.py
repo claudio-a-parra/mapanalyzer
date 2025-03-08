@@ -13,7 +13,7 @@ class EvictionRoundtrip(BaseModule):
     supported_metrics = {
         'BPA' : MetricStrings(
             about  = ('The Block-Personality that each Cache Set adopts.'),
-            title  = 'Block Personality Adoption',
+            title  = 'BPA',
             subtit = '',
             number = '06',
             xlab   = 'Time [access instr.]',
@@ -22,7 +22,7 @@ class EvictionRoundtrip(BaseModule):
         'SMRI' : MetricStrings(
             about  = ('The time a block spends in main memory until it is '
                       'fetched back to cache.'),
-            title  = 'Short Memory Roundtrip Interval',
+            title  = 'SMRI',
             subtit = 'fewer is better',
             number = '07',
             xlab   = 'Time [access instr.]',
@@ -31,7 +31,7 @@ class EvictionRoundtrip(BaseModule):
         'MRID' : MetricStrings(
             about  = ('Histogram showing the memory roundtrip intervals '
                       'duration distribution.'),
-            title  = 'Memory Roundtrip Interval Distribution',
+            title  = 'MRID',
             subtit = 'right-skewed is better',
             number = '08',
             xlab   = 'Rountrip duration [access instr.]',

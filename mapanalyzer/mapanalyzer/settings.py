@@ -14,11 +14,11 @@ class Settings:
         'TLD'  : 'Temporal Locality Degree',
         'CMR'  : 'Cache Miss Rate',
         'CMMA' : 'Cumulative Main Memory Access',
-        'CUR'  : 'Cache Usage Ratio',
+        'CUR'  : 'Cache Usage Rate',
         'AD'   : 'Aliasing Density',
         'BPA'  : 'Block Personality Adoption',
-        'SMRI' : 'Short Memory Roundtrip Interval',
-        'MRID' : 'Memory Roundtrip Interval Distribution'
+        'SMRI' : 'Short Memory Roundtrip Intervals',
+        'MRID' : 'Memory Roundtrip Intervals Distribution'
     }
 
     @classmethod

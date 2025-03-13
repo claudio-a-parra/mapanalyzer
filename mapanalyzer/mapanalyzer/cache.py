@@ -1,7 +1,7 @@
 from collections import deque
 
-from mapanalyzer.settings import Settings as st
-from mapanalyzer.ui import UI
+from .settings import Settings as st
+from .ui import UI
 
 class Block:
     def __init__(self, block_size, tag=None, dirty=False):

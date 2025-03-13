@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 from itertools import zip_longest
 import matplotlib.colors as mcolors # to create shades of colors from list
 
-from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import MetricStrings, Palette, PlotFile
-from mapanalyzer.ui import UI
+from ..settings import Settings as st
+from ..util import MetricStrings, Palette, PlotFile
+from ..ui import UI
 from .base import BaseModule
 
 class Aliasing(BaseModule):

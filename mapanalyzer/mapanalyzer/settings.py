@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from itertools import zip_longest
 
-from mapanalyzer.ui import UI
+from .ui import UI
 
 class Settings:
     mode = 'sim-plot'

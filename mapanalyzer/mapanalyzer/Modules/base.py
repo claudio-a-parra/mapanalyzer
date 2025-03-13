@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 
-from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import Palette, MetricStrings, sample_list
-from mapanalyzer.ui import UI
+from ..settings import Settings as st
+from ..util import Palette, MetricStrings, sample_list
+from ..ui import UI
 
 class BaseModule:
     """

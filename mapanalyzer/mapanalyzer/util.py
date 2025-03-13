@@ -3,8 +3,8 @@ import colorsys # to convert from hls to rgb
 import matplotlib.pyplot as plt
 import argparse # to get command line arguments
 from jsonschema import validate, ValidationError # to validate pdata files
-from mapanalyzer.settings import Settings as st
-from mapanalyzer.ui import UI
+from .settings import Settings as st
+from .ui import UI
 
 class MetricStrings:
     def __init__(self, about='About this metric', title='Title',
@@ -426,7 +426,7 @@ def sample_list(full_list, base=10, n=10):
     tick_step = 1
     tot_ticks = len(full_list)
     factors = [1,2,2.5,5] if base==10 else [1]
-    for i in range(14):
+    for i in range(1000):
         found = False
         for f in factors:
             f_pow_base = int(f * (base ** i))

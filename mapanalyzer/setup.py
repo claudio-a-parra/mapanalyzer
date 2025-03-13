@@ -12,6 +12,10 @@ setup(
         ],
     },
     install_requires=[
+        # build dependencies
+        "setuptools",
+        "wheel",
+        # program dependencies
         "matplotlib",
         "jsonschema",
         "colorama"

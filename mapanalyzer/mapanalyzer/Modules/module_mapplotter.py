@@ -2,9 +2,9 @@ from matplotlib.colors import ListedColormap # for axes.imshow() color map
 from itertools import combinations # for resolution finding
 from math import prod # for resolution finding
 
-from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import MetricStrings, Palette
-from mapanalyzer.ui import UI
+from ..settings import Settings as st
+from ..util import MetricStrings, Palette
+from ..ui import UI
 from .base import BaseModule
 
 class Map(BaseModule):

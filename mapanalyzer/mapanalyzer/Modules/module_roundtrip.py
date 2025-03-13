@@ -2,10 +2,10 @@ import matplotlib.pyplot as plt
 from itertools import zip_longest
 import math
 
-from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import MetricStrings, Palette, PlotFile, sample_list, \
+from ..settings import Settings as st
+from ..util import MetricStrings, Palette, PlotFile, sample_list, \
     median
-from mapanalyzer.ui import UI
+from ..ui import UI
 from .base import BaseModule
 
 class EvictionRoundtrip(BaseModule):

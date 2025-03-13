@@ -1,9 +1,9 @@
 import sys
 import matplotlib.pyplot as plt
 
-from mapanalyzer.settings import Settings as st
-from mapanalyzer.util import MetricStrings, PdataFile, PlotFile
-from mapanalyzer.ui import UI
+from ..settings import Settings as st
+from ..util import MetricStrings, PdataFile, PlotFile
+from ..ui import UI
 
 from .module_mapplotter import Map
 from .module_locality import Locality
@@ -54,7 +54,7 @@ class Manager:
         enabled_list = ['ENABLED']
         metrics_list = ['METRIC']
         modules_list = ['MODULE']
-        descrip_list = ['DESCRIPTION']
+        #descrip_list = ['DESCRIPTION']
         for metric_code,module in st.Metrics.available.items():
             if metric_code in st.Metrics.enabled or \
                metric_code == st.Metrics.bg:
@@ -63,9 +63,9 @@ class Manager:
                 enabled_list.append('[ ]')
             metrics_list.append(metric_code)
             modules_list.append(module.__class__.__name__)
-            descrip_list.append(module.supported_metrics[metric_code].about)
-        UI.columns((enabled_list, metrics_list, modules_list, descrip_list),
-                   sep='   ', header=True)
+            #descrip_list.append(module.supported_metrics[metric_code].about)
+        table = (enabled_list, metrics_list, modules_list) #, descrip_list)
+        UI.columns(table, sep='   ', header=True)
         return
 
     def commit(self, time):

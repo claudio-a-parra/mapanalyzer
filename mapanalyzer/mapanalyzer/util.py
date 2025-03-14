@@ -107,7 +107,7 @@ class Palette:
             sat_list = [max(min(i,100),0) for i in sat]
         else:
             if sat < 1:
-                UI.error('Saturation count cannot be less than 1.')
+                UI.error('Saturation count (sat=) cannot be less than 1.')
             sat_range = 100 - s_off
             step = round(sat_range/(sat+1))
             sat_list = [sat_off+i*step for i in range(1, sat+1)]
@@ -117,7 +117,7 @@ class Palette:
             lig_list = [max(min(i,100),0) for i in lig]
         else:
             if lig < 1:
-                UI.error('Lighting count cannot be less than 1.')
+                UI.error('Lighting count (lig=) cannot be less than 1.')
             lig_range = 100 - l_off
             step = round(lig_range/(lig+1))
             lig_list = [lig_off+i*step for i in range(1, lig+1)]
@@ -127,7 +127,7 @@ class Palette:
             alp_list = [max(min(i,100),0) for i in alp]
         else:
             if alp < 1:
-                UI.error('Alpha count cannot be less than 1.')
+                UI.error('Alpha count (alp=) cannot be less than 1.')
             alp_range = 100 - a_off
             step = round(alp_range/(alp+1))
             alp_list = [alp_off+i*step for i in range(1, alp+1)]

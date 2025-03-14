@@ -327,10 +327,10 @@ class Aliasing(BaseModule):
 
         # set ticks based on the real limits
         cls.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
-                        bases=(10, 2))
+                        bases=(10, 2), include_last=(False, True))
 
         # overwrite Y ticks with "idle" and "busy"
-        text_ticks = ['' for _ in range(num_sets)]
+        text_ticks = ['' for _ in mpl_axes.get_yticks()]
         text_ticks[0] = 'idlest'
         text_ticks[-1] = 'busiest'
         mpl_axes.set_yticklabels(text_ticks)

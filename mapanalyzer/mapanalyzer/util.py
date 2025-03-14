@@ -406,7 +406,7 @@ class PlotFile:
         UI.text(filename, indent=False)
         return
 
-def sample_list(full_list, base=10, n=10):
+def sample_list(full_list, base=10, n=10, include_last=False):
     """
     return a list of ticks based on full_list. The idea is to find
     nice numbers (multiples of powers of 10 or 2) and not having
@@ -437,7 +437,14 @@ def sample_list(full_list, base=10, n=10):
         if found:
             break
 
-    tick_list = full_list[::tick_step]
+    tick_list = list(full_list[::tick_step])
+
+    # include last element of the list
+    if full_list[-1] - tick_list[-1] > tick_step/2:
+        tick_list.append(full_list[-1])
+    else:
+        tick_list[-1] = full_list[-1]
+
     return tick_list
 
 def command_line_args_parser():

@@ -151,7 +151,8 @@ class BaseModule:
         return computed_xy_lims
 
     @classmethod
-    def setup_ticks(cls, mpl_axes, xlims, ylims, bases, bg_mode=False):
+    def setup_ticks(cls, mpl_axes, xlims, ylims, bases, bg_mode=False,
+                    include_last=(False,False)):
         if bg_mode:
             mpl_axes.set_xticks([])
             mpl_axes.set_yticks([])
@@ -160,11 +161,12 @@ class BaseModule:
         ax_rotat = (-90 if st.Plot.x_orient == 'v' else 0, 0)
         ax_width = st.Plot.grid_width
         ax_lims = (xlims, ylims)
+        ax_inc_lst = (include_last)
         ax_bases = bases
         ax_mtick = st.Plot.ticks_max_count
         # set ticks
-        for ax,rt,wd,lm,bs,mt in zip(ax_names, ax_rotat, ax_width, ax_lims,
-                                     ax_bases, ax_mtick):
+        for ax,rt,wd,lm,il,bs,mt in zip(ax_names, ax_rotat, ax_width, ax_lims,
+                                        ax_inc_lst,ax_bases, ax_mtick):
             mpl_axes.tick_params(axis=ax, rotation=rt, width=wd)
             set_ticks = getattr(mpl_axes, f'set_{ax}ticks')
             if type(lm[0]) is float or type(lm[1]) is float:
@@ -177,7 +179,8 @@ class BaseModule:
             else:
                 full_list = range(lm[0], lm[1]+1)
 
-            ticks = sample_list(full_list, base=bs, n=mt)
+            ticks = sample_list(full_list, base=bs, n=mt,
+                                include_last=il)
             set_ticks(ticks)
 
             if ax == 'y':

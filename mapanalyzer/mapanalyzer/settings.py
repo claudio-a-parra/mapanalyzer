@@ -87,7 +87,7 @@ class Settings:
                     name_vals = {}
                     for line in cache_config_file:
                         # skip empty or comment
-                        if line == '' or line[0] == '#':
+                        if line == '\n' or line[0] == '#':
                             continue
                         # get rid of trailing comments
                         content_comment = line.split('#')

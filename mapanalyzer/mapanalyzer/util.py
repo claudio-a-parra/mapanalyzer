@@ -440,10 +440,12 @@ def sample_list(full_list, base=10, n=10, include_last=False):
     tick_list = list(full_list[::tick_step])
 
     # include last element of the list
-    if full_list[-1] - tick_list[-1] > tick_step/2:
-        tick_list.append(full_list[-1])
-    else:
-        tick_list[-1] = full_list[-1]
+    if include_last:
+        if full_list[-1] - tick_list[-1] > tick_step/2:
+            tick_list.append(full_list[-1])
+        else:
+            tick_list[-1] = full_list[-1]
+
 
     return tick_list
 

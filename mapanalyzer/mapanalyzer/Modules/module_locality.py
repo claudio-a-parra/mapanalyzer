@@ -56,16 +56,24 @@ class Locality(BaseModule):
 
         #####################################
         # SPATIAL LOCALITY ACROSS TIME
-        # time window chronological access: keeps the temporal order of accesses.
+        # time window chronological access: keeps the temporal order of
+        # accesses.
         # (access offset, size)
         self.tw_chro_acc = deque()
-        # time window byte counter: keeps one entry per accessed byte, counting
-        # repeated accesses to that byte.
+        # Time Window byte counter: Each entry has two elements: the byte
+        # offset, and the number of accesses to such byte:
         # {byte offset -> number of accesses}
+        #
+        # The Time Window table has up to <cache_size> entries. When that
+        # size is reached, counters are decremented (or removed) based on
+        # the rear-popped element from tw_chro_acc.
         self.tw_byte_count = {}
         self.tw_byte_count_max = st.Cache.cache_size
-        # Spatial Locality vector
+        # Spatial Locality vector: Contains the final SLD metric.
         self.Ls = [0] * st.Map.time_size
+        # the time at which the first (full) time window is completed. That is,
+        # the moment at which the Time Window Byte Counter table has to be
+        self.first_full_time_win = 0;
 
         #####################################
         ## TEMPORAL LOCALITY ACROSS SPACE
@@ -92,6 +100,8 @@ class Locality(BaseModule):
         # keep table of accesses under max by de-queuing from the
         # chronological queue.
         while len(self.tw_byte_count) > self.tw_byte_count_max:
+            if not self.first_full_time_win:
+                self.first_full_time_win = time
             old_off,old_size = self.tw_chro_acc.popleft()
             # decrement/remove bytes from table of bytes
             for b in range(old_off,old_off+old_size):
@@ -181,6 +191,7 @@ class Locality(BaseModule):
     def SLD_to_dict(self):
         return {
             'code' : 'SLD',
+            'first_full_time_win' : self.first_full_time_win,
             'Ls' : self.Ls
         }
 
@@ -193,6 +204,7 @@ class Locality(BaseModule):
     def dict_to_SLD(self, data):
         try:
             self.Ls = data['Ls']
+            self.first_full_time_win = data['first_full_time_win']
         except:
             class_name = self.__class__.__name__
             UI.error(f'{class_name}.dict_to_SLD(): Malformed data.')
@@ -217,12 +229,13 @@ class Locality(BaseModule):
 
         #####################################
         ## CREATE COLOR PALETTE
-        pal = Palette(hue=[self.hue],
+        pal = Palette(hue=[self.hue, self.hue+90],
                       # (line, _)
                       sat=st.Plot.p_sat,
                       lig=st.Plot.p_lig,
                       alp=st.Plot.p_alp)
         line_color = pal[0][0][0][0]
+        first_win_color = pal[1][0][0][0]
         line_width = st.Plot.p_lw
 
 
@@ -230,6 +243,13 @@ class Locality(BaseModule):
         ## PLOT METRIC
         mpl_axes.step(X, Y, where='mid', zorder=2, color=line_color,
                       linewidth=line_width)
+
+
+        #####################################
+        ## PLOT FIRST FULL TIME WINDOW
+        mpl_axes.axvline(x=self.first_full_time_win, zorder=1,
+                         color=first_win_color, linestyle='--',
+                         linewidth=1.5*line_width)
 
 
         ###########################################
@@ -251,7 +271,10 @@ class Locality(BaseModule):
 
         # insert text box with average usage
         if not bg_mode:
-            text = f'Avg {metric_code}: {sum(Y)/len(Y):.2f}%'
+            text_list = []
+            text_list.append(f'Avg {metric_code}: {sum(Y)/len(Y):.2f}%')
+            text_list.append(f'First time window: {self.first_full_time_win}')
+            text = '\n'.join(text_list)
             self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

@@ -605,8 +605,9 @@ class EvictionRoundtrip(BaseModule):
                     text_lines.append(f's{s} median MRI: {s_med:.1f}')
 
             # if too many lines, trim the list
-            if len(text_lines) > 16:
-                text_lines = text_lines[:8] + ['...'] + text_lines[-8:]
+            max_sets = 16
+            if len(text_lines) > max_sets:
+                text_lines = text_lines[:((max_sets+1)//2)] + ['...'] + text_lines[-(max_sets//2):]
 
             # try to be a smart-ass and place the textbox in a place where
             # it doesn't bother: look at where the avg of medians is, and
@@ -614,7 +615,7 @@ class EvictionRoundtrip(BaseModule):
             h_offset = 0.98
             lin_real_medians = [m for m in lin_medians if m is not None]
             if len(lin_real_medians) > 0:
-                avg_lin_medians = lin_real_medians/len(lin_real_medians)
+                avg_lin_medians = sum(lin_real_medians)/len(lin_real_medians)
                 peak_hist = avg_lin_medians / lin_bin_edges[-1]
                 h_offset = 0.02 if peak_hist > 0.5 else 0.98
             if metric_code not in st.Plot.textbox_offsets:

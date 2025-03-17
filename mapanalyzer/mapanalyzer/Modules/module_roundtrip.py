@@ -598,17 +598,29 @@ class EvictionRoundtrip(BaseModule):
             self.draw_textbox(mpl_axes, f'{metric_code}: NO DATA', metric_code,
                               off=(0.5,0.5))
         else:
-            text = []
+            # compose the text to display in the textbox. One line per set
+            text_lines = []
             for s,s_med in enumerate(medians):
                 if s_med is not None:
-                    s_med_txt = f'{s_med:.1f}'
-                else:
-                    s_med_txt = 'None'
-                text.append(f's{s} median MRI: {s_med_txt}')
-            '\n'.join(text)
-            # set default textbox to upper-right corner
+                    text_lines.append(f's{s} median MRI: {s_med:.1f}')
+
+            # if too many lines, trim the list
+            if len(text_lines) > 16:
+                text_lines = text_lines[:8] + ['...'] + text_lines[-8:]
+
+            # try to be a smart-ass and place the textbox in a place where
+            # it doesn't bother: look at where the avg of medians is, and
+            # avoid that area.
+            h_offset = 0.98
+            lin_real_medians = [m for m in lin_medians if m is not None]
+            if len(lin_real_medians) > 0:
+                avg_lin_medians = lin_real_medians/len(lin_real_medians)
+                peak_hist = avg_lin_medians / lin_bin_edges[-1]
+                h_offset = 0.02 if peak_hist > 0.5 else 0.98
             if metric_code not in st.Plot.textbox_offsets:
-                st.Plot.textbox_offsets[metric_code] = (0.98, 0.98)
+                st.Plot.textbox_offsets[metric_code] = (h_offset, 0.98)
+
+            # draw the text
             self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

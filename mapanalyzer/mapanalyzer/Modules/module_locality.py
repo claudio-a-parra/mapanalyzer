@@ -272,7 +272,7 @@ class Locality(BaseModule):
         # insert text box with average usage
         if not bg_mode:
             text_list = []
-            text_list.append(f'Avg {metric_code}: {sum(Y)/len(Y):.2f}%')
+            text_list.append(f'Avg {metric_code}: {sum(Y)/len(Y):.2f}')
             text_list.append(f'First time window: {self.first_full_time_win}')
             text = '\n'.join(text_list)
             self.draw_textbox(mpl_axes, text, metric_code)
@@ -338,7 +338,7 @@ class Locality(BaseModule):
 
         # insert text box with average usage
         if not bg_mode:
-            text = f'Avg {metric_code}: {sum(X)/len(X):.2f}%'
+            text = f'Avg {metric_code}: {sum(X)/len(X):.2f}'
             self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

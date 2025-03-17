@@ -156,7 +156,13 @@ class MemAccess(BaseModule):
         # insert text box with total read/write count
         if not bg_mode:
             text = (f'Total Read : {self.read_dist[-1]}\n'
-                    f'Total Write: {self.write_dist[-1]}')
+                    f'Total Write: {self.write_dist[-1]}\n'
+                    f'Memory Size [blocks]: {mem_size}')
+            # this plot always has lines in the top-right corner,
+            # so if user did not specify anything, let's put it in
+            # the top-left corner.
+            if metric_code not in st.Plot.textbox_offsets:
+                st.Plot.textbox_offsets[metric_code] = (0.02, 0.98)
             self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

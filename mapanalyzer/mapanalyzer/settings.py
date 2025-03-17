@@ -906,6 +906,10 @@ class Settings:
         # textbox horizontal and vertical offsets, {CODE -> (horiz,vert)}
         textbox_offsets = 'default'
 
+        # specific plot sizes per metric, {CODE -> (width,height)}
+        # If a code is not found here, then use Plot.width and Plot.height
+        plots_sizes = 'default'
+
         # Specific to MAP plot.
         # min_map_res is only used if the native resolution is too large (above
         # this maximum), and by trying to find a "nice" lower resolution, the
@@ -939,6 +943,8 @@ class Settings:
             cls.y_ranges = assg_val(cls.y_ranges, args.y_ranges)
             cls.textbox_offsets = assg_val(cls.textbox_offsets,
                                            args.textbox_offsets)
+            cls.plots_sizes = assg_val(cls.plots_sizes,
+                                           args.plots_sizes)
             cls.aggr_last_x = assg_val(cls.aggr_last_x, args.aggr_last_x)
             cls.plot_indiv_sets = assg_val(cls.plot_indiv_sets,
                                            args.plot_indiv_sets)
@@ -954,6 +960,7 @@ class Settings:
             cls.x_ranges = cls.__init_ranges(cls.x_ranges)
             cls.y_ranges = cls.__init_ranges(cls.y_ranges)
             cls.textbox_offsets = cls.__init_textbox_offsets()
+            cls.plots_sizes = cls.__init_plots_sizes()
             cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
                 cls.width, cls.height, cls.dpi, cls.max_map_res)
             if cls.roundtrip_threshold != 'all':
@@ -985,7 +992,8 @@ class Settings:
                     if min_val >= max_val:
                         UI.error(f'Plot Range min:{min_val} >= max:{max_val}.')
                     if met_code not in Settings.ALL_METRIC_CODES.keys():
-                        UI.error(f'Invalid metric code "{met_code}".')
+                        UI.error('Invalid metric code given to axes ranges: '
+                                 f'"{met_code}".')
 
                     ranges[met_code] = (min_val, max_val)
             return ranges
@@ -995,7 +1003,6 @@ class Settings:
             user_tboff = cls.textbox_offsets
             if user_tboff is None or user_tboff == 'default':
                 return {}
-            user_tb_off = str(user_tboff)
             user_offsets = [o.strip() for o in user_tboff.split(',')]
             offsets = {}
             for off in user_offsets:
@@ -1012,10 +1019,36 @@ class Settings:
                     UI.error(f'Vertical textbox offset value out of range '
                              '(0,1).')
                 if met_code not in Settings.ALL_METRIC_CODES.keys():
-                    UI.error(f'Invalid metric code "{met_code}".')
+                    UI.error('Invalid metric code given to textbox offsets: '
+                             f'"{met_code}".')
 
                 offsets[met_code] = (hor_val, ver_val)
             return offsets
+
+        @classmethod
+        def __init_plot_sizes(cls):
+            user_sizes = cls.plots_sizes
+            if user_sizes is None or user_sizes == 'default':
+                return {}
+            user_sizes = [o.strip() for o in user_sizes.split(',')]
+            sizes = {}
+            for sz in user_sizes:
+                try:
+                    met_code, width_val, height_val = sz.split(':')
+                    width_val = float(width_val)
+                    height_val = float(height_val)
+                except ValueError:
+                    UI.error(f'Plots Sizes with wrong format "{sz}".')
+                if width_val < 1:
+                    UI.error(f'Width too small.')
+                if height_val < 1:
+                    UI.error(f'Height too small.')
+                if met_code not in Settings.ALL_METRIC_CODES.keys():
+                    UI.error('Invalid metric code given to plots sizes: '
+                             f'"{met_code}".')
+
+                sizes[met_code] = (width_val, height_val)
+            return sizes
 
         @classmethod
         def __init_map_resolution(cls, width, height, dpi, max_res):

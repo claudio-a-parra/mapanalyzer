@@ -162,17 +162,25 @@ class Manager:
                     __name__
                 UI.warning(f'{bg_class_name}.{BG_to_plot}() not implemented.'
                            ' No background plot will be saved.')
+
+        # define the figure size for this particular plot
+        if metric_code in st.Plot.plots_sizes:
+            figsize = st.Plot.plots_sizes[metric_code]
+        else:
+            figsize = (st.Plot.width, st.Plot.height)
+
+        # create figures
         if BG_to_plot is not None and st.Metrics.bg != metric_code:
             fig,bg_axes = plt.subplots(
                 facecolor='white',
-                figsize=(st.Plot.width,st.Plot.height))
+                figsize=figsize)
             fg_axes = fig.add_axes(bg_axes.get_position())
             # draw background plot
             BG_to_plot(bg_axes, bg_mode=True)
         else:
             fig,fg_axes = plt.subplots(
                 facecolor='white',
-                figsize=(st.Plot.width, st.Plot.height))
+                figsize=figsize)
 
         # draw foreground plot
         fg_module = st.Metrics.available[metric_code]

@@ -524,14 +524,14 @@ def command_line_args_parser():
     parser.add_argument(
         '-pw', '--plot-width', metavar='WIDTH', dest='plot_width',
         type=float, default=None,
-        help=('Width of the plots.\n'
+        help=('Default width of the plots.\n'
               'Format: <integer>')
     )
 
     parser.add_argument(
         '-ph', '--plot-height', metavar='HEIGHT', dest='plot_height',
         type=float, default=None,
-        help=('Height of the plots.\n'
+        help=('Default height of the plots.\n'
               'Format: <integer>')
     )
 
@@ -596,6 +596,15 @@ def command_line_args_parser():
               'Format : full | <CODE>:<MIN>:<MAX>{,<CODE>:<MIN>:<MAX>}\n'
               '         Were <MIN> and <MAX> are numbers.\n'
               'Example: TLD:0.3:0.7,CMR:20:30,CMMA:0:6000')
+    )
+
+    parser.add_argument(
+        '-ps', '--plots-sizes', metavar='SIZES', dest='plots_sizes',
+        type=str, default=None,
+        help=('Set the width and height of individual plots. If not set, '
+              '-pw and -ph are used.\n'
+              'Format : default | <CODE>:<WIDTH>:<HEIGHT>{,<CODE>:<WIDTH>:<HEIGHT>}\n'
+              'Example: CUR:5:3.5,CMMA:8:4')
     )
 
     parser.add_argument(

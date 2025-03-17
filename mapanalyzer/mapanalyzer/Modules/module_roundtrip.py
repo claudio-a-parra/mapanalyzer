@@ -589,7 +589,7 @@ class EvictionRoundtrip(BaseModule):
         Y_max = int(max(max(i) if len(i) else 0 for i in counts))
         ylims = (0,max(Y_max,1))
         xlims = (1,max(1,global_max_interv))
-        self.__setup_hist_limits_and_ticks(
+        lin_xmax = self.__setup_hist_limits_and_ticks(
             mpl_axes, metric_code=metric_code, xlims=xlims, ylims=ylims,
             xticks=lin_bin_edges, xticks_labels=bin_edges)
 
@@ -607,22 +607,26 @@ class EvictionRoundtrip(BaseModule):
             # if too many lines, trim the list
             max_sets = 16
             if len(text_lines) > max_sets:
-                text_lines = text_lines[:((max_sets+1)//2)] + ['...'] + text_lines[-(max_sets//2):]
+                text_lines = text_lines[:((max_sets+1)//2)] + ['...'] + \
+                    text_lines[-(max_sets//2):]
 
-            # try to be a smart-ass and place the textbox in a place where
-            # it doesn't bother: look at where the avg of medians is, and
-            # avoid that area.
-            h_offset = 0.98
-            lin_real_medians = [m for m in lin_medians if m is not None]
-            if len(lin_real_medians) > 0:
-                avg_lin_medians = sum(lin_real_medians)/len(lin_real_medians)
-                peak_hist = avg_lin_medians / lin_bin_edges[-1]
-                h_offset = 0.02 if peak_hist > 0.5 else 0.98
+            # if the user did not specify where to put the textbox, provide
+            # a default value.
             if metric_code not in st.Plot.textbox_offsets:
+                # try to be a smart-ass and place the textbox in a place where
+                # it doesn't bother: look at where the avg of medians is, and
+                # avoid that area.
+                h_offset = 0.98
+                lin_real_medians = [m for m in lin_medians if m is not None]
+                if len(lin_real_medians) > 0:
+                    avg_lin_medians = sum(lin_real_medians) / \
+                        len(lin_real_medians)
+                    peak_hist = avg_lin_medians / lin_xmax
+                    h_offset = 0.02 if peak_hist > 0.5 else 0.98
                 st.Plot.textbox_offsets[metric_code] = (h_offset, 0.98)
 
             # draw the text
-            self.draw_textbox(mpl_axes, text, metric_code)
+            self.draw_textbox(mpl_axes, text_lines, metric_code)
 
         # set labels
         self.setup_labels(mpl_axes, met_str)
@@ -731,7 +735,8 @@ class EvictionRoundtrip(BaseModule):
         """
         Setup X and Y axes limits, ticks and labels. The X axis is a bit
         tricky because it has linear (0, 1, 2...) ticks, but it shows the
-        exponential scale (the tick "labels")
+        exponential scale (the tick "labels").
+        Returns the linear x_max value.
         """
         #####################################
         ## SET X-AXIS LIMITS AND TICK LABELS
@@ -793,7 +798,7 @@ class EvictionRoundtrip(BaseModule):
         wid = st.Plot.grid_width[1]
         mpl_axes.grid(axis='y', which='both', zorder=10, alpha=alp,
                               linestyle=sty, linewidth=wid)
-        return
+        return xmax_idx
 
     @classmethod
     def MRID_to_aggregated_plot(cls, all_pdata_dicts):

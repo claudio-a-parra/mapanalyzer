@@ -1026,7 +1026,7 @@ class Settings:
             return offsets
 
         @classmethod
-        def __init_plot_sizes(cls):
+        def __init_plots_sizes(cls):
             user_sizes = cls.plots_sizes
             if user_sizes is None or user_sizes == 'default':
                 return {}

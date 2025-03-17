@@ -187,7 +187,13 @@ class MemAccess(BaseModule):
         all_write = [m['fg']['write_dist'] for m in pdata_dicts]
         all_mem_size = [m['fg']['mem_size'] for m in pdata_dicts]
         all_line_size = [m['fg']['line_size'] for m in pdata_dicts]
-        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # define the figure size for this particular plot
+        if metric_code in st.Plot.plots_sizes:
+            figsize = st.Plot.plots_sizes[metric_code]
+        else:
+            figsize = (st.Plot.width, st.Plot.height)
+        fig,mpl_axes = plt.subplots(figsize=figsize)
 
 
         #####################################

@@ -817,7 +817,13 @@ class EvictionRoundtrip(BaseModule):
         all_interv_marks = [pd['fg']['dead_intervals']
                             for pd in all_pdata_dicts]
         num_pdatas = len(all_interv_marks)
-        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # define the figure size for this particular plot
+        if metric_code in st.Plot.plots_sizes:
+            figsize = st.Plot.plots_sizes[metric_code]
+        else:
+            figsize = (st.Plot.width, st.Plot.height)
+        fig,mpl_axes = plt.subplots(figsize=figsize)
 
         # obtain intervals and stats for each pdata_mark
         pdatas_intervs = []

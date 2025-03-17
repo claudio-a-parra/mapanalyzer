@@ -203,7 +203,14 @@ class Aliasing(BaseModule):
         # three-level list: (pdata, set, time)
         all_pdatas = [pd['fg']['set_aliasing'] for pd in pdata_dicts]
         num_pdatas = len(all_pdatas)
-        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # define the figure size for this particular plot
+        if metric_code in st.Plot.plots_sizes:
+            figsize = st.Plot.plots_sizes[metric_code]
+        else:
+            figsize = (st.Plot.width, st.Plot.height)
+        fig,mpl_axes = plt.subplots(figsize=figsize)
+
 
         # make sure all pdatas have the same number of sets
         all_num_sets = [0] * num_pdatas

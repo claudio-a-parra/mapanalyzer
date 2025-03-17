@@ -359,7 +359,13 @@ class Locality(BaseModule):
         # extract data from dictionaries and create figure
         total_pdatas = len(pdata_dicts)
         all_Y = [m['fg']['Ls'] for m in pdata_dicts]
-        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # define the figure size for this particular plot
+        if metric_code in st.Plot.plots_sizes:
+            figsize = st.Plot.plots_sizes[metric_code]
+        else:
+            figsize = (st.Plot.width, st.Plot.height)
+        fig,mpl_axes = plt.subplots(figsize=figsize)
 
 
         #####################################
@@ -459,7 +465,13 @@ class Locality(BaseModule):
         # extract data from dictionaries and create figure
         total_pdatas = len(pdata_dicts)
         all_X = [m['fg']['Lt'] for m in pdata_dicts]
-        fig,mpl_axes = plt.subplots(figsize=(st.Plot.width, st.Plot.height))
+
+        # define the figure size for this particular plot
+        if metric_code in st.Plot.plots_sizes:
+            figsize = st.Plot.plots_sizes[metric_code]
+        else:
+            figsize = (st.Plot.width, st.Plot.height)
+        fig,mpl_axes = plt.subplots(figsize=figsize)
 
 
         #####################################

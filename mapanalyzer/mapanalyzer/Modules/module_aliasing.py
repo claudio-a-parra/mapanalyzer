@@ -14,7 +14,7 @@ class Aliasing(BaseModule):
         'AD' : MetricStrings(
             about  = ('Proportion in which each set fetches blocks during '
                       'execution.'),
-            title  = 'Aliasing Density',
+            title  = 'AD',
             subtit = 'transparent is better',
             number = '05',
             xlab   = 'Time [access instr.]',

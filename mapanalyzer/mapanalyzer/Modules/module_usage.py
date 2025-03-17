@@ -12,7 +12,7 @@ class CacheUsage(BaseModule):
         'CUR' : MetricStrings(
             about  = ('Percentage of valid bytes in the cache that are used '
                       'before eviction.'),
-            title  = 'Cache Usage Ratio',
+            title  = 'CUR',
             subtit = 'higher is better',
             number = '04',
             xlab   = 'Time [access instr.]',

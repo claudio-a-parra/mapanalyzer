@@ -176,7 +176,7 @@ class Aliasing(BaseModule):
             self.setup_manual_grid(mpl_axes, axis='y', fn_axis='y',
                                    hlines=sets_separators,
                                    xlims=(xlims[0]-X_pad,xlims[1]+X_pad),
-                                   grid_color='#40BF40CC', zorder=10)
+                                   grid_color='#000000', zorder=10)
         else:
             self.setup_grid(mpl_axes, bg_mode=bg_mode)
 

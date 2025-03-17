@@ -129,7 +129,8 @@ class MemAccess(BaseModule):
         ## PLOT MEMORY SEGMENT SIZE
         # horizontal line with the size of the observed memory segment.
         # This size is in "blocks", as that is what this metric counts.
-        mem_size = st.Map.mem_size // st.Cache.line_size
+        mem_size = (st.Map.mem_size + st.Cache.line_size - 1) // \
+            st.Cache.line_size
         mem_size_color = Palette.from_hsla((120,50,75,100))
         mem_size_line_width = st.Plot.p_lw
         mpl_axes.axhline(y=mem_size, color=mem_size_color, zorder=2,

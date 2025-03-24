@@ -912,11 +912,12 @@ class Settings:
 
         # Specific to MAP plot.
         # min_map_res is only used if the native resolution is too large (above
-        # this maximum), and by trying to find a "nice" lower resolution, the
-        # only found is too low (below this minimum).
-        # If that is the case, then max_map_res is used.
+        # max_map_res), and by trying to find a "nice" lower resolution, the
+        # only one found is too low (below min_map_res).
+        # If that is the case, forget about "nice" lower resolution, and simply
+        # use max_map_res.
         #
-        # This is a derived value because sensible values is derived from the
+        # This is a derived value because sensible values are derived from the
         # width, height, and dpi given.
         min_map_res,max_map_res = 1, 'auto'
 
@@ -1055,9 +1056,9 @@ class Settings:
             # guess the number of pixels in the smallest width or height
             # of the plot area. Pick the smallest between that and the
             # minimum
-            min_res = round(min(0.9*min(width,height)*dpi,210))
+            min_res = round(min(0.9*min(width,height)*dpi,600))
             if max_res == 'auto':
-                max_res = round(min(0.9*min(width,height)*dpi,2310))
+                max_res = round(min(0.9*max(width,height)*dpi,2310)) #2310
             else:
                 try:
                     max_res = int(max_res)

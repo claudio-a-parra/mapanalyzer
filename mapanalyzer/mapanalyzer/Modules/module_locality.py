@@ -72,7 +72,8 @@ class Locality(BaseModule):
         # Spatial Locality vector: Contains the final SLD metric.
         self.Ls = [0] * st.Map.time_size
         # the time at which the first (full) time window is completed. That is,
-        # the moment at which the Time Window Byte Counter table has to be
+        # the moment at which the Time Window Byte Counter table reaches its
+        # maximum size and has to be trimmed.
         self.first_full_time_win = 0;
 
         #####################################
@@ -133,6 +134,7 @@ class Locality(BaseModule):
         if not self.enabled:
             return
 
+        # expensive operation...
         neig = sorted(list(self.tw_byte_count))
 
         # if only one access, there are no deltas to get, then, Ls[time] = 0

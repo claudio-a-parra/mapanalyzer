@@ -1058,7 +1058,7 @@ class Settings:
             # minimum
             min_res = round(min(0.9*min(width,height)*dpi,600))
             if max_res == 'auto':
-                max_res = round(min(0.9*max(width,height)*dpi,2310)) #2310
+                max_res = round(min(0.9*max(width,height)*dpi,2310))
             else:
                 try:
                     max_res = int(max_res)

@@ -16,7 +16,7 @@ class MemAccess(BaseModule):
             subtit = 'lower is better',
             number = '03',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Blocks Accessed in Main Memory [count]',
+            ylab   = 'Main Memory Accesses [blocks]',
         )
     }
     supported_aggr_metrics = {
@@ -26,7 +26,7 @@ class MemAccess(BaseModule):
             subtit = 'lower is better',
             number = '03',
             xlab   = 'Time [access instr.]',
-            ylab   = 'Cache Blocks Accessed in Main Memory [count]',
+            ylab   = 'Main Memory Accesses [blocks]',
         )
     }
 
@@ -309,6 +309,12 @@ class MemAccess(BaseModule):
         text.append(f'Max Avg Total Read Access : {max(R_avg):.0f}')
         text.append(f'Max Avg Total Write Access: {max(W_avg):.0f}')
         text.append(avg_mem_size_text)
+
+        # this plot always has lines in the top-right corner,
+        # so if user did not specify anything, let's put it in
+        # the top-left corner.
+        if metric_code not in st.Plot.textbox_offsets:
+            st.Plot.textbox_offsets[metric_code] = (0.02, 0.98)
         cls.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

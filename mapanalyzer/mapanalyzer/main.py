@@ -1,8 +1,10 @@
 #!/usr/bin/python3
+import runpy, sys
 from .settings import Settings as st
 from .cache import Cache
 from .ui import UI
-from .util import command_line_args_parser, MapDataReader, PdataFile
+from .util import command_line_args_parser, MapDataReader, PdataFile, \
+    PlotFile, Palette, sample_list, MetricStrings
 from . import Modules
 
 def simulate_mode(args):
@@ -138,9 +140,35 @@ def aggregate_mode(args):
         UI.indent_out()
     return
 
+def widget_mode(common_args, widget_argv):
+    if not common_args.script:
+        UI.error(f'No widget script provided!')
+
+    # compose new command line arguments
+    sys.argv = [common_args.script] + widget_argv
+
+    # add input files if there is any
+    if common_args.input_files:
+        sys.argv.append('--')
+        sys.argv.extend(common_args.input_files)
+
+    runpy.run_path(common_args.script, run_name="__main__",
+                   init_globals={
+                       "m_argv" : common_args,
+                       "st": st,
+                       "UI": UI,
+                       "PlotFile": PlotFile,
+                       "Palette": Palette,
+                       "sample_list": sample_list,
+                       "MetricStrings": MetricStrings,
+                       "Module_base": Modules.base.BaseModule,
+                   })
+    return
+
+
 def mode_dispatcher():
     # parse command line arguments
-    args = command_line_args_parser()
+    args, other_args = command_line_args_parser()
     st.set_mode(args)
     st.Plot.from_args(args)
     st.Metrics.from_args(args)
@@ -151,6 +179,8 @@ def mode_dispatcher():
         plot_mode(args)
     elif st.mode == 'aggregate':
         aggregate_mode(args)
+    elif st.mode == 'widget':
+        widget_mode(args, other_args)
     else:
         UI.error(f'Invalid mode "{args.mode}"')
 

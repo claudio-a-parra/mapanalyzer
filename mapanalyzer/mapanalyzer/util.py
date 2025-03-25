@@ -1,4 +1,4 @@
-import os, json
+import sys, os, json
 import colorsys # to convert from hls to rgb
 import matplotlib.pyplot as plt
 import argparse # to get command line arguments
@@ -468,14 +468,19 @@ def command_line_args_parser():
     examples = ('examples:\n'
                 '  Run cache simulation with a given configuration and \n'
                 '  produce metric and plot results:\n'
-                '      mapanalyzer --cache mycache.conf -- myexperiment.map\n'
+                '      mapanalyzer --mode simulate --cache mycache.conf -- '
+                'myexperiment.map\n'
                 '\n'
                 '  Plot the results of a previously simulated cache:\n'
                 '      mapanalyzer --mode plot -- myexperiment.json\n'
                 '\n'
                 '  Aggregate three different runs of the same experiment into\n'
                 '  a single plot:\n'
-                '      mapanalyzer --mode aggregate -- A.json B.json C.json\n')
+                '      mapanalyzer --mode aggregate -- A.json B.json C.json\n'
+                '\n'
+                '  Run your own script in mapanalyzer runtime environment:\n'
+                '      mapanalyzer --mode widget --script my_widget.py '
+                '--widgetArg 123 -- widget_input.txt')
 
     signature = ('By Claudio A. Parra.\n'
                  '2025.\n'
@@ -488,16 +493,9 @@ def command_line_args_parser():
 
     # Adding arguments
     parser.add_argument(
-        metavar='INPUT-FILE', dest='input_files', nargs='+',
-        type=str, default=None,
-        help=('List of input files. Depending on the analysis "mode", they\n'
-              'are either MAP or PDATA type.')
-    )
-
-    parser.add_argument(
         '--mode', metavar='MODE', dest='mode',
-        choices=['simulate', 'plot', 'sim-plot', 'aggregate'],
-        type=str, default=None,
+        choices=['simulate', 'plot', 'sim-plot', 'aggregate', 'widget'],
+        type=str, default='sim-plot',
         help=(
             'Defines the operation mode of the tool:\n'
             'simulate  : Only run the cache simulation.\n'
@@ -512,7 +510,16 @@ def command_line_args_parser():
             'aggregate : Plot the aggregation of multiple metric data files,\n'
             '            aggregating the ones of the same kind.\n'
             '              Input : list of PDATA files.\n'
-            '              Output: Aggregated PLOT files.')
+            '              Output: Aggregated PLOT files.\n'
+            'widget    : Run custom script using the tool\'s runtime.\n'
+            '            Experimental, you shouldn\'t need to use this.')
+    )
+
+    # Add script name
+    parser.add_argument(
+        '--script', metavar='SCRIPT', dest='script',
+        type=str, default=None,
+        help='Python file with the widget (used only in widget mode).'
     )
 
     parser.add_argument(
@@ -646,8 +653,29 @@ def command_line_args_parser():
               'Format: pdf | png')
     )
 
-    args = parser.parse_args()
-    return args
+    # split before and after '--'
+    if '--' in sys.argv:
+        sep_index = sys.argv.index('--')
+        before_double_dash = sys.argv[1:sep_index]
+        after_double_dash = sys.argv[sep_index + 1:]
+    else:
+        before_double_dash = sys.argv[1:]
+        after_double_dash = None
+
+    # parse arguments before '--'
+    known_args, other_args = parser.parse_known_args(before_double_dash)
+
+    # and add things after '--' as input files
+    known_args.input_files = after_double_dash
+
+    # add argument for help message
+    parser.add_argument(
+        '--', metavar='INPUT-FILE', dest='input_files', nargs='+',
+        type=str, default=None,
+        help=('List of input files. Depending on the analysis "mode".')
+    )
+
+    return (known_args, other_args)
 
 def median(full_list:list):
     med_idx = len(full_list) // 2

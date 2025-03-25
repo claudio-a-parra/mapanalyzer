@@ -45,7 +45,7 @@ class Aliasing(BaseModule):
         # window of last fetches
         self.time_window = deque()
         self.time_window_max_size = st.Cache.asso * st.Cache.num_sets
-        self.sets_counters = [0] * st.Cache.num_sets
+        self.fetch_count_per_set = [0] * st.Cache.num_sets
         self.sets_aliasing = [[0] * st.Map.time_size
                              for _ in range(st.Cache.num_sets)]
         return
@@ -57,12 +57,12 @@ class Aliasing(BaseModule):
 
         # append access to queue
         self.time_window.append((set_index,access_time))
-        self.sets_counters[set_index] += 1
+        self.fetch_count_per_set[set_index] += 1
 
-        # trim queue to fit max_size
+        # trim queue to fit up to max_size
         while len(self.time_window) > self.time_window_max_size:
             old_set_idx,_ = self.time_window.popleft()
-            self.sets_counters[old_set_idx] -= 1
+            self.fetch_count_per_set[old_set_idx] -= 1
         return
 
     def commit(self, time):
@@ -73,13 +73,15 @@ class Aliasing(BaseModule):
         # is just one fetch, this is not proof of imbalance, we may be doing
         # a perfect round robin. So, only account for aliasing when the
         # difference is at least 2.
-        if max(self.sets_counters) - min(self.sets_counters) < 2:
+        if max(self.fetch_count_per_set) - min(self.fetch_count_per_set) < 2:
             return
 
+        # time component of the most recent element of the window
         curr_time = self.time_window[-1][1]
-        tot_fetch = sum(self.sets_counters)
+        tot_fetch = sum(self.fetch_count_per_set)
         for s in range(st.Cache.num_sets):
-            self.sets_aliasing[s][curr_time] = self.sets_counters[s] / tot_fetch
+            self.sets_aliasing[s][curr_time] = self.fetch_count_per_set[s] \
+                / tot_fetch
         return
 
     def finalize(self):
@@ -139,19 +141,21 @@ class Aliasing(BaseModule):
 
         ###########################################
         ## OBTAIN AVERAGE LOAD IMBALANCE
-        imbal = [0] * st.Map.time_size
-        i = 0
-        for ith_dist in zip(*self.sets_aliasing):
-            if sum(ith_dist) > 0.001: # anything above 0 should do it
-                imbal[i] = max(ith_dist) - min(ith_dist)
-                i += 1
-        imbal = imbal[:i]
-        if i > 0:
-            imbal_avg = 100*sum(imbal)/len(imbal)
-        else:
-            imbal_avg = 0
-        imbal_txt = f'Average load imbalance: {imbal_avg:.2f}%'
+        # imbal = [0] * st.Map.time_size
+        # i = 0
+        # for ith_dist in zip(*self.sets_aliasing):
+        #     if sum(ith_dist) > 0.001: # anything above 0 should do it
+        #         imbal[i] = max(ith_dist) - min(ith_dist)
+        #         i += 1
+        # imbal = imbal[:i]
+        # if i > 0:
+        #     imbal_avg = 100*sum(imbal)/len(imbal)
+        # else:
+        #     imbal_avg = 0
+        # imbal_txt = f'Average load imbalance: {imbal_avg:.2f}%'
 
+        avg_aliasing = [sum(s_ali)/len(s_ali) for s_ali in self.sets_aliasing]
+        imbal_txt= avg_aliasing
 
         ###########################################
         ## PLOT VISUALS

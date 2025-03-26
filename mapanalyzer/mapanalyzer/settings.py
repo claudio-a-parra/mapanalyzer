@@ -704,7 +704,7 @@ class Settings:
             Temporarily set the cls.ID based on the common prefix of the paths
             (without their dirnames). If cls.from_dict or cls.from_file are
             later called, they update the ID based on that particular file"""
-            if len(input_files_paths) == 0:
+            if input_files_paths is None or len(input_files_paths) == 0:
                 UI.error('No input files were given.')
             elif len(input_files_paths) == 1:
                 cls.path_prefix = os.path.dirname(input_files_paths[0])

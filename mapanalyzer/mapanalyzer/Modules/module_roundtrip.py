@@ -680,13 +680,6 @@ class EvictionRoundtrip(BaseModule):
         # then create an extra bin to fit the largest interval
         if max_value is not None and bin_right_edges[-1] < max_value:
             bin_right_edges += [int(max_value+1)]
-        # else:
-        #     curr_idx = 0
-        #     for right_edge in bin_right_edges:
-        #         curr_idx += 1
-        #         if max_value < right_edge:
-        #             break
-        #     bin_right_edges = bin_right_edges[:curr_idx]
 
         # add the left edge of the first bin.
         return [0] + bin_right_edges

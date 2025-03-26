@@ -15,7 +15,7 @@ class Aliasing(BaseModule):
             about  = ('Proportion in which each set fetches blocks during '
                       'execution.'),
             title  = 'AD',
-            subtit = 'transparent is better',
+            subtit = 'transparent & even is better',
             number = '05',
             xlab   = 'Time [access instr.]',
             ylab   = 'Cache Sets',
@@ -26,7 +26,7 @@ class Aliasing(BaseModule):
             about  = ('Average proportion in which each set fetches blocks '
                       'during execution.'),
             title  = 'Cache Set Load Imbalance',
-            subtit = 'transparent is better',
+            subtit = 'transparent & even is better',
             number = '05',
             xlab   = 'Fetch Number',
             ylab   = 'Cache Sets',
@@ -140,22 +140,38 @@ class Aliasing(BaseModule):
 
 
         ###########################################
-        ## OBTAIN AVERAGE LOAD IMBALANCE
-        # imbal = [0] * st.Map.time_size
-        # i = 0
-        # for ith_dist in zip(*self.sets_aliasing):
-        #     if sum(ith_dist) > 0.001: # anything above 0 should do it
-        #         imbal[i] = max(ith_dist) - min(ith_dist)
-        #         i += 1
-        # imbal = imbal[:i]
-        # if i > 0:
-        #     imbal_avg = 100*sum(imbal)/len(imbal)
-        # else:
-        #     imbal_avg = 0
-        # imbal_txt = f'Average load imbalance: {imbal_avg:.2f}%'
+        ## DRAW SECOND Y AXIS WITH THE INTENSITY AND BALANCE
+        sets_list = list(range(st.Cache.num_sets))
+        sets_intensity = [100*sum(s_ali)/len(s_ali) for s_ali
+                          in self.sets_aliasing]
+        sum_intens = sum(sets_intensity)
+        if sum_intens == 0:
+            sets_balance = [0 for i in sets_intensity]
+        else:
+            sets_balance = [100*i/sum_intens for i in sets_intensity]
+        right_labels = [f'{i:6.2f}%,{b:6.2f}%' for i,b in
+                        zip(sets_intensity,sets_balance)]
 
-        avg_aliasing = [sum(s_ali)/len(s_ali) for s_ali in self.sets_aliasing]
-        imbal_txt= avg_aliasing
+        right_axis = mpl_axes.secondary_yaxis('right')
+        right_axis.set_yticks(sets_list)
+        right_axis.set_yticklabels(right_labels)
+        right_axis.set_ylabel("Intensity, Balance")
+        #right_axis.spines['right'].set_zorder(500)
+        right_axis.set_zorder(500)
+        right_axis.tick_params(
+            axis='y',
+            direction='in',        # tick labels face into the plot
+            pad=-95,               # move labels to the left
+            length=0,              # hide tick lines
+            right=True             # ensure it applies to right axis
+        )
+        for label in right_axis.get_yticklabels():
+            label.set_fontfamily("monospace")
+            label.set_zorder(5000)
+            label.set_bbox(dict(facecolor=st.Plot.tbox_bg,
+                                edgecolor=st.Plot.tbox_border,
+                                boxstyle="square,pad=0.2"))
+        
 
         ###########################################
         ## PLOT VISUALS
@@ -185,14 +201,15 @@ class Aliasing(BaseModule):
             self.setup_grid(mpl_axes, bg_mode=bg_mode)
 
         # insert text box with average load imbalance
-        if not bg_mode:
-            self.draw_textbox(mpl_axes, imbal_txt, metric_code)
+        # if not bg_mode:
+        #     self.draw_textbox(mpl_axes, imbal_txt, metric_code)
 
         # set labels
         self.setup_labels(mpl_axes, met_str, bg_mode=bg_mode)
 
         # title and bg color
         self.setup_general(mpl_axes, pal.bg, met_str, bg_mode=bg_mode)
+
         return
 
     @classmethod
@@ -244,7 +261,7 @@ class Aliasing(BaseModule):
 
         # enter each pdata, and sort the aliasings such that at time t,
         # set_0 becomes the idlest, and set_S-1 the busiest.
-        # save them in a compressed list all_short_pdatas
+        # save them in a compressed list all_compressed_pdatas
         all_compressed_pdatas = [[[] for _ in sets]
                                  for sets in all_pdatas]
         tth_alis = [0] * num_sets
@@ -254,9 +271,9 @@ class Aliasing(BaseModule):
                 for s in range(num_sets):
                     tth_alis[s] = pdat[s][t]
 
-                # if there is no fetches at this time, skip it.
-                if sum(tth_alis) < 0.00001: # comparing float to "zero"
-                    continue
+                # # if there is no fetches at this time, skip it.
+                # if sum(tth_alis) < 0.00001: # comparing float to "zero"
+                #     continue
 
                 # Otherwise, sort alias degrees (idle first, bussy last), and
                 # write their values to the compressed list
@@ -304,19 +321,37 @@ class Aliasing(BaseModule):
 
 
         ###########################################
-        ## OBTAIN AVERAGE LOAD IMBALANCE
-        imbal = [0] * time_size
-        i = 0
-        for ith_alis in zip(*avg_tier_aliasing):
-            if sum(ith_alis) > 0.00000001: # anything above 0 should do it
-                imbal[i] = ith_alis[-1] - ith_alis[0]
-                i += 1
-        imbal = imbal[:i]
-        if i > 0:
-            imbal_avg = 100*sum(imbal)/len(imbal)
+        ## DRAW SECOND Y AXIS WITH THE INTENSITY AND BALANCE
+        sets_list = list(range(num_sets))
+        sets_intensity = [100*sum(s_ali)/len(s_ali) for s_ali
+                          in avg_tier_aliasing]
+        sum_intens = sum(sets_intensity)
+        if sum_intens == 0:
+            sets_balance = [0 for i in sets_intensity]
         else:
-            imbal_avg = 0
-        imbal_text = f'Avg load imbalance: {imbal_avg:.2f}%'
+            sets_balance = [100*i/sum_intens for i in sets_intensity]
+        right_labels = [f'{i:6.2f}%,{b:6.2f}%' for i,b in
+                        zip(sets_intensity,sets_balance)]
+
+        right_axis = mpl_axes.secondary_yaxis('right')
+        right_axis.set_yticks(sets_list)
+        right_axis.set_yticklabels(right_labels)
+        right_axis.set_ylabel("Intensity, Balance")
+        #right_axis.spines['right'].set_zorder(500)
+        right_axis.set_zorder(500)
+        right_axis.tick_params(
+            axis='y',
+            direction='in',        # tick labels face into the plot
+            pad=-95,               # move labels to the left
+            length=0,              # hide tick lines
+            right=True             # ensure it applies to right axis
+        )
+        for label in right_axis.get_yticklabels():
+            label.set_fontfamily("monospace")
+            label.set_zorder(5000)
+            label.set_bbox(dict(facecolor=st.Plot.tbox_bg,
+                                edgecolor=st.Plot.tbox_border,
+                                boxstyle="square,pad=0.2"))
 
 
         #####################################
@@ -326,7 +361,7 @@ class Aliasing(BaseModule):
         if st.Plot.aggr_last_x:
             last_X_text = cls.draw_last_Xs(
                 mpl_axes, last_times, ylims=(ylims[0]-Y_pad,ylims[1]+Y_pad),
-                pre_text='Avg number of fetches')
+                pre_text='Avg numb fetche')
 
 
         #####################################
@@ -362,7 +397,12 @@ class Aliasing(BaseModule):
         text = [f'Executions: {num_pdatas}']
         if st.Plot.aggr_last_x:
             text.append(last_X_text)
-        text.append(imbal_text)
+
+        # this plot has text on the right side, so move the text to
+        # the left (if user did not specify anything).
+        if metric_code not in st.Plot.textbox_offsets:
+            st.Plot.textbox_offsets[metric_code] = (0.02, 0.98)
+
         cls.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

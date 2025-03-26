@@ -311,7 +311,7 @@ class BaseModule:
 
     @classmethod
     def draw_last_Xs(cls, mpl_axes, last_Xs, ylims,
-                     pre_text='Avg Exec Duration'):
+                     pre_text='Avg Exe Time'):
         pal = Palette(
             # (individual, avg)
             hue = ( 0,  0),
@@ -360,7 +360,7 @@ class BaseModule:
                         colors=avg_color, linestyles='solid',
                         linewidth=avg_line_width, zorder=3)
 
-        return f'Avg Memory Size [blocks]: {last_Y_avg:.0f}'
+        return f'Avg Mem Size [blks]: {last_Y_avg:.0f}'
 
     def export_plot(self, metric_code, mpl_axes, bg_mode=False):
         fn_name = f'{metric_code}_to_plot'

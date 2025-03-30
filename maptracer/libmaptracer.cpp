@@ -5,7 +5,7 @@ Copyright (C) 2023 Marco Bonelli.
 Copyright (C) 2024 Claudio Parra.
 SPDX-License-Identifier: MIT.
 
-This pintool with the header mem_tracer.h provides a tool to select a block of
+This pintool with the header maptracer.h provides a tool to select a block of
 memory allocated with malloc() (not working for calloc), and trace all
 accesses to such memory block. The tool records:
  - the timestamp of access.
@@ -56,22 +56,27 @@ struct tracked_malloc_block tracked_block
 Option for the pin command line tool. In this case: '-o output_filename'.
 Its default value is 'mem_access_pattern.map' */
 KNOB<std::string> map_filename(KNOB_MODE_WRITEONCE, "pintool", "o",
-                   "mem_access_pattern.map", "Name of the output file.");
+                               "mem_access_pattern.map",
+                               "Name of the output file.");
+
+KNOB<int> num_threads(KNOB_MODE_WRITEONCE, "pintool", "thr", "4",
+                      "Number of threads to expect from the "
+                      "application. Values: integers. (def: 4)");
 
 KNOB<std::string> collapse_time_jumps(KNOB_MODE_WRITEONCE, "pintool", "c",
                     "yes", "Allows collapsing those segments of time that have "
-                    "no events from any thread. Otherwise simulate continious "
-                    "execution. Values: yes (default), no.");
+                    "no events from any thread. Otherwise simulate continuous "
+                    "execution. Values: yes (def.), no.");
 
 
 /* Where to store the logs of each thread.
-Statically allocate MAX_THREADS Event traces (one for each possible thread in
+Statically allocate MAX_THREAD_ID+1 Event traces (one for each possible thread in
 the application). Each thread can register up to MAX_THR_EVENTS in their trace.
 
 The idea is to avoid dynamic allocation. Why? because we are measuring real
 time events and if we go down to the OS to request memory at runtime, well...
 we fuck up all the measurments. */
-UINT16 MAX_THREADS = 8;
+UINT16 MAX_THREAD_ID = 3;
 const UINT32 MAX_THR_EVENTS = 90000000; // 90,000,000 * 192 bytes
 static bool max_threads_warning_flag = false;
 std::stringstream metadata;
@@ -111,22 +116,23 @@ MergedTrace merged_trace={.list=NULL,
 
 /* ======== Utility functions ======== */
 /* core function that logs a thread event in the thread's queue */
-void log_event(const THREADID thrid, const event_t event,
+void log_event(const THREADID threadid, const event_t event,
                 const UINT32 size, const ADDRINT offset){
-    if(thrid > MAX_THREADS){
+    if(threadid > MAX_THREAD_ID){
         if(! max_threads_warning_flag){
-            warning << "WARNING: Application created more than "
-                    << MAX_THREADS << " threads. "
-                    << "Please change the MAX_THREADS value in libmaptracer.";
+            warning << "WARNING: Application created a thread with ID="
+                    << threadid << " which is greater than the max allowed. "
+                    << "Please give a bigger value to the pintool argument "
+                    << "'-thr'. Example: '-thr " << threadid <<"'" << std::endl;
             max_threads_warning_flag = true;
         }
         return;
     }
     // get new log index (tail of the queue)
-    UINT32 new_log_idx = thr_traces[thrid].size;
+    UINT32 new_log_idx = thr_traces[threadid].size;
     // just count if overflow
     if(new_log_idx >= MAX_THR_EVENTS){
-        thr_traces[thrid].overflow +=1;
+        thr_traces[threadid].overflow +=1;
         return;
     }
     // get timestamp
@@ -134,9 +140,9 @@ void log_event(const THREADID thrid, const event_t event,
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     UINT32 timestamp = (UINT32)(1000000000 * ts.tv_sec + ts.tv_nsec - basetime);
     // write access log
-    thr_traces[thrid].list[new_log_idx] =
-        (Event){timestamp,0,(UINT16)thrid,event,size,offset};
-    thr_traces[thrid].size += 1;
+    thr_traces[threadid].list[new_log_idx] =
+        (Event){timestamp,0,(UINT16)threadid,event,size,offset};
+    thr_traces[threadid].size += 1;
 }
 
 
@@ -200,13 +206,13 @@ VOID merge_traces(void){
     // 2. Get the minimum timestamp-gap between two consecutive sequential
     //    accesses in any thread. This will become the unit of coarse time.
     merged_trace.slice_size = UINT32_MAX;
-    for(UINT32 t=0; t<MAX_THREADS; t++){
-        if(thr_traces[t].size < 1)
+    for(UINT32 thr=0; thr<=MAX_THREAD_ID; thr++){
+        if(thr_traces[thr].size < 1)
             // this thread didn't register any access.
             continue;
-        merged_trace.list_len += thr_traces[t].size;
-        if(thr_traces[t].size < 2){
-            warning << "WARNING: Thread " << t << " registers only "
+        merged_trace.list_len += thr_traces[thr].size;
+        if(thr_traces[thr].size < 2){
+            warning << "WARNING: Thread " << thr << " registers only "
                     << "one event. Not useful to determine slice size."
                     << std::endl;
             continue;
@@ -214,9 +220,9 @@ VOID merge_traces(void){
         // find the minimum timestamp-gap between two consecutive accesses in
         // this thread.
         INT64 this_gap;
-        for(UINT32 j=0; j<thr_traces[t].size-2; j++){
+        for(UINT32 j=0; j<thr_traces[thr].size-2; j++){
             this_gap = \
-              thr_traces[t].list[j+1].time - thr_traces[t].list[j].time;
+              thr_traces[thr].list[j+1].time - thr_traces[thr].list[j].time;
             if(this_gap < merged_trace.slice_size)
                 merged_trace.slice_size = this_gap;
         }
@@ -241,13 +247,13 @@ VOID merge_traces(void){
     // Now merge events from thr_trace[] in merged_trace[] such that they are
     // globally sorted by their timestamp
     UINT64 this_timestamp, earliest_timestamp;
-    UINT32 *front = (UINT32*) calloc(MAX_THREADS, sizeof(UINT32));
+    UINT32 *front = (UINT32*) calloc(MAX_THREAD_ID+1, sizeof(UINT32));
     INT64 earliest_thread;
     for(UINT64 e=0; e<merged_trace.list_len; e++){
         // find the thread such that its front event is the earliest.
         earliest_thread = -1;
         earliest_timestamp = UINT64_MAX;
-        for(INT32 thr=0; thr<MAX_THREADS; thr++){
+        for(INT32 thr=0; thr<=MAX_THREAD_ID; thr++){
             // if the index to the front event in this thread trace is out of
             // boundaries, that means that this thread trace has no more events.
             if(front[thr] >= thr_traces[thr].size)
@@ -480,7 +486,7 @@ VOID image_load(IMG img, VOID* v) {
         RTN_InsertCall(start_routine,
                        IPOINT_BEFORE,
                        (AFUNPTR)action_start_tracing,
-                       // pass Pin-Thread ID
+                       // pass Pin-specific Thread ID
                        IARG_THREAD_ID,
                        IARG_END);
         RTN_Close(start_routine);
@@ -586,13 +592,13 @@ VOID Fini(INT32 code, VOID* v) {
 
     // count threads and detect whether there were events overflows in them
     UINT32 thread_count=0;
-    for(UINT32 i=0; i<MAX_THREADS; i++){
-        if(thr_traces[i].size < 1)
+    for(UINT32 thr=0; thr<=MAX_THREAD_ID; thr++){
+        if(thr_traces[thr].size < 1)
             continue;
         thread_count += 1;
-        if(thr_traces[i].overflow > 0){
-            warning << "Thread " << i << " could not register "
-                    << thr_traces[i].overflow << " events!" << std::endl;
+        if(thr_traces[thr].overflow > 0){
+            warning << "Thread " << thr << " could not register "
+                    << thr_traces[thr].overflow << " events!" << std::endl;
         }
     }
 
@@ -611,14 +617,14 @@ VOID Fini(INT32 code, VOID* v) {
 }
 
 
-/* ======== Help for user and Main ======== time,thread,event,size,offset */
+/* ======== Help for user and Main ======== */
 /* Help for the user */
 INT32 Usage() {
     std::cerr
         << std::endl
         << "Usage" << std::endl
         << std::endl
-        << "    pin -t (...)/mem_tracer.so [-c yes|no] -- "
+        << "    pin -t (...)/libmaptracer.so [-c yes|no] -thr NUM_THREADS -- "
       "<testing_application> [test_app_args]"
         << std::endl
         << std::endl
@@ -657,25 +663,38 @@ int main(int argc, char **argv) {
     // out of memory.
     // Use PIN_StopApplicationThreads(), so threads stop while allocating
     // memory, avoiding strange timings due to the mallocs.
-    thr_traces = (ThreadTrace*) calloc(MAX_THREADS, sizeof(ThreadTrace));
+    int user_num_threads = num_threads.Value();
+    if(user_num_threads < 1){
+        warning << "Wrong value given to '-thr'. It must be >=1." << std::endl;
+        MAX_THREAD_ID = 0;
+    }else{
+        MAX_THREAD_ID = user_num_threads - 1;
+    }
+    thr_traces = (ThreadTrace*) calloc(MAX_THREAD_ID+1, sizeof(ThreadTrace));
     if(!thr_traces){
-        error << "Could not allocate memory for thread traces array."
+        error << "Could not allocate memory for the array of thread_traces."
               << std::endl;
         Fini(0, NULL);
         exit(1);
     }
     Event *e_list;
-    for(UINT32 t=0; t<MAX_THREADS; t++){
+    for(UINT32 thr=0; thr<=MAX_THREAD_ID; thr++){
         e_list = (Event*) malloc(MAX_THR_EVENTS * sizeof(Event));
         if(!e_list){
             warning << "Could only allocate memory for "
-                    << t-1 <<" thread logs." << std::endl;
-            MAX_THREADS = t-1;
+                    << thr+1 <<" thread logs." << std::endl;
+            if(!thr){
+                error << "Could not allocate memory for a single thread log."
+                      << std::endl;
+                Fini(0, NULL);
+                exit(1);
+            }
+            MAX_THREAD_ID = thr - 1;
             break;
         }
-        thr_traces[t].list = e_list;
-        thr_traces[t].size = 0;
-        thr_traces[t].overflow = 0;
+        thr_traces[thr].list = e_list;
+        thr_traces[thr].size = 0;
+        thr_traces[thr].overflow = 0;
     }
 
 

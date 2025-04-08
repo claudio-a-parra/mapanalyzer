@@ -238,7 +238,11 @@ class Map(BaseModule):
             else:
                 block_sep = False
 
-        xmin,xmax = 0-0.5,st.Map.time_size-0.5
+        xmin,xmax = 0, st.Map.time_size-1
+        if 'MAP' in st.Plot.x_ranges:
+            xmin,xmax = st.Plot.x_ranges['MAP']
+        xmin,xmax = xmin-0.5,xmax+0.5
+
         line_color = Palette.from_hsla((self.hue, st.Plot.p_sat[0],
                                         st.Plot.p_lig[0], st.Plot.p_alp[0]))
         if byte_sep:
@@ -262,7 +266,12 @@ class Map(BaseModule):
 
     def __fade_padding_bytes(self, axes):
         fade_bytes_alpha=st.Plot.fade_bytes_alpha
-        xmin,xmax = 0-0.5,st.Map.time_size-0.5
+
+        xmin,xmax = 0, st.Map.time_size-1
+        if 'MAP' in st.Plot.x_ranges:
+            xmin,xmax = st.Plot.x_ranges['MAP']
+        xmin,xmax = xmin-0.5,xmax+0.5
+
         if st.Map.left_pad > 0:
             X = [xmin, xmax]
             axes.fill_between(

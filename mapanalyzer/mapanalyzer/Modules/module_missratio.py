@@ -191,14 +191,14 @@ class MissRatio(BaseModule):
                 avg = sum(thr_mr)/len(thr_mr)
                 text = f'Avg: {avg:.2f}%'
             else:
-                text = ''
+                text = []
                 thr_str_len = len(str(num_thrs))
                 for thr,thr_mr_obj in self.thread_miss_ratio.items():
                     thr_mr = thr_mr_obj.miss_ratio
                     avg = sum(thr_mr)/len(thr_mr)
-                    text += (f'Avg t{str(thr).ljust(thr_str_len)} '
-                             f'{metric_code}: {avg:.2f}%\n')
-                text = text[:-1]
+                    text.append(f'Avg t{str(thr).rjust(thr_str_len)} '
+                                f'{metric_code}: {avg:.2f}%')
+                text.sort()
             self.draw_textbox(mpl_axes, text, metric_code)
 
         # set labels

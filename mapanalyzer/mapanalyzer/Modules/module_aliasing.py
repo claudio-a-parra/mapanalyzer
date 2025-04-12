@@ -200,6 +200,10 @@ class Aliasing(BaseModule):
         else:
             self.setup_grid(mpl_axes, bg_mode=bg_mode)
 
+        # draw end of execution.
+        mpl_axes.vlines([xlims[1]], ymin=ylims[0]-Y_pad, ymax=ylims[1]+Y_pad,
+                        colors='black', linestyles='solid', linewidth=1, zorder=3)
+
         # insert text box with average load imbalance
         # if not bg_mode:
         #     self.draw_textbox(mpl_axes, imbal_txt, metric_code)

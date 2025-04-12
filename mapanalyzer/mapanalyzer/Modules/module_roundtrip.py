@@ -334,6 +334,11 @@ class EvictionRoundtrip(BaseModule):
                         mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
                         ylims=ylims, y_pad=Y_pad, invert_y=True)
 
+                    # draw end of execution.
+                    mpl_axes.vlines([xlims[1]], ymin=ylims[0]-Y_pad,
+                                    ymax=ylims[1]+Y_pad, colors='black',
+                                    linestyles='solid', linewidth=1, zorder=3)
+
                     # set ticks based on the real limits
                     self.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,
                                      bases=(10, 10), bg_mode=bg_mode)
@@ -462,6 +467,11 @@ class EvictionRoundtrip(BaseModule):
                     real_xlim, real_ylim = self.setup_limits(
                         mpl_axes, metric_code, xlims=xlims, x_pad=X_pad,
                         ylims=ylims, y_pad=Y_pad, invert_y=True)
+
+                    # draw end of execution.
+                    mpl_axes.vlines([xlims[1]], ymin=ylims[0]-Y_pad,
+                                    ymax=ylims[1]+Y_pad, colors='black',
+                                    linestyles='solid', linewidth=1, zorder=3)
 
                     # set ticks based on the real limits
                     self.setup_ticks(mpl_axes, xlims=real_xlim, ylims=real_ylim,

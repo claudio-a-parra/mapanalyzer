@@ -189,7 +189,7 @@ class MissRatio(BaseModule):
                 thr = list(self.thread_miss_ratio.keys())[0]
                 thr_mr = self.thread_miss_ratio[thr].miss_ratio
                 avg = sum(thr_mr)/len(thr_mr)
-                text = f'Avg: {avg:.2f}%'
+                text = f'Avg {metric_code}: {avg:.2f}%'
             else:
                 text = []
                 thr_str_len = len(str(num_thrs))

@@ -120,7 +120,7 @@ class Palette:
                 UI.error('Lighting count (lig=) cannot be less than 1.')
             lig_range = 100 - l_off
             step = round(lig_range/(lig+1))
-            lig_list = [lig_off+i*step for i in range(1, lig+1)]
+            lig_list = [l_off+i*step for i in range(1, lig+1)]
 
         # determine the list of alpha values
         if hasattr(alp, '__getitem__'):
@@ -130,7 +130,7 @@ class Palette:
                 UI.error('Alpha count (alp=) cannot be less than 1.')
             alp_range = 100 - a_off
             step = round(alp_range/(alp+1))
-            alp_list = [alp_off+i*step for i in range(1, alp+1)]
+            alp_list = [a_off+i*step for i in range(1, alp+1)]
 
         self.fg = self.__hsl2rgb(hue_list[0], 75,  10, 100)
         self.bg = self.__hsl2rgb(hue_list[0], 100, 100, 60)

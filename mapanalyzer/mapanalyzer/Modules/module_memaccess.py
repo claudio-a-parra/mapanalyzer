@@ -13,7 +13,7 @@ class MemAccess(BaseModule):
             about  = ('Cumulative distribution of main memory read/write '
                       'operations.'),
             title  = 'CMMA',
-            subtit = 'lower is better',
+            subtit = 'staircase-shaped is better',
             number = '03',
             xlab   = 'Time [access instr.]',
             ylab   = 'Main Memory Accesses [blocks]',
@@ -23,7 +23,7 @@ class MemAccess(BaseModule):
         'CMMA' : MetricStrings(
             about  = ('Average of cumulative main memory access.'),
             title  = 'Aggregated CMMA',
-            subtit = 'lower is better',
+            subtit = 'staircase-shaped is better',
             number = '03',
             xlab   = 'Time [access instr.]',
             ylab   = 'Main Memory Accesses [blocks]',

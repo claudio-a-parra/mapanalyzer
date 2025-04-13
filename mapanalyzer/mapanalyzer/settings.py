@@ -344,7 +344,7 @@ class Settings:
             # use the pdata bg unless user explicitly has set bg
             user_bg = pdata_bg
             if cls.bg_user_set:
-                user_bg = cls.bg
+                user_bg = cls.bg_user_set
 
             cls.bg = cls.__init_bg(user_bg, [pdata_bg], None)
             cls.initialized = True

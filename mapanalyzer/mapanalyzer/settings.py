@@ -910,16 +910,8 @@ class Settings:
         # If a code is not found here, then use Plot.width and Plot.height
         plots_sizes = 'default'
 
-        # Specific to MAP plot.
-        # min_map_res is only used if the native resolution is too large (above
-        # max_map_res), and by trying to find a "nice" lower resolution, the
-        # only one found is too low (below min_map_res).
-        # If that is the case, forget about "nice" lower resolution, and simply
-        # use max_map_res.
-        #
-        # This is a derived value because sensible values are derived from the
-        # width, height, and dpi given.
-        min_map_res,max_map_res = 1, 'auto'
+        # resolution of MAP plot.
+        map_res = 'auto'
 
         # Specific to SMRI.
         # draw segments of up to this length. If 'all', draw them all.
@@ -937,7 +929,7 @@ class Settings:
             cls.height = assg_val(cls.height, args.plot_height)
             cls.dpi = assg_val(cls.dpi, args.dpi)
             # overwritten by __init_derived_values()
-            cls.max_map_res = assg_val(cls.max_map_res, args.max_res)
+            cls.map_res = assg_val(cls.map_res, args.max_res)
             cls.format = assg_val(cls.format, args.format)
             cls.x_orient = assg_val(cls.x_orient, args.x_orient)
             cls.x_ranges = assg_val(cls.x_ranges, args.x_ranges)
@@ -962,8 +954,8 @@ class Settings:
             cls.y_ranges = cls.__init_ranges(cls.y_ranges)
             cls.textbox_offsets = cls.__init_textbox_offsets()
             cls.plots_sizes = cls.__init_plots_sizes()
-            cls.min_map_res,cls.max_map_res = cls.__init_map_resolution(
-                cls.width, cls.height, cls.dpi, cls.max_map_res)
+            cls.map_res = cls.__init_map_resolution(
+                cls.width, cls.height, cls.dpi, cls.map_res)
             if cls.roundtrip_threshold != 'all':
                 try:
                     cls.roundtrip_threshold = int(cls.roundtrip_threshold)
@@ -1052,19 +1044,19 @@ class Settings:
             return sizes
 
         @classmethod
-        def __init_map_resolution(cls, width, height, dpi, max_res):
-            # guess the number of pixels in the smallest width or height
-            # of the plot area. Pick the smallest between that and the
-            # minimum
-            min_res = round(min(0.9*min(width,height)*dpi,600))
+        def __init_map_resolution(cls, width, height, dpi, res):
+            # If 'auto', guess the number of pixels in the largest
+            # (width,height) of the plot area. Pick that or the maximum
+            max_res = 2310
             if max_res == 'auto':
-                max_res = round(min(0.9*max(width,height)*dpi,2310))
+                guess_ress = round(0.9*max(width,height)*dpi)
             else:
                 try:
-                    max_res = int(max_res)
+                    guess_res = int(max_res)
                 except:
                     UI.error(f'Error: max-res must be an integer or "auto".')
-            return (min_res,max_res)
+            res = min(max_res, guess_res)
+            return res
 
         @classmethod
         def describe(cls):
@@ -1076,7 +1068,7 @@ class Settings:
                 'grid_width', 'grid_style', 'grid_alpha',
                 'grid_max_bytes', 'grid_max_blocks', 'tbox_bg', 'tbox_border',
                 'tbox_font', 'tbox_font_size', 'fade_bytes_alpha',
-                'x_ranges', 'y_ranges', 'min_map_res', 'max_map_res',
+                'x_ranges', 'y_ranges', 'map_res',
                 'initialized'
             ]
             vals = [getattr(cls, at) for at in attrs]

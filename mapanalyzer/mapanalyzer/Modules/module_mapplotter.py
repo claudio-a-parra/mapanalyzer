@@ -1,5 +1,4 @@
 from matplotlib.colors import ListedColormap # for axes.imshow() color map
-from itertools import combinations # for resolution finding
 from math import prod # for resolution finding
 
 from ..settings import Settings as st
@@ -30,14 +29,10 @@ class Map(BaseModule):
             return
 
         # METRIC INTERNAL VARIABLES
-        # select the resolution of the map time-space grid. If too large, pick
-        # a value under max_res
-        map_mat_rows = Map.__sub_resolution_between(
-            st.Map.num_padded_bytes, st.Plot.min_map_res, st.Plot.max_map_res
-        )
-        map_mat_cols = Map.__sub_resolution_between(
-            st.Map.time_size, st.Plot.min_map_res, st.Plot.max_map_res
-        )
+        # select the resolution of the map time-space grid.
+        map_mat_rows = min(st.Plot.map_res, st.Map.num_padded_bytes)
+        map_mat_cols = min(st.Plot.map_res, st.Map.time_size)
+
         # cols: whole memory snapshot at a given instruction time
         # rows: byte (space) state across all instructions
         self.space_time = [[0] * map_mat_cols for _ in range(map_mat_rows)]
@@ -293,41 +288,3 @@ class Map(BaseModule):
                 zorder=0)
         return
 
-    @staticmethod
-    def __sub_resolution_between(native, min_res, max_res):
-        """Find a good lower resolution"""
-        if native < max_res:
-            return native
-
-        def prime_factors(n):
-            """Helper function to get prime factors"""
-            factors = []
-            while n % 2 == 0:
-                factors.append(2)
-                n //= 2
-            for i in range(3, int(n**0.5) + 1, 2):
-                while n % i == 0:
-                    factors.append(i)
-                    n //= i
-            if n > 2:
-                factors.append(n)
-            return factors
-
-        # Get the prime factors of the native resolution
-        factors = prime_factors(native)
-
-        # Generate all products of combinations of factors in descending order
-        power_set = sorted(
-            (prod(ps)
-             for r in range(1, len(factors) + 1)
-             for ps in combinations(factors, r)),
-            reverse=True
-        )
-
-        # Find the largest valid resolution within the range
-        for r in power_set:
-            if min_res <= r < max_res:
-                return r
-
-        # If no suitable resolution is found, return max_res as a fallback
-        return max_res

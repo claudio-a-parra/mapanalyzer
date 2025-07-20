@@ -1048,13 +1048,15 @@ class Settings:
             # If 'auto', guess the number of pixels in the largest
             # (width,height) of the plot area. Pick that or the maximum
             max_res = 2310
-            if max_res == 'auto':
+            guess_res = 1000
+            if res == 'auto':
                 guess_ress = round(0.9*max(width,height)*dpi)
             else:
                 try:
-                    guess_res = int(max_res)
+                    print("res:", res)
+                    guess_res = int(res)
                 except:
-                    UI.error(f'Error: max-res must be an integer or "auto".')
+                    UI.error(f'Error: MAP Resolution must be an integer or "auto".')
             res = min(max_res, guess_res)
             return res
 

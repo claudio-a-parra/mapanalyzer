@@ -4,9 +4,7 @@ Given that processing units such as CPU or GPU commonly access data through a _h
 
 The tool here presented allows the user to capture the memory access pattern exhibited by a section of a given program, and analyze its interaction with a memory hierarchy (cache memory) of user-defined characteristics.
 
-This analysis becomes a measurable definition of **Cache Frindliness** that goes beyond the simple count of Cache Misses, including more sophisticated metrics such as the distribution of *time* taken by memory blocks to be re-fetched from RAM after they have been evicted (Memory Roundtrip Intervals (MRI) Distribution)
-
-Most metrics are discrete-domain functions, i.e., they show instant snapshots throughout the entire execution, this allows to see their continuous change throughout the analyzed program's execution.
+This analysis is done through a set of **metrics** (described below), constituting a measurable definition of **Cache Frindliness** that goes beyond the simple count of Cache Misses, including more sophisticated metrics such as the distribution of *time* taken by memory blocks to be re-fetched from RAM after they have been evicted (Memory Roundtrip Intervals (MRI) Distribution)
 
 The purpose of Mapanalyzer is to offer a practical mechanism for observing and studying the memory access patterns produced by memory-intensive programs, facilitating the identification of bottlenecks and opportunities for better usage of a hierarchical memory system.
 
@@ -15,12 +13,13 @@ This tool is part of the [doctoral thesis of Claudio A. Parra](https://escholars
 ![Sample Plots](doc/sample-plots.png)
 
 ## Cache Friendliness Metrics
-
 Cache-friendliness is here characterized through metrics such as Spatial Locality Degree (SLD), Temporal Locality Degree (TLD), Cache Miss Ratio (CMR), Cumulative Main Memory Access (CMMA), Cache Utilization Ratio (CUR), and Aliasing Density (AD). 
 
 Each metric provides a unique perspective: locality degrees measure spatial and temporal memory access closeness; CMR quantifies efficiency through cache misses; CMMA tracks data movement between cache and main memory; CUR evaluates the extent of cache usage; and AD identifies problematic memory strides causing frequent cache conflicts (aliasing).
 
 The Memory Roundtrip Interval (MRI) is introduced, quantifying the time a memory block remains outside cache after eviction. Short roundtrip intervals are particularly costly in terms of performance, suggesting that blocks are evicted prematurely.
+
+Most metrics are discrete-domain functions, i.e., they show instant snapshots throughout the entire execution.
 
 A complete description of the here presented cache friendliness metrics can be found in the **third chapter** of the mentioned [thesis](https://escholarship.org/uc/item/8402z970).
 

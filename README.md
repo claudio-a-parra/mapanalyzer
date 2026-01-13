@@ -1,27 +1,28 @@
 # Memory Access Pattern (MAP) Analyzer
 
-Given that the CPU access data through a _hierarchy of memory_, the manner or _pattern_ in which an algorithm traverses memory has a big impact in the performance of such program.
+Given that processing units such as CPU or GPU commonly access data through a _hierarchy of memory_, the manner or _pattern_ in which an algorithm traverses memory has a big impact in the performance of such program.
 
 The tool here presented allows the user to capture the memory access pattern exhibited by a section of a given program, and analyze its interaction with a memory hierarchy (cache memory) of user-defined characteristics.
 
-This analysis becomes a measurable definition of **Cache Frindliness** that goes beyond the simple count of Cache Misses, including more sophisticated metrics such as the distribution of *time* taken by memory blocks to be re-fetched from RAM after they have been evicted (Memory Roundtrip Intervals Distribution)
+This analysis becomes a measurable definition of **Cache Frindliness** that goes beyond the simple count of Cache Misses, including more sophisticated metrics such as the distribution of *time* taken by memory blocks to be re-fetched from RAM after they have been evicted (Memory Roundtrip Intervals (MRI) Distribution)
 
-This tool is part of the [Ph.D dissertation of Claudio A. Parra](https://escholarship.org/uc/item/8402z970).
+Most metrics are discrete-domain functions, i.e., they show instant snapshots throughout the entire execution, this allows to see their continuous change throughout the analyzed program's execution.
+
+The purpose of Mapanalyzer is to offer a practical mechanism for observing and studying the memory access patterns produced by memory-intensive programs, facilitating the identification of bottlenecks and opportunities for better usage of a hierarchical memory system.
+
+This tool is part of the [doctoral thesis of Claudio A. Parra](https://escholarship.org/uc/item/8402z970).
 
 ![Sample Plots](doc/sample-plots.png)
 
 ## Cache Friendliness Metrics
-A complete description of the here presented cache friendliness metrics can be found in the **third chapter** of the thesis.
 
-For examples of these metrics applied to different matrix transposition algorithms, please refer to the **fifth chapter** of the thesis.
+Cache-friendliness is here characterized through metrics such as Spatial Locality Degree (SLD), Temporal Locality Degree (TLD), Cache Miss Ratio (CMR), Cumulative Main Memory Access (CMMA), Cache Utilization Ratio (CUR), and Aliasing Density (AD). 
 
-The following is a redacted excerpt of the abstract:
+Each metric provides a unique perspective: locality degrees measure spatial and temporal memory access closeness; CMR quantifies efficiency through cache misses; CMMA tracks data movement between cache and main memory; CUR evaluates the extent of cache usage; and AD identifies problematic memory strides causing frequent cache conflicts (aliasing).
 
-> Cache-friendliness is here characterized through metrics such as Spatial Locality Degree (SLD), Temporal Locality Degree (TLD), Cache Miss Ratio (CMR), Cumulative Main Memory Access (CMMA), Cache Utilization Ratio (CUR), and Aliasing Density (AD). 
+The Memory Roundtrip Interval (MRI) is introduced, quantifying the time a memory block remains outside cache after eviction. Short roundtrip intervals are particularly costly in terms of performance, suggesting that blocks are evicted prematurely.
 
-> Each metric provides a unique perspective: locality degrees measure spatial and temporal memory access closeness; CMR quantifies efficiency through cache misses; CMMA tracks data movement between cache and main memory; CUR evaluates the extent of cache usage; and AD identifies problematic memory strides causing frequent cache conflicts (aliasing).
-
-> Additionally, the concept of Memory Roundtrip Interval (MRI) is introduced, quantifying the time a memory block remains outside cache after eviction. Short roundtrip intervals are particularly costly in terms of performance, suggesting that blocks are evicted prematurely.
+A complete description of the here presented cache friendliness metrics can be found in the **third chapter** of the mentioned [thesis](https://escholarship.org/uc/item/8402z970).
 
 
 ## Main Components
@@ -35,7 +36,7 @@ The tool contains three parts:
 
 
 ## Installation
-The three mentioned components should be installed running
+The three mentioned components should be installed by running
 
 ``` shell
 make install
@@ -52,18 +53,15 @@ Alternatively, you could go to each sub-directory and run their own `make instal
 Subdirectories `maptrace` and `mapanalyzer` also have their own `make help` to see what the makefiles do.
 
 ## Usage
+Here is a quick guide with the most common options. A complete explanation of the usage is found in the **fourth** chapter of the mentioned [thesis](https://escholarship.org/uc/item/8402z970). 
 
-A complete explanation of the usage is found in the **fourth** chapter of the Ph.D. Thesis this tool belongs to.
-
-But here is the TL;DR: To capture the MAP of an instrumented application:
+To capture the MAP of an instrumented application:
 
 ``` shell
 pin -t path/to/libmaptracer.so -o path/to/mapfile.map -- <application and options>
 ```
 
-This will generate a file `path/to/mapfile.map`.
-
-Then, to plot the metrics:
+This will generate a file `path/to/mapfile.map`. Then, to plot the metrics:
 
 ``` shell
 # Using defaults options values.

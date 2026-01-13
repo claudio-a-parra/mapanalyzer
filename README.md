@@ -100,21 +100,22 @@ mapanalyzer -mc CUR -xr CUR:100:200 -xo h -- path/to/mapfile.map
 
 ## Examples
 
-MAP exhibited by bubble sort on a tiny array of integers `[1, 6, 3, 2, 4, 5]`.
+MAP of bubble sorting a tiny array of (4 bytes) integers `[1, 6, 3, 2, 4, 5]`. Dark red is read access. Light red is write access.
 ![Bubble Sort MAP plot](doc/example_map_bubblesort.png)
 
-MAP of a matrix transposition using the Cycles method (if you zoom in you can see that there are accesses all over the place) with one or two threads
+MAP of a matrix transposition using the Cycles method (if you zoom in you can see that there are accesses all over the place!) with one (left) and two (right) threads.
 ![Cycles Transposer MAP plot](doc/example_map_cycles.png)
 
-MAP of the same matrix transpositions but using the MaxSquare Algorithm (sequential)
+MAP of the same matrix transpositions but using the MaxSquare Algorithm. Top: sequential. Bottom: multi-threaded (8 threads)
 ![MaxSquare Transposer MAP plot](doc/example_map_maxsquare.png)
-
-MAP of Parallel MaxSquare Algorithm (multi-threaded)
 ![Parallel MaxSquare Transposer MAP plot](doc/example_map_maxsquare_8threads.png)
 
-Spatial (left) and Temporal (right) Locality Degree of Cycles (top) and MaxSquare (bottom) transposition algorithms.
+Spatial (left) and Temporal (right) Locality Degree of Cycles (top) and MaxSquare (bottom) transposition algorithms. Each color represents a different thread.
 ![Locality Degree Cycles](doc/example_loc_cycles.png)
 ![Locality Degree MaxSquare](doc/example_loc_maxsquare.png)
 
-Memory Roundtrip Distribution of Maxsquare
+Memory Roundtrip Distribution of Maxsquare matrix transposer. Most blocks, once evicted to main memory, stay in main memory for a large number of memory operations. This is quite homogeneous for all sets in the cache (s0-s7), indicating no significant cache aliasing.
 ![Memory Roundtrip Distribution MaxSquare](doc/example_mri_dist_maxsquare.png)
+
+Cumulative Main Memory Access of a hybrid matrix transposer that starts recursive, and under a certain sub-matrix size it switches to in-place (Cycles). The plot on the top-left shows the number of main memory accesses performed when the matrix is immediately transposed with Cycles. The bottom right, when the recursion is taken all the way to the base-case. The green line is the size of the matrix (in cache blocks)
+![Cumulative Main Memory Access Hybrid transposer](doc/example_cmma.png)

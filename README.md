@@ -6,7 +6,7 @@ The tool here presented allows the user to capture the memory access pattern exh
 
 This analysis becomes a measurable definition of **Cache Frindliness** that goes beyond the simple count of Cache Misses, including more sophisticated metrics such as the distribution of *time* taken by memory blocks to be re-fetched from RAM after they have been evicted (Memory Roundtrip Intervals Distribution)
 
-This tool is part of the [Ph.D dissertation of Claudio A. Parra](https://escholarship.org/uc/item/8402z97).
+This tool is part of the [Ph.D dissertation of Claudio A. Parra](https://escholarship.org/uc/item/8402z970).
 
 ![Sample Plots](doc/sample-plots.png)
 

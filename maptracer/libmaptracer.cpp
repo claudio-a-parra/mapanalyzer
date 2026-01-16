@@ -24,7 +24,8 @@ https://software.intel.com/sites/landingpage/pintool/docs/98869/Pin/doc/html/ind
 #include <iostream>
 #include <fstream>
 #include <iomanip> // to set doubles precision
-                   //
+#include <sstream>
+
 /* tracked memory block */
 struct tracked_malloc_block {
     ADDRINT start;     // First address of the block
@@ -652,11 +653,11 @@ INT32 Usage() {
 }
 
 int main(int argc, char **argv) {
-    // Initialize Pin lock, Pin itself, and Pin symbols
+    // Initialize
+    PIN_InitSymbols();
     PIN_InitLock(&pin_lock);
     if (PIN_Init(argc, argv))
         return Usage();
-    PIN_InitSymbols();
 
     // allocate space for the logs
     // Maybe implement a dynamic memory allocation system. to avoid running

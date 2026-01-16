@@ -1,5 +1,4 @@
-valgrind-3.21.0/
-valgrind-3.21.0.tar.bz2
-pin-3.28-98749-g6643ecee5-gcc-linux/source/tools/Config/makefile.unix.config
-pin-3.30-98830-g1d7b601b3-gcc-linux/
 **/__pycache__
+Dockerfile.devel
+run_docker.devel.sh
+publish/

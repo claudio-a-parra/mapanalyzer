@@ -10,9 +10,9 @@ The purpose of Mapanalyzer is to offer a practical mechanism for observing and s
 
 This tool is part of the [doctoral thesis of Claudio A. Parra](https://escholarship.org/uc/item/8402z970).
 
-![Sample Plots](doc/sample-plots.png)
+**You can see a little showcase with the most up-to-date MAP files, plot-data, and plots themselves (pdf), generated from the examples in `this-repo/examples/` in [parra-ca.github.io/mapanalyzer/](https://parra-ca.github.io/mapanalyzer/)**
 
-**You can see a little showcase with the most up-to-date MAP files, plot-data, and plots themselves (pdf), generated from the examples in `this-repo/examples/` here: [parra-ca.github.io/mapanalyzer/](https://parra-ca.github.io/mapanalyzer/)**
+![Sample Plots](doc/sample-plots.png)
 
 ## Cache Friendliness Metrics
 Cache-friendliness is here characterized through metrics such as Spatial Locality Degree (SLD), Temporal Locality Degree (TLD), Cache Miss Ratio (CMR), Cumulative Main Memory Access (CMMA), Cache Utilization Ratio (CUR), and Aliasing Density (AD). 
@@ -113,7 +113,7 @@ mapanalyzer -mc CUR -xr CUR:100:200 -xo h -- path/to/mapfile.map
 ```
 
 ## Examples
-**You can see a little showcase with the most up-to-date MAP files, plot-data, and plots themselves (pdf), generated from the examples in `this-repo/examples/` here: [parra-ca.github.io/mapanalyzer/](https://parra-ca.github.io/mapanalyzer/)**
+**You can see a little showcase with the most up-to-date MAP files, plot-data, and plots themselves (pdf), generated from the examples in `this-repo/examples/` in [parra-ca.github.io/mapanalyzer/](https://parra-ca.github.io/mapanalyzer/)**
 
 MAP of bubble sorting a tiny array of (4 bytes) integers `[1, 6, 3, 2, 4, 5]`. Dark red is read access. Light red is write access.
 ![Bubble Sort MAP plot](doc/example_map_bubblesort.png)

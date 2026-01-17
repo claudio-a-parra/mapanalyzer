@@ -6,7 +6,7 @@ on:
 
 jobs:
   #---------------------------------------
-  ci:
+  tests:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -42,7 +42,7 @@ jobs:
           path: public
 
   #---------------------------------------
-  pages:
+  showcase:
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04

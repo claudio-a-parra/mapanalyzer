@@ -25,7 +25,7 @@ EXAMPLES_SUBDIR_DEFAULT = "__EXPORT"
 EXAMPLES_SUBDIR = EXAMPLES_SUBDIR_DEFAULT
 INDEX_TEMPLATE = "index_template.html"
 INDEX = "index.html"
-HTML_PLACEHOLDER = "<li>__ITEMS_PLACEHOLDER__</li>"
+HTML_PLACEHOLDER = "<div>__ITEMS_PLACEHOLDER__</div>"
 
 
 def validate_root(given_root) -> Path:
@@ -98,7 +98,7 @@ def iter_example_files(example_dir: Path) -> Iterable[Path]:
                 yield p
 
 def render_items_html(*, root: Path, examples_base: Path) -> str:
-    items: list[str] = []
+    examples: list[str] = []
 
     example_dirs = sorted(
         (p for p in examples_base.iterdir() if p.is_dir()),
@@ -106,7 +106,7 @@ def render_items_html(*, root: Path, examples_base: Path) -> str:
     )
 
     for exdir in example_dirs:
-        exname = exdir.name
+        exname = exdir.name.title()
 
         files = list(iter_example_files(exdir))
         files.sort(key=lambda p: (kind_order(p), p.name))
@@ -117,16 +117,21 @@ def render_items_html(*, root: Path, examples_base: Path) -> str:
             display = p.name.removeprefix(f"{exname}_")
 
             file_lis.append(
-                "      <li>"
-                f'<span class="size">{html.escape(size)}</span> '
-                f'<a href="{html.escape(href(p, root=root))}">{html.escape(display)}</a>'
+                '<li class="file-item">'
+                f'<span class="file-size">{html.escape(size)}</span> '
+                f'<a class="file-name" href="{html.escape(href(p, root=root))}">{html.escape(display)}</a>'
                 "</li>"
             )
 
-        inner_ul = "    <ul>\n" + "\n".join(file_lis) + "\n    </ul>"
-        items.append(f"  <li>{html.escape(exname)}\n{inner_ul}\n  </li>")
+        file_list = ('<ul class="file-list">\n' +
+                    '\n'.join(file_lis) + '\n'
+                    '</ul>')
+        examples.append('<div class="example">\n'
+                        f'<h2 class="example-title">{html.escape(exname)}</h2>\n'
+                        f'{file_list}\n'
+                        '</div>')
 
-    return "\n".join(items)
+    return '\n'.join(examples)
 
 def main() -> int:
     if len(sys.argv) >= 2:

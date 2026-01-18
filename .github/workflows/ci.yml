@@ -43,7 +43,7 @@ jobs:
 
   #---------------------------------------
   showcase:
-    needs: ci
+    needs: tests
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:

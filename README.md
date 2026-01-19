@@ -65,6 +65,31 @@ Alternatively, you could go to each sub-directory (`pin`, `maptracer`, and `mapa
 
 Subdirectories `maptrace` and `mapanalyzer` also have their own `make help` to see what the makefiles do.
 
+
+## Instrumentation
+In order to instrument a piece of code and obtain the memory access pattern exhibited during its execution, you must use the maptracer interface (`mt_...` functions below):
+
+``` c
+//...
+#include <maptracer.h>;      // <-- Include the maptracer library
+//...
+int main(int argc, char **argv) {
+    //...
+    mt_select_next_block(); // <-- Tell maptracer that we will focus
+                            //     on the memory region returned by 
+                            //     the next malloc.
+    int *L = (int*)malloc(L_len*sizeof(int));
+    //...
+    mt_start_tracing();     // <-- Start collecting memory access
+                            //     operations in that region.
+
+    // work on that memory region...
+    
+    mt_stop_tracing();      // <-- Stop collecting data.
+    //...
+}
+```
+
 ## Usage
 Here is a quick guide with the most common options. A complete explanation of the usage is found in the **fourth** chapter of the mentioned [thesis](https://escholarship.org/uc/item/8402z970). 
 

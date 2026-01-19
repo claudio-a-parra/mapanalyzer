@@ -4,10 +4,12 @@ SHELL := /bin/bash
 .PHONY: help dependencies remove examples
 help:
 	@echo "TARGETS: "
-	@echo "    install : install pin, maptracer, and mapanalyzer"
-	@echo "    remove  : remove pin, maptracer, and mapanalyzer"
-	@echo "    help    : print this message"
-	@echo "    test    : test the installation of the components"
+	@echo "  dependencies  : install dependencies needed by mapanalyzer."
+	@echo "  install       : install pin, maptracer, and mapanalyzer."
+	@echo "  remove        : remove pin, maptracer, and mapanalyzer."
+	@echo "  help          : print this message."
+	@echo "  examples      : run examples (assuming you already installed mapanalyzer)."
+	@echo "  publish       : create showcase website with the examples."
 dependencies:
 	sudo dnf install --assumeyes make gcc gcc-c++ wget tar python3 python3-pip
 	python3 -m pip install setuptools wheel matplotlib jsonschema colorama
@@ -17,6 +19,9 @@ remove:
 	$(MAKE) -C pin remove
 examples:
 	make -C examples all
+
+examples-clean:
+	make -C examples clean
 
 
 .PHONY: install install_pin install_maptracer install_mapanalyzer
@@ -64,6 +69,6 @@ publish:
 	cp -r examples/__EXPORT/. public/examples/
 	cp examples/index_template.html examples/style.css public/
 	python3 examples/fill_template.py public/
-	rm public/index_template.html
+	rm -rf public/index_template.html public/examples/*/README.md
 clean:
 	rm -rf public

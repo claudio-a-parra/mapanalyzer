@@ -1,24 +1,26 @@
 SHELL := /bin/bash
 
-all_examples := $(patsubst ./%/,%,$(wildcard ./*/))
-out_dirs     := maps pdata plots aggr
-OUTS         := __EXPORT
+out_dirs     = maps pdata plots aggr
+OUTS         = __EXPORT
+all_examples = $(filter-out $(OUTS),$(patsubst ./%/,%,$(wildcard ./*/)))
 
-.PHONY: all
-all:
-	@for ex in $(all_examples); do \
-		echo -e "\nEXAMPLE $${ex^^}:"; \
-		$(MAKE) -C "$$ex" all; \
-		for outd in $(out_dirs); do \
-			if find "$${ex}/$${outd}" -type f -print -quit 2>/dev/null | grep -q .; then \
-				mkdir -p "$(OUTS)/$${ex}"; \
-				mv -t "$(OUTS)/$${ex}" "$${ex}/$${outd}"; \
-			fi; \
-		done; \
+
+.PHONY: all $(all_examples)
+all: $(all_examples)
+$(all_examples):
+	@echo -e "\n\033[1mEXAMPLE $@:\033[0m"
+	[[ -f "$@/export.sh" ]] || exit 1
+	./$@/export.sh
+	for outd in $(out_dirs); do \
+		compgen -G "$@/$${outd}/*" &>/dev/null || continue; \
+		mkdir -p "$(OUTS)/$@/$${outd}"; \
+		mv -t "$(OUTS)/$@/$${outd}" "$@/$${outd}"/*; \
+		cp "$@/README.md" "$(OUTS)/$@"; \
 	done
 
+
 clean:
-	rm -rf $(OUTS)
-	@for ex in $(all_examples); do \
+	rm -rf $(OUTS) index.html
+	for ex in $(all_examples); do \
 		$(MAKE) -C "$$ex" clean; \
 	done

@@ -1,0 +1,42 @@
+# binary arguments
+bin_args  = BIN_ARGS_PLACEHOLDER
+ex_name   = $(shell basename $$PWD)
+_empty   :=
+_space   := $(_empty) $(_empty)
+id_args   = $(subst $(_space),-,$(strip $(bin_args)))
+id_name   = $(ex_name)-$(id_args)
+
+source    = main.c
+binary    = $(ex_name)
+
+CC        = gcc
+CCOPTS    = -Wall -O0 -g
+CCLIBS    =
+lmt_path  = /usr/local/lib/libmaptracer.so
+
+dir_map   = maps
+dir_pdata = pdata
+dir_plot  = plots
+dir_aggr  = aggr
+
+timestamp = $(shell date +%Y%m%d_%H%M%S)
+map_file  = $(id_name).$(timestamp).map
+pin_num_threads = 1
+
+# mapanalyzer options
+MA_CACHE   = cache.conf
+MA_WIDTH   = 8
+MA_HEIGHT  = 4.5
+MA_DPI     = 600
+MA_MAXRES  = auto
+MA_METRICS = all
+MA_BGMET   = MAP
+MA_XRANGES = full
+MA_YRANGES = full
+MA_XORIENT = v
+MA_SMRITHR = all
+MA_TBOXOFF = default
+MA_PLSIZES = default
+MA_FORMAT  = pdf
+# MA_FLAGS = -Lx -Is
+MA_FLAGS = -Is

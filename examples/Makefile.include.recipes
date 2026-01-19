@@ -1,0 +1,118 @@
+.PHONY: all help clean mkdirs
+all: help
+help:
+	@echo "TARGETS"
+	@echo "    build    : build the $(ex_name) binary './$(binary)'"
+	@echo
+	@echo "    run      : simply run './$(binary) $(bin_args)'. Nothing special."
+	@echo
+	@echo "    map      : run './$(binary) $(bin_args)', but this time, capturing"
+	@echo "               its MAP into './$(dir_map)/$(id_name).YYYYMMDD_HHmm.map'"
+	@echo
+	@echo "    plot     : Plot a captured MAP, leaving the results in "
+	@echo "               './$(dir_pdata)/*.json' and './$(dir_plot)/*.{pdf,png,jpg}'"
+	@echo
+	@echo "    aggregate: aggregate all the pdata files found in'./$(dir_pdata)/'"
+	@echo
+	@echo "    export   : Execute the 'export.sh' script of this example (if any),"
+	@echo "               which internally calls make with different variables for"
+	@echo "               more complex builds. It should do all the job."
+	@echo
+	@echo "    clean    : Remove binary and output directories."
+	@echo
+	@echo "Targets don't invoke each other to complete their prerequisites."
+mkdirs:
+	@mkdir -p ./$(dir_map) ./$(dir_pdata) ./$(dir_plot)
+clean:
+	rm -rf $(binary) $(dir_map) $(dir_pdata) $(dir_plot) $(dir_aggr)
+
+
+
+############################################################
+# BUILD
+build: $(binary)
+$(binary): $(source)
+	@echo "BUILDING: (map_file: $(map_file))"
+	$(CC) $(CCOPTS) -o $(binary) $(source) $(CCLIBS)
+
+
+
+############################################################
+# RUN
+run: $(binary)
+	./$(binary) $(bin_args)
+
+
+
+############################################################
+# MAP
+map: ./$(dir_map)/$(map_file)
+	@echo "MAPPING: (map_file: $(map_file))"
+	@echo $< '('$$(numfmt --to=iec --suffix=B $$(stat -c %s $<))')'
+	@if [[ "$$(cat $< | wc -l)" -gt 21 ]]; then \
+		(head -n15 $< && echo '...' && tail -n5 $<) ;\
+	else \
+		cat $< ;\
+	fi | awk '/^#/{print "    " $$0} !/^#/ && NF {print "    " $$0}'; echo
+
+./$(dir_map)/$(map_file): $(binary) | mkdirs
+	pin -t $(lmt_path) -o $@ -thr $(pin_num_threads) -- ./$(binary) $(bin_args)
+	@if [[ ! -f $@ ]]; \
+		then echo "Pin did not create a MAP file."; \
+		exit 1; \
+	fi
+
+
+
+############################################################
+# PLOT
+plot: mkdirs
+	@echo "PLOTTING: (map_file: $(map_file))"
+	if ! compgen -G "./$(dir_map)/$(id_name)*.map" &>/dev/null; then\
+		echo -e 'Not found: ./$(dir_map)/$(id_name)*.map\nNothing to plot.'; \
+		exit 1; \
+	fi
+	mapanalyzer \
+		--mode sim-plot \
+		--cache $(MA_CACHE) \
+		--max-res $(MA_MAXRES) \
+		--metrics "$(MA_METRICS)" \
+		--background-metric $(MA_BGMET) \
+		--plot-width $(MA_WIDTH) \
+		--plot-height $(MA_HEIGHT) \
+		--dpi $(MA_DPI) \
+		--x-ranges "$(MA_XRANGES)" \
+		--y-ranges "$(MA_YRANGES)" \
+		--x-tick-ori $(MA_XORIENT) \
+		--short-roundtrip-threshold $(MA_SMRITHR) \
+		--textbox-offsets "$(MA_TBOXOFF)" \
+		--plots-sizes "$(MA_PLSIZES)" \
+		--format $(MA_FORMAT) $(MA_FLAGS) \
+		-- ./$(dir_map)/$(map_file)
+	mv *.json ./$(dir_pdata)
+	mv *.$(MA_FORMAT) ./$(dir_plot)
+
+
+
+############################################################
+# AGGREGATE
+aggregate: mkdirs
+	@echo "AGGREGATING: (map_file: $(map_file))"
+	if ! compgen -G "./$(dir_pdata)/*.json" &>/dev/null; then \
+		echo -e 'Not found: ./$(dir_pdata)/*.json\nNothing to aggregate.'; \
+		exit 1; \
+	fi
+	mapanalyzer \
+		--mode aggregate \
+		--plot-width $(MA_WIDTH) \
+		--plot-height $(MA_HEIGHT) \
+		--dpi $(MA_DPI) \
+		--x-ranges "$(MA_XRANGES)" \
+		--y-ranges "$(MA_YRANGES)" \
+		--x-tick-ori $(MA_XORIENT) \
+		--short-roundtrip-threshold $(MA_SMRITHR) \
+		--textbox-offsets "$(MA_TBOXOFF)" \
+		--plots-sizes "$(MA_PLSIZES)" \
+		--format $(MA_FORMAT) $(MA_FLAGS) \
+		-- ./$(dir_pdata)/$(name)*.json
+	mv *.$(MA_FORMAT) ./$(dir_aggr)

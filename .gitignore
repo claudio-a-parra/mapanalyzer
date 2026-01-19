@@ -2,3 +2,4 @@
 Dockerfile.devel
 run_docker.devel.sh
 publish/
+public/

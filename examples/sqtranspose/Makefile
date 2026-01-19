@@ -1,7 +1,7 @@
 include ../Makefile.include.variables
 
-LS       := 6
-RS       := 0
-bin_args := $(LS) $(RS)
+MAT_SZ   := 50
+ALG      := n
+bin_args := $(MAT_SZ) $(ALG)
 
 include ../Makefile.include.recipes

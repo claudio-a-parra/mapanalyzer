@@ -4,22 +4,34 @@
 }
 h1 {
     text-align: center;
+    margin-bottom: 0;
 }
-.intro, .footer {
+strong {
+    font-weight: bold;
+}
+p.subtitle {
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+.intro{
     margin-block: 1em;
     padding: 1em;
     max-width: 80ch;
     margin-inline: auto;
 }
-.footer {
-    text-align: center;
+
+.intro > p {
+    margin: 0;
 }
+
 .example {
     background-color: #f8f8f8;
     border-radius: 1em;
     padding: 1em;
     max-width: 80ch;
-    margin: auto;
+    margin-inline: auto;
+    margin-block: 1em;
 }
 .example-title {
     margin: 0.2em;
@@ -27,8 +39,37 @@ h1 {
 .file-list {
     margin-top: 0.2em;
 }
-li > span.file-size {
+.file-size {
     min-width: 4em;
     display: inline-block;
     text-align: right;
+}
+.file-name {
+    font-family: ui-monospace,
+                 SFMono-Regular,
+                 Menlo,
+                 Monaco,
+                 Consolas,
+                 "Liberation Mono",
+                 monospace;
+    text-decoration: none;
+}
+.file-name:hover {
+    text-decoration: underline;
+}
+
+pre {
+    padding: 0.75rem;
+    background: #fAf6e0;
+    overflow: auto;
+}
+code {
+    font-size: 0.85em;
+    font-family: ui-monospace,
+                 SFMono-Regular,
+                 Menlo,
+                 Monaco,
+                 Consolas,
+                 "Liberation Mono",
+                 monospace;
 }

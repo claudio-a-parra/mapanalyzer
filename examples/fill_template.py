@@ -17,7 +17,9 @@ if
 from __future__ import annotations
 
 import sys
+import os
 import html
+import pypandoc
 from pathlib import Path
 from typing import Iterable
 
@@ -26,6 +28,8 @@ EXAMPLES_SUBDIR = EXAMPLES_SUBDIR_DEFAULT
 INDEX_TEMPLATE = "index_template.html"
 INDEX = "index.html"
 HTML_PLACEHOLDER = "<div>__ITEMS_PLACEHOLDER__</div>"
+BASELINK = "https://github.com/parra-ca/mapanalyzer/tree/main/examples/"
+SUBDIRS = ("maps", "pdata", "plots", "aggr")
 
 
 def validate_root(given_root) -> Path:
@@ -56,9 +60,11 @@ def validate_root(given_root) -> Path:
         f"- and   : {given_root}/{INDEX_TEMPLATE}"
     )
 
+
 def href(p: Path, *, root: Path) -> str:
     # relative link from site root
     return p.relative_to(root).as_posix()
+
 
 def human_size(nbytes: int) -> str:
     units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"]
@@ -77,25 +83,56 @@ def human_size(nbytes: int) -> str:
         s = f"{v:.1f}".rstrip("0").rstrip(".")
     return f"{s}{units[u]}"
 
-def kind_order(p: Path) -> int:
-    ext = p.suffix.lower()
-    if ext == ".map":
-        return 0
-    if ext == ".json":
-        return 1
-    if ext == ".pdf":
-        return 2
-    return 3
 
-def iter_example_files(example_dir: Path) -> Iterable[Path]:
-    # Files live under these subdirectories (some may be absent).
-    for sub in ("maps", "pdata", "plots", "aggr"):
+def drop_last_line(md: str) -> str:
+    """remove the last (real) Markdown line"""    
+    md = md.replace("\r\n", "\n").replace("\r", "\n")
+    lines = md.strip().split("\n")
+    lines = lines[:-1]
+    return "\n".join(lines) + "\n"
+
+
+def files_by_subdir(example_dir: Path) -> dict[str, list[Path]]:
+    """return {'maps' -> [files in map]), 'pdata' -> ..., }"""
+    grouped: dict[str, list[Path]] = {}
+    for sub in SUBDIRS:
         d = example_dir / sub
         if not d.is_dir():
             continue
-        for p in d.rglob("*"):
-            if p.is_file():
-                yield p
+        files = [p for p in d.rglob("*") if p.is_file()]
+        if files:
+            files.sort()
+            grouped[sub] = files
+    return grouped
+
+
+def render_file_groups_html(*, example_dir: Path, root: Path) -> str:
+    grouped = files_by_subdir(example_dir)
+    if not grouped:
+        return ""
+
+    kind_lists: list[str] = []
+    for kind_name, kind_files in grouped.items():
+        this_kind_items: list[str] = []
+        for p in kind_files:
+            size = human_size(p.stat().st_size)
+            display = p.name
+            this_kind_items.append(
+                '<li class="file-item">'
+                f'<span class="file-size">{html.escape(size)}</span> '
+                f'<a class="file-name" href="{html.escape(href(p, root=root))}">{html.escape(display)}</a>'
+                "</li>"
+            )
+
+        kind_lists.append(
+            '<li class="kind-item">'
+            f'<span class="kind-name">{html.escape(kind_name)}</span>\n'
+            f'<ul class="file-list">\n' + "\n".join(this_kind_items) + "\n</ul>\n"
+            "</li>"
+        )
+
+    return '<ul class="kind-list">\n' + "\n".join(kind_lists) + "\n</ul>\n"
+
 
 def render_items_html(*, root: Path, examples_base: Path) -> str:
     examples: list[str] = []
@@ -105,30 +142,46 @@ def render_items_html(*, root: Path, examples_base: Path) -> str:
         key=lambda p: p.name,
     )
 
-    for exdir in example_dirs:
-        exname = exdir.name.title()
+    for example_dir in example_dirs:
+        example_name = example_dir.name
 
-        files = list(iter_example_files(exdir))
-        files.sort(key=lambda p: (kind_order(p), p.name))
+        # create title for this example
+        href_id = example_name.replace(" ", "_").lower()
+        pretty_name = example_name.title()
+        src_link = BASELINK + example_name
+        title_html = f'<h2 id="{href_id}" class="example-title">' +\
+            f'{html.escape(pretty_name)} (<a href="{src_link}">source</a>)' +\
+            f'</h2>\n'
 
-        file_lis: list[str] = []
-        for p in files:
-            size = human_size(p.stat().st_size)
-            display = p.name.removeprefix(f"{exname}_")
-
-            file_lis.append(
-                '<li class="file-item">'
-                f'<span class="file-size">{html.escape(size)}</span> '
-                f'<a class="file-name" href="{html.escape(href(p, root=root))}">{html.escape(display)}</a>'
-                "</li>"
+        
+        # get text from README.md and inject as html
+        readme_path = example_dir / "README.md"
+        if readme_path.is_file():
+            # last line is a link to this same page. drop it.
+            readme_md = drop_last_line(
+                readme_path.read_text(encoding="utf-8")
             )
+            readme_html = pypandoc.convert_text(
+                readme_md,
+                to="html5",
+                format="md",
+                extra_args=["--shift-heading-level-by=2"],
+            )
+            readme_html = f'<div class="readme">\n{readme_html}\n</div>\n'
+        else:
+            readme_html = ""
 
-        file_list = ('<ul class="file-list">\n' +
-                    '\n'.join(file_lis) + '\n'
-                    '</ul>')
+        # compose list of files
+        grouped_file_list_html =  render_file_groups_html(
+            example_dir=example_dir,
+            root=root,
+        )
+            
+        # put all parts together for this example (in one div)
         examples.append('<div class="example">\n'
-                        f'<h2 class="example-title">{html.escape(exname)}</h2>\n'
-                        f'{file_list}\n'
+                        f'{title_html}'
+                        f'{readme_html}'
+                        f'{grouped_file_list_html}'
                         '</div>')
 
     return '\n'.join(examples)
